@@ -9,24 +9,43 @@ import {
   Avatar,
 } from '@mui/material';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import {API_ENDPOINTS} from '../api/endpoint';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+
+
+function onLogin(token){
+  localStorage.setItem("token",token);
+}
 
 function LoginPage() {
+  localStorage.setItem("token",'');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const [errors, setErrors] = useState({ email: false, password: false });
-
-  const handleLogin = () => {
+  const [errors, setErrors] = useState({ email: false, password: false,message: null });
+  const navigate = useNavigate();
+  const handleLogin = async () => {
     let newErrors = { email: false, password: false };
     if (!email) newErrors.email = true;
     if (!password) newErrors.password = true;
     setErrors(newErrors);
 
     if (!newErrors.email && !newErrors.password) {
-      alert(`Logging in with email: ${email}`);
-      // Add real login logic here
+      try {
+      const response = await axios.post(API_ENDPOINTS.login, { "userName": email, "pass":password });
+      const token = response.data.token;
+      onLogin(token);
+      navigate('/submit');
+      setErrors('');
+      } catch (err) {
+        console.error('Login failed:', err);
+      setErrors({ ...newErrors, message: 'Invalid credentials or server error' });
+    
+      }
     }
   };
+
 
   return (
     <Container maxWidth="xs">

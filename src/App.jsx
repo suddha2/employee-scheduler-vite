@@ -21,6 +21,7 @@ export default function App() {
     <LocalizationProvider dateAdapter={AdapterDateFns}>
        
         <Router>
+       
           <Navbar />
           <Routes>
             <Route path="/" element={<Navigate to="/login" />} />

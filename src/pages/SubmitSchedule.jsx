@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState,useEffect } from 'react';
 import {
   Container,
   TextField,
@@ -18,19 +18,37 @@ import { differenceInDays } from 'date-fns';
 import useSWR from "swr";
 import dayjs from 'dayjs';
 import { API_ENDPOINTS } from '../api/endpoint';
+import axiosInstance from '../components/axiosInstance';
 
 //const locations = ['New York', 'London', 'Tokyo', 'Remote'];
-const fetcher = (url) => fetch(url).then((res) => res.json());
+
 
 export default function SubmitSchedule() {
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
-  const [location, setLocation] = useState('');
+  const [location, setLocation] = useState(null);
   const [errors, setErrors] = useState({});
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success', }); // can be 'error', 'info', 'warning'
-  const { data: locations, error } = useSWR(API_ENDPOINTS.locations, fetcher);
-  if (error) { console.log(error); return <div>Error loading locations</div>; }
-  if (!locations) return <div>Loading...</div>;
+  
+
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        const response = await axiosInstance.get(API_ENDPOINTS.locations);
+        setLocation(response.data);
+      } catch (err) {
+        console.error(err);
+        setFetchError('Failed to load locations');
+      } finally {
+        //setLoading(false);
+      }
+    };
+
+    fetchLocations();
+  }, []);
+ 
+  // if (errors) { console.log(errors); return <div>Error loading locations</div>; }
+  // if (!location) return <div>Loading...</div>;
   const validate = () => {
     const newErrors = {};
 
@@ -129,7 +147,7 @@ export default function SubmitSchedule() {
                 }}
               />
 
-              <Autocomplete options={locations || []} getOptionLabel={(option) => option.region || ''} value={location || null} onChange={(event, newValue) => { setLocation(newValue); }}
+              <Autocomplete options={location || []} getOptionLabel={(option) => option.region || ''} value={location || null} onChange={(event, newValue) => { setLocation(newValue); }}
                 isOptionEqualToValue={(option, value) => option.id === value?.id}
                 renderInput={(params) => (
                   <TextField
