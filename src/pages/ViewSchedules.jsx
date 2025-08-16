@@ -86,25 +86,46 @@ function buildAssignmentMap(assignments) {
 export default function ExpandedScheduleView() {
 
 
-  const rotaData = scheduleData; // useRotaWebSocket();
+  const rotaData = useRotaWebSocket();
   const schedule = rotaData.shiftAssignmentList || [];
   const empList = rotaData.employeeList || [];
-  const [assignmentMap, setAssignmentMap] = useState(() => buildAssignmentMap(schedule));
-
+  const [assignmentMap, setAssignmentMap] = useState({});
+  useEffect(() => {
+  if (rotaData?.shiftAssignmentList) {
+    const newMap = buildAssignmentMap(rotaData.shiftAssignmentList);
+    setAssignmentMap(newMap);
+  }
+}, [rotaData.shiftAssignmentList]);
 
   // Group assignments by location + shiftType
   const [groupedAssignments, setGroupedAssignments] = useState({});
-  useEffect(() => {
-  const grouped = {};
-  schedule.forEach((assignment) => {
-    const key = `${assignment.location}|${assignment.shiftType}`;
-    if (!grouped[key]) {
-      grouped[key] = [];
-    }
-    grouped[key].push(assignment);
-  });
-  setGroupedAssignments(grouped);
-}, [schedule]);
+
+//   useEffect(() => {
+//   const grouped = {};
+//   schedule.forEach((assignment) => {
+//     const key = `${assignment.location}|${assignment.shiftType}`;
+//     if (!grouped[key]) {
+//       grouped[key] = [];
+//     }
+//     grouped[key].push(assignment);
+//   });
+//   setGroupedAssignments(grouped);
+// }, [schedule]);
+
+useEffect(() => {
+  if (rotaData?.shiftAssignmentList) {
+    const grouped = {};
+    rotaData.shiftAssignmentList.forEach((assignment) => {
+      const key = `${assignment.location}|${assignment.shiftType}`;
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+      grouped[key].push(assignment);
+    });
+    setGroupedAssignments(grouped);
+  }
+}, [rotaData.shiftAssignmentList]);
+
   const [highlighted, setHighlighted] = useState({});
 
 
@@ -163,8 +184,12 @@ export default function ExpandedScheduleView() {
     });
   }
 
+if (!rotaData?.shiftAssignmentList?.length) {
+    return <Typography>Waiting for schedule to be solved...</Typography>;
+  }
 
   return (
+    
     <DndContext onDragEnd={handleDrop}>
       <Typography variant="h6" gutterBottom>
         Schedule View (Grouped by Day)
