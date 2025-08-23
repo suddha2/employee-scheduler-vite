@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState,useEffect } from 'react';
 import { AppBar, Toolbar, Typography, Button } from '@mui/material';
 import { Link } from 'react-router-dom';
 
@@ -7,10 +7,16 @@ function isTokenValid() {
   var token = localStorage.getItem("token");
   return typeof token === 'string' && token.trim() !== '';
 }
-function setToken(){
-  localStorage.setItem("token",'');
-}
+
 function Navbar()   {
+
+  const [token, setToken] = useState(null);
+useEffect(() => {
+  if (localStorage.getItem("token")) {
+   setToken(localStorage.getItem("token"));
+  }
+});
+
   return (
     <AppBar position="static">
       <Toolbar>
@@ -33,7 +39,7 @@ function Navbar()   {
       color="inherit"
       component={Link}
       to="/login"
-      onClick={() => setToken()}
+      onClick={() => { setToken(""); localStorage.setItem("token","");}}
     >
       Logout
     </Button>

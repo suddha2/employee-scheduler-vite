@@ -40,7 +40,7 @@ function LoginPage() {
       setErrors('');
       } catch (err) {
         console.error('Login failed:', err);
-      setErrors({ ...newErrors, message: 'Invalid credentials or server error' });
+        setErrors({ ...newErrors, message: 'Invalid credentials or server error' });
     
       }
     }

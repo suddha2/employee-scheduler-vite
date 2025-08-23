@@ -1,30 +1,27 @@
 import React, { useState, useCallback, useEffect } from "react";
 import {
   Table, TableHead, TableBody, TableRow, TableCell,
-  TableContainer, Paper, Typography, Box, Chip, Tooltip
+  TableContainer, Paper, Typography, Box, Chip, Tooltip,Button
 } from "@mui/material";
 import { format, addDays, eachDayOfInterval } from "date-fns";
 import { useDroppable, DndContext } from "@dnd-kit/core";
 import FloatingEmployeeList from "./FloatingEmployeeList";
-import { scheduleData } from "../data/schedule";
-import { useRotaWebSocket } from "../components/useRotaWebSocket";
-import { da, hi } from "date-fns/locale";
+import { useLocation } from 'react-router-dom';
+import { scheduleData } from "../data/schedule"
 
 const weekdayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const startDate = new Date("2025-08-04");
-const endDate = addDays(startDate, 27);
-const allDates = eachDayOfInterval({ start: startDate, end: endDate });
-
 const datesByWeekday = {};
 weekdayOrder.forEach((day) => {
-  datesByWeekday[day] = allDates.filter((d) => format(d, "EEE") === day);
+  datesByWeekday[day] = [];
 });
+
+
 
 function DroppableCell({ id, assigned, onRemove, highlighted }) {
   const { isOver, setNodeRef } = useDroppable({ id });
-  // console.log(" =========================== DroppableCell rendered for id:", id, "isOver:", isOver, "assigned:", assigned, "highlighted:", highlighted); 
-  const [, location, shiftType, date] = id.split("|");
-  const cellKey = `${location}|${shiftType}|${date}`;
+  //console.log(" =========================== DroppableCell rendered for id:", id, "isOver:", isOver, "assigned:", assigned, "highlighted:", highlighted); 
+  const [, location, shiftType, date,shiftTime] = id.split("|");
+  const cellKey = `${location}|${shiftType}|${date}|${shiftTime}`;
 
   const assignedIds = assigned.map((e) => e.id);
   const extraHighlighted = highlighted.filter((e) => !assignedIds.includes(e.id));
@@ -72,82 +69,90 @@ function DroppableCell({ id, assigned, onRemove, highlighted }) {
 }
 
 function buildAssignmentMap(assignments) {
+  console.log("buildAssignmentMap=====================");
   const map = {};
 
-  assignments.forEach(({ location, shiftType, date, employee }) => {
-    const key = `${location}|${shiftType}|${date}`;
-    map[key] = employee;
-  });
+  assignments.forEach(({ shift, employee }) => {
+    const location = shift.shiftTemplate.location;
+    const shiftType = shift.shiftTemplate.shiftType;
+    const date = shift.shiftStart; // "YYYY-MM-DD"
+    const shiftStartTime = shift.shiftTemplate.startTime;
+    const key = `${location}|${shiftType}|${date}|${shiftStartTime}`;
 
+    if (!map[key]) {
+      map[key] = [];
+    }
+
+    if (employee) {
+      map[key].push(employee);
+    }
+  });
+  
+  const uniqueDateStrings = Array.from(
+    new Set(assignments.map((a) => a.shift.shiftStart))
+  );
+  console.log(uniqueDateStrings);
+  uniqueDateStrings.forEach((dateStr) => {
+    //const date = parseISO(dateStr);
+    const weekday = format(new Date(dateStr), "EEE"); // e.g. "Sun"
+    
+    if (datesByWeekday[weekday]) {
+      datesByWeekday[weekday].push(dateStr);
+    }
+  });
   return map;
 }
 
 
 export default function ExpandedScheduleView() {
+const [loading, setLoading] = useState(false);
+const [snackbar, setSnackbar] = useState({ message: '', opened: false });
 
-
-  const rotaData = useRotaWebSocket();
+  const location = useLocation();
+  const rotaData = location.state?.rotaData;
+  console.log("Received RotaData : ",rotaData);
+  //const rotaData = scheduleData;
   const schedule = rotaData.shiftAssignmentList || [];
   const empList = rotaData.employeeList || [];
   const [assignmentMap, setAssignmentMap] = useState({});
-  useEffect(() => {
-  if (rotaData?.shiftAssignmentList) {
-    const newMap = buildAssignmentMap(rotaData.shiftAssignmentList);
-    setAssignmentMap(newMap);
-  }
-}, [rotaData.shiftAssignmentList]);
-
-  // Group assignments by location + shiftType
   const [groupedAssignments, setGroupedAssignments] = useState({});
+  useEffect(() => {
+    if (rotaData?.shiftAssignmentList) {
+      const newMap = buildAssignmentMap(rotaData.shiftAssignmentList);
+      setAssignmentMap(newMap);
+      console.log(assignmentMap)
+      const grouped = {};
+      rotaData.shiftAssignmentList.forEach((assignment) => {
+        const { location, shiftType } = assignment.shift.shiftTemplate;
+        const key = `${location}|${shiftType}`;
 
-//   useEffect(() => {
-//   const grouped = {};
-//   schedule.forEach((assignment) => {
-//     const key = `${assignment.location}|${assignment.shiftType}`;
-//     if (!grouped[key]) {
-//       grouped[key] = [];
-//     }
-//     grouped[key].push(assignment);
-//   });
-//   setGroupedAssignments(grouped);
-// }, [schedule]);
+        if (!grouped[key]) {
+          grouped[key] = [];
+        }
 
-useEffect(() => {
-  if (rotaData?.shiftAssignmentList) {
-    const grouped = {};
-    rotaData.shiftAssignmentList.forEach((assignment) => {
-      const key = `${assignment.location}|${assignment.shiftType}`;
-      if (!grouped[key]) {
-        grouped[key] = [];
-      }
-      grouped[key].push(assignment);
-    });
-    setGroupedAssignments(grouped);
-  }
-}, [rotaData.shiftAssignmentList]);
-
+        grouped[key].push(assignment);
+      });
+      setGroupedAssignments(grouped);
+    }
+  }, [rotaData.shiftAssignmentList]);
+ console.log();
   const [highlighted, setHighlighted] = useState({});
 
-
-  // useEffect(() => {
-  //   console.log("🔍 Highlighted updated:", highlighted);
-  // }, [highlighted]);
-
   function handleRemove(cellKey, emp) {
+  console.log("Removing", emp.id, "from", cellKey);
+
   setAssignmentMap((prev) => {
     const current = prev[cellKey] ?? [];
-    return {
-      ...prev,
-      [cellKey]: current.filter((e) => e.id !== emp.id),
-    };
+    const updated = current.filter((e) => e.id !== emp.id);
+    console.log("AssignmentMap updated:", updated);
+    return { ...prev, [cellKey]: updated };
   });
 
   setHighlighted((prev) => {
     const current = prev[cellKey] ?? [];
-    return {
-      ...prev,
-      [cellKey]: current.filter((e) => e.id !== emp.id),
-    };
+    const updated = current.filter((e) => e.id !== emp.id);
+    console.log("Highlighted updated:", updated);
+    return { ...prev, [cellKey]: updated };
   });
 }
 
@@ -157,20 +162,20 @@ useEffect(() => {
     const droppedEmp = empList.find((e) => e.id === empId);
     if (!droppedEmp || !over) return;
 
-    const [, location, shiftType, date] = over.id.split("|");
-    const cellKey = `${location}|${shiftType}|${date}`;
+    const [, location, shiftType, date,shiftTime] = over.id.split("|");
+    const cellKey = `${location}|${shiftType}|${date}|${shiftTime}`;
 
     setAssignmentMap((prev) => {
-  const current = prev[cellKey] ?? [];
-  const alreadyAssigned = current.some((e) => e.id === droppedEmp.id);
-  if (alreadyAssigned) return prev;
+      const current = prev[cellKey] ?? [];
+      const alreadyAssigned = current.some((e) => e.id === droppedEmp.id);
+      if (alreadyAssigned) return prev;
 
-  return {
-    ...prev,
-    [cellKey]: [...current, droppedEmp],
-  };
-});
-    
+      return {
+        ...prev,
+        [cellKey]: [...current, droppedEmp],
+      };
+    });
+
 
     setHighlighted((prev) => {
       const current = prev[cellKey] ?? [];
@@ -184,17 +189,51 @@ useEffect(() => {
     });
   }
 
-if (!rotaData?.shiftAssignmentList?.length) {
+  async function handleSave(){
+    setLoading(true);
+
+  try {
+    const response = await fetch('/api/save', {
+      method: 'POST',
+      body: JSON.stringify({ assignments: assignmentMap }),
+      headers: {
+          Authorization : `Bearer ${localStorage.getItem("token")}`,
+          'Content-Type': 'application/json',
+        },
+    });
+
+    const result = await response.json();
+
+    setSnackbar({ message: result.message || 'Saved successfully!', opened: true });
+  } catch (error) {
+    setSnackbar({ message: 'Save failed. Please try again.', opened: true });
+    console.error('Save error:', error);
+  } finally {
+    setLoading(false);
+  }
+
+  }
+  function hasUnsavedChanges(){
+
+  }
+  if (!rotaData?.shiftAssignmentList?.length) {
     return <Typography>Waiting for schedule to be solved...</Typography>;
   }
 
   return (
-    
+
     <DndContext onDragEnd={handleDrop}>
       <Typography variant="h6" gutterBottom>
         Schedule View (Grouped by Day)
       </Typography>
-
+      
+<Box
+  sx={{
+    maxHeight: 'calc(100vh - 80px)', // adjust based on footer height
+    overflowY: 'auto',
+    paddingBottom: '96px', // reserve space so content doesn't hide behind footer
+  }}
+>
       <TableContainer component={Paper}>
         <Table size="small">
           <TableHead>
@@ -217,15 +256,20 @@ if (!rotaData?.shiftAssignmentList?.length) {
                   {weekdayOrder.map((day) => (
                     <TableCell key={day} sx={{ verticalAlign: "top" }}>
                       {datesByWeekday[day].map((date) => {
-                        const dateStr = format(date, "yyyy-MM-dd");
-                        const matching = assignments.filter((a) => a.date === dateStr);
-
+                        const dateStr = date; //format(date, "yyyy-MM-dd");
+                        //const matching = assignments.filter((a) => a.date === dateStr);
+                        const matching = assignments.filter((a) => {
+                          const shiftDateStr = format(new Date(a.shift.shiftStart), "yyyy-MM-dd");
+                          return shiftDateStr === dateStr;
+                        });
+                        
+                        
                         return matching.map((assignment) => {
-                          const cellKey = `${location}|${shiftType}|${assignment.date}`;
+                          //const cellKey = `${location}|${shiftType}|${assignment.date}`;
+                          const shiftDateStr = format(new Date(assignment.shift.shiftStart), "yyyy-MM-dd");
+                          const shiftStartTime = assignment.shift.shiftTemplate.startTime;
+                          const cellKey = `${location}|${shiftType}|${shiftDateStr}|${shiftStartTime}`;
                           const droppableId = `cell|${cellKey}`;
-                          //const emp = assignment.employee;
-                          //const assigned = emp ? [`${emp.firstName} ${emp.lastName}`] : [];
-                          // const cellKey = `${location}|${shiftType}|${date}`;
                           const assigned = assignmentMap[cellKey] || [];
 
                           return (
@@ -246,10 +290,20 @@ if (!rotaData?.shiftAssignmentList?.length) {
                                       borderBottom: "none",
                                     }}
                                   >
-                                    {format(new Date(assignment.date), "MMM d")}
+                                    {format(new Date(assignment.shift.shiftStart), "MMM d")}
                                   </TableCell>
                                 </TableRow>
                                 <TableRow>
+                                  <TableCell
+                                    sx={{
+                                      p: 0,
+                                      borderTop: "none",
+                                      width: "40%",
+                                      fontSize: "0.85rem",
+                                    }}
+                                  >
+                                    {assignment.shift.shiftTemplate.startTime}
+                                  </TableCell>
                                   <TableCell sx={{ p: 0, borderTop: "none" }}>
 
 
@@ -275,8 +329,26 @@ if (!rotaData?.shiftAssignmentList?.length) {
           </TableBody>
         </Table>
       </TableContainer>
-
+      </Box>
       <FloatingEmployeeList employees={rotaData.employeeList || []} />
+      <Box
+  sx={{
+    position: "fixed",
+    bottom: 0,
+    left: 0,
+    width: "100%",
+    backgroundColor: "#f8f9fa",
+    borderTop: "1px solid #dee2e6",
+    padding: "12px 24px",
+    textAlign: "right",
+    zIndex: 1000,
+  }}
+>
+
+  <Button variant="contained" color="primary" onClick={handleSave}  disabled={!hasUnsavedChanges}>
+    Save Schedule
+  </Button>
+</Box>
     </DndContext>
   );
 }

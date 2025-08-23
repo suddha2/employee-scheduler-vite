@@ -1,15 +1,12 @@
-// src/useRotaWebSocket.js
-import { useEffect, useState, useRef } from 'react';
+import { useEffect,useRef,useState } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { API_ENDPOINTS } from '../api/endpoint';
 
-export const useRotaWebSocket = () => {
-	const [data, setData] = useState(null);
-	const [connected, setConnected] = useState(false);
-	const clientRef = useRef(null);
-
-	useEffect(() => {
+export function useRequestUpdates(setRequests, updateRequestStatus) {
+    const clientRef = useRef(null);
+    
+  useEffect(() => {
 		const client = new Client({
 			webSocketFactory: () => new SockJS(`${API_ENDPOINTS.websoc}?token=${localStorage.getItem("token")}`), 
 			connectHeaders: { Authorization: `Bearer ${localStorage.getItem("token")}}`, },
@@ -17,12 +14,13 @@ export const useRotaWebSocket = () => {
 			debug: (str) => console.log('[STOMP]', str),
 			onConnect: () => {
 				console.log('✅ Connected to WebSocket');
-				setConnected(true);
+				
 
 				client.subscribe('/user/queue/req-update', (message) => {
 					try {
+                        console.log("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$",message);
 						const data = JSON.parse(message.body);
-						setData(data);
+						updateRequestStatus(data);
 					} catch (err) {
 						console.error('Failed to parse message:', err);
 					}
@@ -39,8 +37,5 @@ export const useRotaWebSocket = () => {
 		return () => {
 			clientRef.current?.deactivate();
 		};
-	}, []);
-
-	return { data, connected }; // ✅ always return an object
-};
-
+	}, [setRequests, updateRequestStatus]);
+}

@@ -1,193 +1,159 @@
-import React, { useState,useEffect } from 'react';
+// SubmitSchedule.jsx
+import React, { useState, useEffect } from 'react';
 import {
   Container,
-  TextField,
-  Button,
-  MenuItem,
   Typography,
-  Box,
   Paper,
-  Stack,
+  Snackbar,
   Alert,
-  Snackbar
+  Box,
 } from '@mui/material';
-import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
+import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { Autocomplete } from '@mui/material';
-import { differenceInDays } from 'date-fns';
-import useSWR from "swr";
-import dayjs from 'dayjs';
+import { useNavigate } from 'react-router-dom';
+import { useRequestUpdates } from '../components/useRequestUpdates';
+import ScheduleForm from './ScheduleForm';
+import ScheduleList from './ScheduleList';
 import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
 
-//const locations = ['New York', 'London', 'Tokyo', 'Remote'];
+
 
 
 export default function SubmitSchedule() {
-  const [startDate, setStartDate] = useState(null);
-  const [endDate, setEndDate] = useState(null);
-  const [location, setLocation] = useState(null);
-  const [errors, setErrors] = useState({});
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success', }); // can be 'error', 'info', 'warning'
+  const [locations, setLocations] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+
+const updateRequestStatus = (updatedReq) => {
+
+
+  setRequests((prev) => {
   
+
+    return prev.map((req) => {
+      const isMatch = req.id === updatedReq.id;
+      if (isMatch) {
+ 
+        return updatedReq; // Replace entire object
+      }
+      return req;
+    });
+  });
+};
+
+  //const { rotaData } = useRotaWebSocket();
+  const navigate = useNavigate();
+const ws  = useRequestUpdates(setRequests, updateRequestStatus);
 
   useEffect(() => {
     const fetchLocations = async () => {
       try {
-        const response = await axiosInstance.get(API_ENDPOINTS.locations);
-        setLocation(response.data);
+        const response = await axiosInstance.get(API_ENDPOINTS.locations, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        setLocations(response.data);
       } catch (err) {
-        console.error(err);
-        setFetchError('Failed to load locations');
-      } finally {
-        //setLoading(false);
+        console.error('Failed to load locations', err);
+        setSnackbar({ open: true, message: 'Failed to load locations', severity: 'error' });
       }
     };
 
     fetchLocations();
   }, []);
- 
-  // if (errors) { console.log(errors); return <div>Error loading locations</div>; }
-  // if (!location) return <div>Loading...</div>;
-  const validate = () => {
-    const newErrors = {};
-
-    if (!startDate) newErrors.startDate = "Start date is required";
-    if (!endDate) newErrors.endDate = "End date is required";
-
-    if (startDate && endDate) {
-      const diff = differenceInDays(endDate, startDate);
-      if (diff < 1) {
-        newErrors.dateRange = "Select a future End Date";
+  
+    const fetchRequests = async () => {
+      try {
+        const response = await axiosInstance.get(API_ENDPOINTS.enqueueList, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+        setRequests(response.data);
+      } catch (err) {
+        console.error('Failed to fetch requests', err);
+        setSnackbar({ open: true, message: 'Failed to load requests', severity: 'error' });
       }
-      if (diff > 30) {
-        newErrors.dateRange = "Date difference must be between 1 and 30 days";
-      }
-    }
+    };
+useEffect(() => {
+    fetchRequests();
+  }, []);
 
-    if (!location) newErrors.location = "Location is required";
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
 
+
+
+  const handleNewRequest = (newRequest) => {
+    setRequests((prev) => [...prev, newRequest]);
   };
-
-  const handleSubmit = async () => {
-    if (!validate()) return;
-
-    try {
-      const payload = {
-        location: location.region,  // use location.id
-        startDate: dayjs(startDate).format('YYYY-MM-DD'),
-        endDate: dayjs(endDate).format('YYYY-MM-DD'),
-      };
-
-      const response = await fetch(`${API_ENDPOINTS.enqueueSolve}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to submit schedule');
-      }
-
-      const result = await response.json();
-      setSnackbar({ open: true, message: `Schedule submitted for ${location}`, severity: 'success', });
-
-      // Optionally reset form
-      setStartDate(null);
-      setEndDate(null);
-      setLocation(null);
-      setErrors({});
-    } catch (error) {
-      console.error(error);
-      alert('Error submitting schedule. Please try again.');
-    }
-  };
-
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Container maxWidth="sm" sx={{ mt: 6 }}>
+      <Container maxWidth="lg" sx={{ mt: 6 }}>
         <Paper elevation={4} sx={{ p: 4 }}>
           <Typography variant="h5" gutterBottom>
             Smart Scheduling
           </Typography>
 
-          <Box component="form" noValidate autoComplete="off" sx={{ mt: 2 }}>
-            <Stack spacing={3}>
-              <DatePicker
-                label="Start Date"
-                value={startDate}
-                onChange={(newValue) => setStartDate(newValue)}
-                format="dd/MM/yyyy"
-                slotProps={{
-                  textField: {
-                    fullWidth: true,
-                    error: !!errors.startDate || !!errors.dateRange,
-                    helperText: errors.startDate || errors.dateRange || '',
-                  },
-                }}
+          {/* Flex layout with 40/60 split and divider */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: { xs: 'column', md: 'row' },
+              mt: 2,
+            }}
+          >
+            {/* Left: Form (40%) */}
+            <Box sx={{ flex: { md: '0 0 20%' }, width: '100%' }}>
+              <ScheduleForm
+                locations={locations}
+                onSubmitSuccess={handleNewRequest}
+                setSnackbar={setSnackbar}
+                setRequests={setRequests}
               />
+            </Box>
 
-              <DatePicker
-                label="End Date"
-                value={endDate}
-                onChange={(newValue) => setEndDate(newValue)}
-                format="dd/MM/yyyy"
-                slotProps={{
-                  textField: {
-                    fullWidth: true,
-                    error: !!errors.endDate || !!errors.dateRange,
-                    helperText: errors.endDate || errors.dateRange || '',
-                  },
-                }}
-              />
+            {/* Divider */}
+            <Box
+              sx={{
+                width: '1px',
+                backgroundColor: 'grey.400',
+                mx: 2,
+                display: { xs: 'none', md: 'block' },
+                alignSelf: 'stretch',
+              }}
+            />
 
-              <Autocomplete options={location || []} getOptionLabel={(option) => option.region || ''} value={location || null} onChange={(event, newValue) => { setLocation(newValue); }}
-                isOptionEqualToValue={(option, value) => option.id === value?.id}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Location"
-                    fullWidth
-                    error={!!errors.location}
-                    helperText={errors.location}
-                  />
-                )}
-              />
-              <Button
-                variant="contained"
-                color="primary"
-                fullWidth
-                sx={{ mt: 2 }}
-                onClick={handleSubmit}
-              >
-                Submit
-              </Button>
-              <Snackbar
-                open={snackbar.open}
-                autoHideDuration={3000}
-                onClose={() => setSnackbar({ ...snackbar, open: false })}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-              >
-                <Alert
-                  onClose={() => setSnackbar({ ...snackbar, open: false })}
-                  severity={snackbar.severity}
-                  sx={{ width: '100%' }}
-                  variant="filled"
-                >
-                  {snackbar.message}
-                </Alert>
-              </Snackbar>
-            </Stack>
+            {/* Right: List (60%) */}
+            <Box sx={{ flex: { md: '0 0 75%' }, width: '100%' }}>
+              <ScheduleList requests={requests} />
+            </Box>
           </Box>
+
+          {/* Snackbar */}
+          <Snackbar
+            open={snackbar.open}
+            autoHideDuration={3000}
+            onClose={() => setSnackbar({ ...snackbar, open: false })}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          >
+            <Alert
+              onClose={() => setSnackbar({ ...snackbar, open: false })}
+              severity={snackbar.severity}
+              variant="filled"
+              sx={{ width: '100%' }}
+            >
+              {snackbar.message}
+            </Alert>
+          </Snackbar>
         </Paper>
       </Container>
     </LocalizationProvider>
+
+
 
   );
 }

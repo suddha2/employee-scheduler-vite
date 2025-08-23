@@ -4,8 +4,10 @@ import App from './App';
 import CssBaseline from '@mui/material/CssBaseline';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
+  //<React.StrictMode>
+  <>
     <CssBaseline />
     <App />
-  </React.StrictMode>
+    </>
+  //</React.StrictMode>
 );
