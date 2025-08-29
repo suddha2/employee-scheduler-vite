@@ -89,7 +89,10 @@ useEffect(() => {
   const handleNewRequest = (newRequest) => {
     setRequests((prev) => [...prev, newRequest]);
   };
-
+const handleView=(req)=>{
+  console.log("submitSchedule->handleview->",req);
+  navigate(`/schedules?id=${req.rotaId}`);
+}
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Container maxWidth="lg" sx={{ mt: 6 }}>
@@ -129,7 +132,7 @@ useEffect(() => {
 
             {/* Right: List (60%) */}
             <Box sx={{ flex: { md: '0 0 75%' }, width: '100%' }}>
-              <ScheduleList requests={requests} />
+              <ScheduleList requests={requests} onView={handleView}/>
             </Box>
           </Box>
 

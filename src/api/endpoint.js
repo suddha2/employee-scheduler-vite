@@ -5,6 +5,8 @@ export const  API_ENDPOINTS = {
   locations: `${API_BASE_URL}/api/regions`,
   enqueueRequest : `${API_BASE_URL}/api/enqueueRequest`,
   enqueueList : `${API_BASE_URL}/api/enqueue/latest`,
+  solvedSchedule : `${API_BASE_URL}/api/solved`,
+  updateSolvedSol : `${API_BASE_URL}/api/save`,
   websoc: `${API_BASE_URL}/ws`,
 
 };

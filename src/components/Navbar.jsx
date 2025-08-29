@@ -29,12 +29,12 @@ useEffect(() => {
 
        {isTokenValid() && (
   <>
-    <Button color="inherit" component={Link} to="/submit">
+    {/* <Button color="inherit" component={Link} to="/submit">
       Smart Schedule
     </Button>
     <Button color="inherit" component={Link} to="/schedules">
       View Schedules
-    </Button>
+    </Button> */}
     <Button
       color="inherit"
       component={Link}

@@ -19,6 +19,7 @@ function onLogin(token){
 }
 
 function LoginPage() {
+  
   localStorage.setItem("token",'');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

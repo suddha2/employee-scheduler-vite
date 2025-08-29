@@ -1,41 +1,77 @@
-import { useState,  useEffect } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   Table, TableHead, TableBody, TableRow, TableCell,
-  TableContainer, Paper, Typography, Box,  Tooltip,Button,CircularProgress
+  TableContainer, Paper, Typography, Box, Chip, Tooltip,Button
 } from "@mui/material";
 import { format, addDays, eachDayOfInterval } from "date-fns";
-import {  DndContext } from "@dnd-kit/core";
+import { useDroppable, DndContext } from "@dnd-kit/core";
 import FloatingEmployeeList from "./FloatingEmployeeList";
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams,useLocation } from 'react-router-dom';
 // import { scheduleData } from "../data/schedule"
 import { API_ENDPOINTS } from '../api/endpoint';
-import axiosInstance from '../components/axiosInstance';
-import { DroppableCell } from "../components/droppableCell";
-import { useNavigate } from 'react-router-dom';
-
 
 const weekdayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const datesByWeekday = {};
 weekdayOrder.forEach((day) => {
   datesByWeekday[day] = [];
 });
-function LoadingSpinner() {
-  return (
-    <Box
-      display="flex"
-      justifyContent="center"
-      alignItems="center"
-      height="100%"
-      width="100%"
-    >
-      <CircularProgress size={48} thickness={4} />
-    </Box>
-  );
-}
+
+
+
+// function DroppableCell({ id, assigned, onRemove, highlighted }) {
+//   const { isOver, setNodeRef } = useDroppable({ id });
+//   //console.log(" =========================== DroppableCell rendered for id:", id, "isOver:", isOver, "assigned:", assigned, "highlighted:", highlighted); 
+//   const [, location, shiftType, date,shiftTime] = id.split("|");
+//   const cellKey = `${location}|${shiftType}|${date}|${shiftTime}`;
+
+//   const assignedIds = assigned.map((e) => e.id);
+//   const extraHighlighted = highlighted.filter((e) => !assignedIds.includes(e.id));
+//   const allVisible = [...assigned, ...extraHighlighted];
+
+
+//   return (
+//     <Tooltip title={id} arrow>
+//       <Box
+//         ref={setNodeRef}
+//         sx={{
+//           flexGrow: 1,
+//           border: isOver ? "2px dashed #3f51b5" : "1px dashed #ccc",
+//           borderRadius: 1,
+//           backgroundColor: isOver ? "#e3f2fd" : "#fafafa",
+//           padding: 0.5,
+//           mt: 0.5,
+//           display: "flex",
+//           flexWrap: "wrap",
+//           gap: 0.5,
+//           minHeight: 40,
+//         }}
+//       >
+//         {/* Chips or Unassigned */}
+//         {allVisible.length > 0 ? (
+//           allVisible.map((emp) => (
+//             <Chip
+//               key={`${cellKey}-${emp.id}`}
+//               label={`${emp.firstName} ${emp.lastName}`}
+//               onDelete={() => onRemove(cellKey, emp)}
+//               sx={{
+//                 whiteSpace: "nowrap",
+//                 backgroundColor: highlighted.some((e) => e.id === emp.id)
+//                   ? "#a5d6a7"
+//                   : "#e0e0e0",
+//               }}
+//             />
+//           ))
+//         ) : (
+//           <em style={{ color: "#888" }}>Unassigned</em>
+//         )}
+//       </Box>
+//     </Tooltip>
+//   );
+// }
 
 function buildAssignmentMap(assignments) {
+  console.log("buildAssignmentMap=====================");
   const map = {};
-  const seen = {}; // Track employee IDs per key
 
   assignments.forEach(({ shift, employee }) => {
     const location = shift.shiftTemplate.location;
@@ -46,66 +82,78 @@ function buildAssignmentMap(assignments) {
 
     if (!map[key]) {
       map[key] = [];
-      seen[key] = new Set();
     }
 
-    if (employee && !seen[key].has(employee.id)) {
+    if (employee) {
       map[key].push(employee);
-      seen[key].add(employee.id);
     }
   });
-
+  
   const uniqueDateStrings = Array.from(
     new Set(assignments.map((a) => a.shift.shiftStart))
   );
-
+  console.log(uniqueDateStrings);
   uniqueDateStrings.forEach((dateStr) => {
+    //const date = parseISO(dateStr);
     const weekday = format(new Date(dateStr), "EEE"); // e.g. "Sun"
+    
     if (datesByWeekday[weekday]) {
-      if (!datesByWeekday[weekday].includes(dateStr)) {
-        datesByWeekday[weekday].push(dateStr);
-      }
+      datesByWeekday[weekday].push(dateStr);
     }
   });
-
   return map;
 }
 
 
-
-export default function ExpandedScheduleView() {
-const [loading, setLoading] = useState(false);
+export default function ExpandedScheduleView_OLD() {
+  const location = useLocation();
+  console.log("Component mounted");
+console.log("location.search:", location.search);
+console.log("location.key:", location.key);
+const [loading, setLoading] = useState(true);
 const [snackbar, setSnackbar] = useState({ message: '', opened: false });
 const [rotaData,setRotaData] = useState(null);
+  // const{id}= useParams();
+  // console.log("id == ",id);
 
-
-  const navigate = useNavigate();
+  
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
+  console.log("id == ",id);
+  // const location = useLocation();
+  // const rotaData = location.state?.rotaData;
+  // console.log("Received RotaData : ",rotaData);
 
+console.log("Component mounted");
+console.log("Extracted ID:", id);
 
 useEffect(() => {
+  console.log("useEffect triggered");
+  
+}, [id]);
 
-  if(!id) return;
-    const fetchSchedule = async () => {
-      try {
-        const response = await axiosInstance.get(`${API_ENDPOINTS.solvedSchedule}?id=${id}`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
-        setRotaData(response.data);
-      } catch (err) {
-        console.error('Failed to load schedule', err);
-      } finally {
-        setLoading(false);
-      }
-    };
- 
-    fetchSchedule();
-  }, []);
 
-  const empList = rotaData?.employeeList || [];
+//   const fetchSchedule = async () => {
+//     console.log("Fetching schedule for ID:", id);
+//     try {
+//       const response = await axiosInstance.get(`${API_ENDPOINTS.solvedSchedule}/${id}`, {
+//         headers: {
+//           Authorization: `Bearer ${localStorage.getItem('token')}`,
+//         },
+//       });
+//       setRotaData(response.data);
+//     } catch (err) {
+//       console.error("Failed to load schedule", err);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   fetchSchedule();
+// }, [location]);
+  //const rotaData = scheduleData;
+  const schedule = rotaData.shiftAssignmentList || [];
+  const empList = rotaData.employeeList || [];
   
   
   const [assignmentMap, setAssignmentMap] = useState({});
@@ -117,6 +165,7 @@ useEffect(() => {
     if (rotaData?.shiftAssignmentList) {
       const newMap = buildAssignmentMap(rotaData.shiftAssignmentList);
       setAssignmentMap(newMap);
+      console.log(assignmentMap)
       const grouped = {};
       rotaData.shiftAssignmentList.forEach((assignment) => {
         const { location, shiftType } = assignment.shift.shiftTemplate;
@@ -130,21 +179,24 @@ useEffect(() => {
       });
       setGroupedAssignments(grouped);
     }
-  }, [rotaData?.shiftAssignmentList]);
+  }, [rotaData.shiftAssignmentList]);
 
   const [highlighted, setHighlighted] = useState({});
 
   function handleRemove(cellKey, emp) {
+  console.log("Removing", emp.id, "from", cellKey);
 
   setAssignmentMap((prev) => {
     const current = prev[cellKey] ?? [];
     const updated = current.filter((e) => e.id !== emp.id);
-    return { ...prev, [cellKey]: updated.id };
+    console.log("AssignmentMap updated:", updated);
+    return { ...prev, [cellKey]: updated };
   });
 
   setHighlighted((prev) => {
     const current = prev[cellKey] ?? [];
     const updated = current.filter((e) => e.id !== emp.id);
+    console.log("Highlighted updated:", updated);
     return { ...prev, [cellKey]: updated };
   });
 }
@@ -184,27 +236,20 @@ useEffect(() => {
 
   async function handleSave(){
     setLoading(true);
-const compactMap = Object.fromEntries(
-  Object.entries(assignmentMap).map(([slotKey, employees]) => [
-    slotKey,
-    employees.map(emp => ({ id: emp.id })),
-  ])
-);
-  try {
 
-    const response = await axiosInstance.post(`${API_ENDPOINTS.updateSolvedSol}`, {
+  try {
+    const response = await fetch('/api/save', {
       method: 'POST',
-      body: JSON.stringify({ assignments: compactMap,rota:id }),
+      body: JSON.stringify({ assignments: assignmentMap }),
       headers: {
           Authorization : `Bearer ${localStorage.getItem("token")}`,
           'Content-Type': 'application/json',
         },
     });
 
-    
+    const result = await response.json();
 
-    setSnackbar({ message: response.message || 'Saved successfully!', opened: true });
-    navigate("/submit");
+    setSnackbar({ message: result.message || 'Saved successfully!', opened: true });
   } catch (error) {
     setSnackbar({ message: 'Save failed. Please try again.', opened: true });
     console.error('Save error:', error);
@@ -220,9 +265,6 @@ const compactMap = Object.fromEntries(
     return <Typography>Waiting for schedule to be solved...</Typography>;
   }
 
-  if(loading) {
-    return <LoadingSpinner />
-  }
   return (
 
     <DndContext onDragEnd={handleDrop}>

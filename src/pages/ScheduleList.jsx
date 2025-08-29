@@ -9,7 +9,7 @@ import {
     Paper, Button
 } from '@mui/material';
 
-export default function ScheduleList({ requests }) {
+export default function ScheduleList({ requests,onView }) {
     if (!requests.length) {
         return <Typography color="text.secondary">No requests submitted yet.</Typography>;
     }
@@ -38,7 +38,7 @@ export default function ScheduleList({ requests }) {
                                 variant="contained"
                                 color={req.completed ? 'primary' : 'warning'}
                                 disabled={!req.completed}
-                                onClick={() => req.completed && handleView(req)}
+                                onClick={() => req.completed && onView(req)}
                             >
                                 {req.completed ? 'View' : 'Pending'}
                             </Button></TableCell>

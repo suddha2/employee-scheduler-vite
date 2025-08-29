@@ -27,12 +27,7 @@ export default function App() {
             <Route path="/" element={<Navigate to="/login" />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/submit" element={<SubmitSchedule />} />
-            <Route
-              path="/schedules"
-              element={
-                <ViewSchedules
-
-                />
+            <Route path="/schedules" element={<ViewSchedules />
               }
             />
           </Routes>
