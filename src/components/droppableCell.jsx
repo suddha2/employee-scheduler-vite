@@ -11,7 +11,18 @@ export function DroppableCell({ id, assigned, onRemove, highlighted }) {
   const assignedIds = assigned.map((e) => e.id);
   const extraHighlighted = highlighted.filter((e) => !assignedIds.includes(e.id));
   const allVisible = [...assigned, ...extraHighlighted];
-
+const getUrgencyStyle = (shiftType) => {
+  switch (shiftType) {
+    case "WAKING_NIGHT":
+      return { color: "#d9534f", fontWeight: 600 }; // high urgency
+    case "LONG_DAY":
+      return { color: "#f0ad4e", fontWeight: 500 }; // medium urgency
+    case "FLOATING":
+      return { color: "#888", fontStyle: "italic" }; // low urgency
+    default:
+      return { color: "#999" };
+  }
+};
 
   return (
     <Tooltip title={id} arrow>
@@ -46,7 +57,7 @@ export function DroppableCell({ id, assigned, onRemove, highlighted }) {
             />
           ))
         ) : (
-          <em style={{ color: "#888" }}>Unassigned</em>
+          <em style={getUrgencyStyle(shiftType)}>⚠️ Unassigned</em>
         )}
       </Box>
     </Tooltip>
