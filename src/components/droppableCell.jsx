@@ -2,6 +2,9 @@ import {
   Box, Chip, Tooltip
 } from "@mui/material";
 import { useDroppable } from "@dnd-kit/core";
+import { shiftColors, shiftTypes,getPriorityColor } from "../components/shiftTypeGrading";
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+
 export function DroppableCell({ id, assigned, onRemove, highlighted }) {
   const { isOver, setNodeRef } = useDroppable({ id });
   //console.log(" =========================== DroppableCell rendered for id:", id, "isOver:", isOver, "assigned:", assigned, "highlighted:", highlighted); 
@@ -14,13 +17,13 @@ export function DroppableCell({ id, assigned, onRemove, highlighted }) {
 const getUrgencyStyle = (shiftType) => {
   switch (shiftType) {
     case "WAKING_NIGHT":
-      return { color: "#d9534f", fontWeight: 600 }; // high urgency
+      return { color: getPriorityColor(shiftColors[shiftType]), fontWeight: 600 }; // high urgency
     case "LONG_DAY":
-      return { color: "#f0ad4e", fontWeight: 500 }; // medium urgency
+      return { color: getPriorityColor(shiftColors[shiftType]), fontWeight: 500 }; // medium urgency
     case "FLOATING":
-      return { color: "#888", fontStyle: "italic" }; // low urgency
+      return { color: getPriorityColor(shiftColors[shiftType]), fontStyle: "italic" }; // low urgency
     default:
-      return { color: "#999" };
+      return { color: getPriorityColor(shiftColors[shiftType])};
   }
 };
 
@@ -57,7 +60,7 @@ const getUrgencyStyle = (shiftType) => {
             />
           ))
         ) : (
-          <em style={getUrgencyStyle(shiftType)}>⚠️ Unassigned</em>
+          <em style={getUrgencyStyle(shiftType)}> Unassigned</em>
         )}
       </Box>
     </Tooltip>

@@ -10,15 +10,9 @@ import {
 } from "@mui/material";
 import { ExpandLess, ExpandMore } from "@mui/icons-material";
 import { useDraggable, DragOverlay } from "@dnd-kit/core";
+import { shiftColors, shiftTypes,getPriorityColor } from "../components/shiftTypeGrading";
 
 
- const shiftTypes = ["LONG_DAY", "DAY", "WAKING_NIGHT", "FLOATING"];
-  const shiftColors = {
-    LONG_DAY: "#FFB74D", // Morning - orange
-    DAY: "#64B5F6", // Afternoon - blue
-    WAKING_NIGHT: "#9575CD", // Evening - purple
-    FLOATING: "#206c92ff", // Night - grey
-  };
 
 function EmployeeItem({ employee }) {
   //const id = `${employee.firstName} ${employee.lastName}`;
@@ -62,7 +56,7 @@ function EmployeeItem({ employee }) {
               width: 20,
               height: 20,
               borderRadius: "50%",
-              backgroundColor: shiftColors[type],
+              backgroundColor: getPriorityColor(shiftColors[type]),
               color: "white",
               fontSize: 12,
               display: "flex",

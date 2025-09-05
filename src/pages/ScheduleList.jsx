@@ -8,6 +8,7 @@ import {
     Typography,
     Paper, Button, Box, Chip, Grid
 } from '@mui/material';
+import { shiftColors, shiftTypes,getPriorityColor } from "../components/shiftTypeGrading";
 
 export default function ScheduleList({ requests, onView }) {
     if (!requests.length) {
@@ -59,7 +60,7 @@ export default function ScheduleList({ requests, onView }) {
                                             {Object.entries(req.scheduleSummary).map(([type, stats]) => (
                                                 <Grid container spacing={1} alignItems="center" key={type} sx={{ marginBottom: 0.5 }}>
                                                     <Grid item xs={3} sm={2}>
-                                                        <Chip label={type} variant="outlined" size="small" sx={{ width: '100%' }} />
+                                                        <Chip label={type} variant="outlined" size="small" sx={{ background:getPriorityColor(shiftTypes[type]), width: '100%' }} />
                                                     </Grid>
                                                     <Grid item xs={9} sm={10}>
                                                         <Typography variant="body2">

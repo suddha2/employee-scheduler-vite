@@ -266,26 +266,27 @@ export default function ExpandedScheduleView() {
 
       <Box
         sx={{
-
+          paddingTop: 5,
           maxHeight: 'calc(100vh - 90px)', // adjust based on footer height
-          // overflowX: 'auto',
-          // overflowY: 'auto',
-          // paddingBottom: '72px'
-           //minHeight:'100vh',
-           display: 'flex',
-           flexDirection: 'column',
-          // pt: '64px', // reserve space so content doesn't hide behind navbar
-          // paddingTop: '30px', // reserve space so content doesn't hide behind navbar
-          // paddingBottom: '96px', // reserve space so content doesn't hide behind footer
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
-        <TableContainer component={Paper}>
+        <TableContainer component={Paper} sx={{
+
+          verticalAlign: "top",
+          position: 'sticky',
+          left: 0,
+          backgroundColor: 'white',
+          zIndex: 2,
+          fontWeight: 'bold',
+        }} >
           <Table stickyHeader size="small">
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: "bold" }}>Location - Shift</TableCell>
                 {weekdayOrder.map((day) => (
-                  <TableCell key={day} sx={{ fontWeight: "bold" }}>
+                  <TableCell key={day} sx={{ fontWeight: "bold", textAlign: "center" }}>
                     {day}
                   </TableCell>
                 ))}
@@ -296,14 +297,16 @@ export default function ExpandedScheduleView() {
                 const [location, shiftType] = key.split("|");
                 //console.log("location shiftType ", location, shiftType);
                 return (
-                  <TableRow key={idx} sx={{ verticalAlign: "top" }}>
+                  <TableRow key={idx} sx={{ position: 'sticky', verticalAlign: "top" }}>
                     <TableCell sx={{
                       position: 'sticky',
                       left: 0,
                       backgroundColor: 'white',
                       zIndex: 2,
                       fontWeight: 'bold',
-                    }}>{`${location} - ${shiftType}`}</TableCell>
+                    }}>
+                      {`${location} - ${shiftType.replaceAll("_", " ") }`}
+                    </TableCell>
                     {weekdayOrder.map((day) => (
                       <TableCell key={day} sx={{ verticalAlign: "top" }}>
                         {datesByWeekday[day].map((date) => {
