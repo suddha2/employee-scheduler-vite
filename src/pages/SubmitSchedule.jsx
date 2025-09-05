@@ -25,26 +25,26 @@ export default function SubmitSchedule() {
   const [requests, setRequests] = useState([]);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-const updateRequestStatus = (updatedReq) => {
+  const updateRequestStatus = (updatedReq) => {
 
 
-  setRequests((prev) => {
-  
+    setRequests((prev) => {
 
-    return prev.map((req) => {
-      const isMatch = req.id === updatedReq.id;
-      if (isMatch) {
- 
-        return updatedReq; // Replace entire object
-      }
-      return req;
+
+      return prev.map((req) => {
+        const isMatch = req.id === updatedReq.id;
+        if (isMatch) {
+
+          return updatedReq; // Replace entire object
+        }
+        return req;
+      });
     });
-  });
-};
+  };
 
   //const { rotaData } = useRotaWebSocket();
   const navigate = useNavigate();
-const ws  = useRequestUpdates(setRequests, updateRequestStatus);
+  const ws = useRequestUpdates(setRequests, updateRequestStatus);
 
   useEffect(() => {
     const fetchLocations = async () => {
@@ -64,21 +64,21 @@ const ws  = useRequestUpdates(setRequests, updateRequestStatus);
 
     fetchLocations();
   }, []);
-  
-    const fetchRequests = async () => {
-      try {
-        const response = await axiosInstance.get(API_ENDPOINTS.enqueueList, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
-        setRequests(response.data);
-      } catch (err) {
-        console.error('Failed to fetch requests', err);
-        setSnackbar({ open: true, message: 'Failed to load requests', severity: 'error' });
-      }
-    };
-useEffect(() => {
+
+  const fetchRequests = async () => {
+    try {
+      const response = await axiosInstance.get(API_ENDPOINTS.enqueueList, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      setRequests(response.data);
+    } catch (err) {
+      console.error('Failed to fetch requests', err);
+      setSnackbar({ open: true, message: 'Failed to load requests', severity: 'error' });
+    }
+  };
+  useEffect(() => {
     fetchRequests();
   }, []);
 
@@ -89,10 +89,10 @@ useEffect(() => {
   const handleNewRequest = (newRequest) => {
     setRequests((prev) => [...prev, newRequest]);
   };
-const handleView=(req)=>{
-  console.log("submitSchedule->handleview->",req);
-  navigate(`/schedules?id=${req.rotaId}`);
-}
+  const handleView = (req) => {
+    console.log("submitSchedule->handleview->", req);
+    navigate(`/schedules?id=${req.rotaId}`);
+  }
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Container maxWidth="lg" sx={{ mt: 6 }}>
@@ -132,7 +132,7 @@ const handleView=(req)=>{
 
             {/* Right: List (60%) */}
             <Box sx={{ flex: { md: '0 0 75%' }, width: '100%' }}>
-              <ScheduleList requests={requests} onView={handleView}/>
+              <ScheduleList requests={requests} onView={handleView} />
             </Box>
           </Box>
 

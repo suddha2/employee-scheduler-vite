@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef,useEffect } from "react";
 import {
   Paper,
   Typography,
@@ -10,6 +10,15 @@ import {
 } from "@mui/material";
 import { ExpandLess, ExpandMore } from "@mui/icons-material";
 import { useDraggable, DragOverlay } from "@dnd-kit/core";
+
+
+ const shiftTypes = ["LONG_DAY", "DAY", "WAKING_NIGHT", "FLOATING"];
+  const shiftColors = {
+    LONG_DAY: "#FFB74D", // Morning - orange
+    DAY: "#64B5F6", // Afternoon - blue
+    WAKING_NIGHT: "#9575CD", // Evening - purple
+    FLOATING: "#206c92ff", // Night - grey
+  };
 
 function EmployeeItem({ employee }) {
   //const id = `${employee.firstName} ${employee.lastName}`;
@@ -36,9 +45,36 @@ function EmployeeItem({ employee }) {
         "&:hover": {
           backgroundColor: "grey.200",
         },
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
       }}
     >
-      {employee.firstName} {employee.lastName}
+      <Box sx={{ flexGrow: 1 }}>
+        {employee.firstName} {employee.lastName}
+      </Box>
+
+      <Box sx={{ display: "flex", gap: 0.5 }}>
+        {shiftTypes.map((type) => (
+          <Box
+            key={type}
+            sx={{
+              width: 20,
+              height: 20,
+              borderRadius: "50%",
+              backgroundColor: shiftColors[type],
+              color: "white",
+              fontSize: 12,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            title={`${type} shift`}
+          >
+            {employee.shiftTypeSummary?.[type] ?? 0}
+          </Box>
+        ))}
+      </Box>
     </Box>
   );
 }
@@ -50,6 +86,13 @@ export default function FloatingEmployeeList({ employees = [] })  {
   const [searchQuery, setSearchQuery] = useState("");
   const dragging = useRef(false);
   const offset = useRef({ x: 0, y: 0 });
+const NAVBAR_HEIGHT = 64;
+const BOTTOM_BAR_HEIGHT = 56;
+const LIST_HEIGHT = 400; // or measure dynamically if needed
+const LIST_WIDTH = 260;
+  useEffect(() => {
+    console.log("Updated employees:", employees);
+  }, [employees]);
 
   const handleMouseDown = (e) => {
     dragging.current = true;
@@ -63,10 +106,17 @@ export default function FloatingEmployeeList({ employees = [] })  {
 
   const handleMouseMove = (e) => {
     if (!dragging.current) return;
-    setPosition({
-      left: e.clientX - offset.current.x,
-      top: e.clientY - offset.current.y,
-    });
+
+  const rawTop = e.clientY - offset.current.y;
+  const rawLeft = e.clientX - offset.current.x;
+
+  const maxTop = window.innerHeight - BOTTOM_BAR_HEIGHT - LIST_HEIGHT;
+  const clampedTop = Math.max(NAVBAR_HEIGHT, Math.min(rawTop, maxTop));
+
+  const maxLeft = window.innerWidth - LIST_WIDTH;
+  const clampedLeft = Math.max(0, Math.min(rawLeft, maxLeft));
+
+  setPosition({ top: clampedTop, left: clampedLeft });
   };
 
   const handleMouseUp = () => {

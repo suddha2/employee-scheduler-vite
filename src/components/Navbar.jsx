@@ -18,7 +18,7 @@ useEffect(() => {
 });
 
   return (
-    <AppBar position="static">
+    <AppBar position="fixed" >
       <Toolbar>
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
           Employee Scheduler
