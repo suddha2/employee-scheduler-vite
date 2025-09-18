@@ -84,9 +84,9 @@ const NAVBAR_HEIGHT = 64;
 const BOTTOM_BAR_HEIGHT = 56;
 const LIST_HEIGHT = 400; // or measure dynamically if needed
 const LIST_WIDTH = 260;
-  useEffect(() => {
-    console.log("Updated employees:", employees);
-  }, [employees]);
+  // useEffect(() => {
+  //   console.log("Updated employees:", employees);
+  // }, [employees]);
 
   const handleMouseDown = (e) => {
     dragging.current = true;

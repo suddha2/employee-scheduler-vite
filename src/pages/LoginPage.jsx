@@ -37,7 +37,8 @@ function LoginPage() {
       const response = await axios.post(API_ENDPOINTS.login, { "userName": email, "pass":password });
       const token = response.data.token;
       onLogin(token);
-      navigate('/submit');
+      //navigate('/submit');
+      navigate('/paycycleSchedule');
       setErrors('');
       } catch (err) {
         console.error('Login failed:', err);

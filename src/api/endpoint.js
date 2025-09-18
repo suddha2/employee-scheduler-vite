@@ -7,6 +7,7 @@ export const  API_ENDPOINTS = {
   enqueueList : `${API_BASE_URL}/api/enqueue/latest`,
   solvedSchedule : `${API_BASE_URL}/api/solved`,
   updateSolvedSol : `${API_BASE_URL}/api/save`,
+  payCycleSchedule : `${API_BASE_URL}/api/payCycle`,
   websoc: `${API_BASE_URL}/ws`,
 
 };

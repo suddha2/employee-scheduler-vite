@@ -18,8 +18,7 @@ export function useRequestUpdates(setRequests, updateRequestStatus) {
 
 				client.subscribe('/user/queue/req-update', (message) => {
 					try {
-                        console.log("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$",message);
-						const data = JSON.parse(message.body);
+                        const data = JSON.parse(message.body);
 						updateRequestStatus(data);
 					} catch (err) {
 						console.error('Failed to parse message:', err);

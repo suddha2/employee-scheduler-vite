@@ -6,12 +6,10 @@ import Navbar from './components/Navbar';
 import LoginPage from './pages/LoginPage';
 import SubmitSchedule from './pages/SubmitSchedule';
 import ViewSchedules from './pages/ViewSchedules';
+import PayCycleSchedule from './pages/PayCycleScheduleView';
 
-//import { scheduleData } from './data/schedule'; // Assuming schedule data is imported from a file
-// import { employees } from './data/schedule'; // Assuming employee data is imported from a file
 export default function App() {
-  //const [schedule, setSchedule] = useState(scheduleData);
-  //const [availableEmployees, setAvailableEmployees] = useState(employees);
+
 
 
   return (
@@ -23,6 +21,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/login" />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/paycycleSchedule" element={<PayCycleSchedule />} />
             <Route path="/submit" element={<SubmitSchedule />} />
             <Route path="/schedules" element={<ViewSchedules />} />
           </Routes>

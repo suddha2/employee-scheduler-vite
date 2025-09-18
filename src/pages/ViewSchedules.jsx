@@ -158,6 +158,7 @@ export default function ExpandedScheduleView() {
   const [highlighted, setHighlighted] = useState({});
 
   function handleRemove(cellKey, emp) {
+
     setAssignmentMap((prev) => {
       const current = prev[cellKey] ?? [];
       const [location, shiftType, date, shiftTime] = cellKey.split("|");
@@ -172,7 +173,7 @@ export default function ExpandedScheduleView() {
       }
 
       const updated = current.filter((e) => e.id !== emp.id);
-      return { ...prev, [cellKey]: updated.id };
+      return { ...prev, [cellKey]: updated };
     });
 
     setHighlighted((prev) => {
@@ -186,7 +187,6 @@ export default function ExpandedScheduleView() {
     const [, empIdStr] = active.id.split("|");
     const empId = Number(empIdStr);
     const droppedEmp = summarizedEmpList.find((e) => e.id === empId);
-    console.log("picked ", droppedEmp);
     if (!droppedEmp || !over) return;
 
     const [, location, shiftType, date, shiftTime] = over.id.split("|");
@@ -292,6 +292,7 @@ export default function ExpandedScheduleView() {
                 ))}
               </TableRow>
             </TableHead>
+              
             <TableBody>
               {Object.entries(groupedAssignments).map(([key, assignments], idx) => {
                 const [location, shiftType] = key.split("|");
