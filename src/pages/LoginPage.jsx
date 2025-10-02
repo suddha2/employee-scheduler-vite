@@ -18,7 +18,7 @@ function onLogin(token){
   localStorage.setItem("token",token);
 }
 
-function LoginPage() {
+function LoginPage_old() {
   
   localStorage.setItem("token",'');
   const [email, setEmail] = useState('');
@@ -100,4 +100,4 @@ function LoginPage() {
   );
 }
 
-export default LoginPage;
+export default LoginPage_old;
