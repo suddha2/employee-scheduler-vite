@@ -100,8 +100,52 @@ export default function PayCycleSchedule() {
     }, []);
     const handleViewClick = (id) => {
         console.log("handleViewClick = ", id);
-        navigate(`/schedules?id=${id}`);
+        //navigate(`/schedules?id=${id}`);
+        window.open(`/schedules?id=${id}`, '_blank');
     }
+    const handleServiceStatsClick = (id) => {
+        console.log("handleViewClick = ", id);
+        //navigate(`/schedules?id=${id}`);
+        window.open(`/servicestats?id=${id}`, '_blank');
+    }
+    const handleEmpStatsClick = (id) => {
+        console.log("handleViewClick = ", id);
+        //navigate(`/schedules?id=${id}`);
+        window.open(`/empstats?id=${id}`, '_blank');
+    }
+
+    const handleDownloadClick = async (rotaId) => {
+        try {
+            const response = await axiosInstance.get(`${API_ENDPOINTS.csvDownload}?id=${rotaId}`, {
+                responseType: "blob",
+            });
+
+            // Extract filename from Content-Disposition header
+            const disposition = response.headers["content-disposition"];
+            let filename = `rota-${rotaId}.csv`; // fallback
+
+            if (disposition && disposition.includes("filename=")) {
+                const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (match && match[1]) {
+                    filename = match[1].replace(/['"]/g, ""); // remove quotes
+                }
+            }
+
+            const blob = new Blob([response.data], { type: "text/csv" });
+            const url = window.URL.createObjectURL(blob);
+
+            const link = document.createElement("a");
+            link.href = url;
+            link.setAttribute("download", filename);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error("CSV download failed", err);
+        }
+    };
     const handleCardSubmit = async (period) => {
         const { startDate, endDate } = period;
 
@@ -271,14 +315,50 @@ export default function PayCycleSchedule() {
                                                         ⏳ Waiting for completion...
                                                     </Button>
                                                 ) : currentPeriod.hasSolveRequest && currentPeriod.solevReqStatus === 'COMPLETED' ? (
-                                                    <Button variant="contained" color="primary" onClick={() => handleViewClick(currentPeriod.rotaId)}>
-                                                        View
-                                                    </Button>
+                                                    <Box display="flex" gap={1} flexWrap="wrap" alignItems={"right"}>
+                                                        <Button
+                                                            variant="contained"
+                                                            color="primary"
+                                                            size="small"
+                                                            sx={{ px: 2, py: 0.5 }}
+                                                            onClick={() => handleServiceStatsClick(currentPeriod.rotaId)}
+                                                        >
+                                                            Service Stats
+                                                        </Button>
+                                                        <Button
+                                                            variant="contained"
+                                                            color="primary"
+                                                            size="small"
+                                                            sx={{ px: 2, py: 0.5 }}
+                                                            onClick={() => handleEmpStatsClick(currentPeriod.rotaId)}
+                                                        >
+                                                            Employee Stats
+                                                        </Button>
+                                                        <Button
+                                                            variant="outlined"
+                                                            color="secondary"
+                                                            size="small"
+                                                            sx={{ px: 2, py: 0.5 }}
+                                                            onClick={() => handleDownloadClick(currentPeriod.rotaId)}
+                                                        >
+                                                            Download CSV
+                                                        </Button>
+                                                        <Button
+                                                            variant="contained"
+                                                            color="primary"
+                                                            size="small"
+                                                            sx={{ px: 2, py: 0.5 }}
+                                                            onClick={() => handleViewClick(currentPeriod.rotaId)}
+                                                        >
+                                                            View
+                                                        </Button>
+                                                    </Box>
                                                 ) : (
                                                     <Button variant="contained" color="primary" onClick={() => handleCardSubmit(period)}>
                                                         Generate
                                                     </Button>
                                                 )}
+
                                             </Alert>
                                         </Box>
 

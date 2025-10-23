@@ -1,34 +1,26 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo, memo } from "react";
 import {
   Table, TableHead, TableBody, TableRow, TableCell,
   TableContainer, Paper, Typography, Box, Tooltip, Button, CircularProgress
 } from "@mui/material";
-import { format, addDays, eachDayOfInterval } from "date-fns";
-import { DndContext } from "@dnd-kit/core";
+import { format } from "date-fns";
+import { DndContext, DragOverlay, pointerWithin } from "@dnd-kit/core";
+import { useVirtualizer } from '@tanstack/react-virtual';
 import FloatingEmployeeList from "./FloatingEmployeeList";
-import { useSearchParams } from 'react-router-dom';
-// import { scheduleData } from "../data/schedule"
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
 import { DroppableCell } from "../components/droppableCell";
-import { useNavigate } from 'react-router-dom';
-
 
 const weekdayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const datesByWeekday = {};
 weekdayOrder.forEach((day) => {
   datesByWeekday[day] = [];
 });
+
 function LoadingSpinner() {
   return (
-    <Box
-      display="flex"
-      justifyContent="center"
-      alignItems="center"
-      verticalAlign="middle"
-      height="100%"
-      width="100%"
-    >
+    <Box display="flex" justifyContent="center" alignItems="center" height="100%" width="100%">
       <CircularProgress size={48} thickness={4} />
     </Box>
   );
@@ -36,12 +28,12 @@ function LoadingSpinner() {
 
 function buildAssignmentMap(assignments) {
   const map = {};
-  const seen = {}; // Track employee IDs per key
+  const seen = {};
 
   assignments.forEach(({ shift, employee }) => {
     const location = shift.shiftTemplate.location;
     const shiftType = shift.shiftTemplate.shiftType;
-    const date = shift.shiftStart; // "YYYY-MM-DD"
+    const date = shift.shiftStart;
     const shiftStartTime = shift.shiftTemplate.startTime;
     const key = `${location}|${shiftType}|${date}|${shiftStartTime}`;
 
@@ -61,7 +53,7 @@ function buildAssignmentMap(assignments) {
   );
 
   uniqueDateStrings.forEach((dateStr) => {
-    const weekday = format(new Date(dateStr), "EEE"); // e.g. "Sun"
+    const weekday = format(new Date(dateStr), "EEE");
     if (datesByWeekday[weekday]) {
       if (!datesByWeekday[weekday].includes(dateStr)) {
         datesByWeekday[weekday].push(dateStr);
@@ -73,45 +65,137 @@ function buildAssignmentMap(assignments) {
 }
 
 function setEmpSummary(emplist, assignments) {
-
   const shiftTypeMap = {};
+
   assignments.forEach(({ shift, employee }) => {
     if (!employee) return;
-    console.log("Processing assignment:", { shift, employee });
-    if (!shiftTypeMap[employee.id]) {
-      shiftTypeMap[employee.id] = {};
+
+    const empId = employee.id;
+    const shiftType = shift.shiftTemplate.shiftType;
+
+    if (!shiftTypeMap[empId]) {
+      shiftTypeMap[empId] = {};
     }
-    shiftTypeMap[employee.id][shift.shiftTemplate.shiftType] =
-      (shiftTypeMap[employee.id][shift.shiftTemplate.shiftType] || 0) + 1;
+
+    if (!shiftTypeMap[empId][shiftType]) {
+      shiftTypeMap[empId][shiftType] = { count: 0, hours: 0 };
+    }
+
+    shiftTypeMap[empId][shiftType].count += 1;
+    shiftTypeMap[empId][shiftType].hours += shift.durationInHours;
   });
 
-  // Step 2: Update emplist with shiftTypeSummary
   const updatedEmplist = emplist.map(emp => ({
     ...emp,
     shiftTypeSummary: shiftTypeMap[emp.id] || {}
-
   }));
 
-  console.log("Updated Employee List with Shift Summary:", updatedEmplist);
   return updatedEmplist;
 }
 
-export default function ExpandedScheduleView() {
+// Memoized virtual row component
+const VirtualRow = memo(({ 
+  row, 
+  columnWidths, 
+  weekdayOrder, 
+  datesByWeekday, 
+  assignmentMap, 
+  highlighted, 
+  handleRemove, 
+  activeDragId,
+  virtualRow,
+  measureElement 
+}) => {
+  const { location, shiftType, assignments } = row;
+
+  return (
+    <Box
+      ref={measureElement}
+      data-index={virtualRow.index}
+      sx={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        transform: `translateY(${virtualRow.start}px)`,
+        display: 'flex',
+        borderBottom: '1px solid #ddd',
+        backgroundColor: '#f3f0e1ff',
+      }}
+    >
+      <Box sx={{ width: columnWidths[0], fontWeight: 'bold', p: 1, borderRight: '1px solid #eee' }}>
+        {`${location} - ${shiftType.replaceAll("_", " ")}`}
+      </Box>
+
+      {weekdayOrder.map((day, i) => (
+        <Box key={day} sx={{ width: columnWidths[i + 1], p: 1, borderRight: '1px solid #eee' }}>
+          {datesByWeekday[day].map((date) => {
+            const dateStr = date;
+            const matching = assignments.filter((a) => {
+              const shiftDateStr = format(new Date(a.shift.shiftStart), "yyyy-MM-dd");
+              return shiftDateStr === dateStr;
+            });
+
+            return matching.map((assignment) => {
+              const shiftDateStr = format(new Date(assignment.shift.shiftStart), "yyyy-MM-dd");
+              const shiftStartTime = assignment.shift.shiftTemplate.startTime;
+              const cellKey = `${location}|${shiftType}|${shiftDateStr}|${shiftStartTime}`;
+              const droppableId = `cell|${cellKey}`;
+
+              return (
+                <Box key={assignment.id} sx={{ mb: 1 }}>
+                  <Typography variant="caption" fontWeight="bold" display="block">
+                    {format(new Date(assignment.shift.shiftStart), "MMM d")}
+                  </Typography>
+                  <Typography variant="caption" display="block" color="text.secondary">
+                    {assignment.shift.shiftTemplate.startTime.slice(0, 5)}-
+                    {assignment.shift.shiftTemplate.endTime.slice(0, 5)}
+                  </Typography>
+                  <DroppableCell
+                    id={droppableId}
+                    assigned={assignmentMap[cellKey] ?? []}
+                    highlighted={highlighted[cellKey] ?? []}
+                    onRemove={handleRemove}
+                    isDragging={!!activeDragId}
+                  />
+                </Box>
+              );
+            });
+          })}
+        </Box>
+      ))}
+    </Box>
+  );
+}, (prevProps, nextProps) => {
+  // Only re-render if these specific props change
+  return (
+    prevProps.activeDragId === nextProps.activeDragId &&
+    prevProps.row.key === nextProps.row.key &&
+    prevProps.virtualRow.start === nextProps.virtualRow.start &&
+    prevProps.assignmentMap === nextProps.assignmentMap
+  );
+});
+
+VirtualRow.displayName = 'VirtualRow';
+
+export default function ViewSchedules() {
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ message: '', opened: false });
   const [rotaData, setRotaData] = useState(null);
-
+  const [assignmentMap, setAssignmentMap] = useState({});
+  const [groupedAssignments, setGroupedAssignments] = useState({});
+  const [summarizedEmpList, setSummarizedEmpList] = useState([]);
+  const [highlighted, setHighlighted] = useState({});
+  const [activeDragId, setActiveDragId] = useState(null);
+  const [draggedEmployee, setDraggedEmployee] = useState(null);
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
 
-  var empList = rotaData?.employeeList || [];
-  const [assignmentMap, setAssignmentMap] = useState({});
-  const [groupedAssignments, setGroupedAssignments] = useState({});
-  const [summarizedEmpList, setSummarizedEmpList] = useState([]);
-  useEffect(() => {
+  const parentRef = useRef(null);
 
+  useEffect(() => {
     if (!id) return;
     const fetchSchedule = async () => {
       try {
@@ -129,51 +213,84 @@ export default function ExpandedScheduleView() {
     };
 
     fetchSchedule();
-  }, []);
+  }, [id]);
 
   useEffect(() => {
-    if (rotaData?.shiftAssignmentList) {
-      const newMap = buildAssignmentMap(rotaData.shiftAssignmentList);
-      setAssignmentMap(newMap);
-      const grouped = {};
-      rotaData.shiftAssignmentList.forEach((assignment) => {
-        const { location, shiftType } = assignment.shift.shiftTemplate;
-        const key = `${location}|${shiftType}`;
+    if (!rotaData || !Array.isArray(rotaData.shiftAssignmentList)) return;
+    if (rotaData.shiftAssignmentList.length === 0) return;
 
-        if (!grouped[key]) {
-          grouped[key] = [];
-        }
+    const grouped = {};
+    rotaData.shiftAssignmentList.forEach((assignment) => {
+      const { location, shiftType } = assignment.shift.shiftTemplate;
+      const key = `${location}|${shiftType}`;
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(assignment);
+    });
 
-        grouped[key].push(assignment);
-      });
-      setGroupedAssignments(grouped);
-      const updated = setEmpSummary(rotaData.employeeList, rotaData.shiftAssignmentList);
-      setSummarizedEmpList(updated);
-    }
-  }, [rotaData?.shiftAssignmentList]);
+    setGroupedAssignments(grouped);
 
+    const newMap = buildAssignmentMap(rotaData.shiftAssignmentList);
+    setAssignmentMap(newMap);
 
+    const updated = setEmpSummary(rotaData.employeeList, rotaData.shiftAssignmentList);
+    setSummarizedEmpList(updated);
+  }, [rotaData]);
 
+  const rowData = useMemo(() => {
+    return Object.entries(groupedAssignments).map(([key, assignments]) => {
+      const [location, shiftType] = key.split("|");
+      return {
+        key,
+        location,
+        shiftType,
+        assignments
+      };
+    });
+  }, [groupedAssignments]);
 
-  const [highlighted, setHighlighted] = useState({});
+  const rowVirtualizer = useVirtualizer({
+    count: rowData.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 150,
+    overscan: 3, // CRITICAL: Reduced from 50 to 3
+  });
 
-  function handleRemove(cellKey, emp) {
+  const handleRemove = useMemo(() => (cellKey, emp) => {
+    const [, location, shiftType, date, shiftTime] = cellKey.split("|");
 
     setAssignmentMap((prev) => {
       const current = prev[cellKey] ?? [];
-      const [location, shiftType, date, shiftTime] = cellKey.split("|");
-      console.log(emp);
-
-      if (emp.shiftTypeSummary && emp.shiftTypeSummary[shiftType]) {
-        emp.shiftTypeSummary[shiftType] = (emp.shiftTypeSummary[shiftType] ?? 0) - 1;
-      } else {
-        const removedEmp = summarizedEmpList.find((e) => e.id === emp.id);
-        emp.shiftTypeSummary = removedEmp?.shiftTypeSummary || {};
-        emp.shiftTypeSummary[shiftType] = (emp.shiftTypeSummary[shiftType] ?? 0) - 1;
-      }
-
       const updated = current.filter((e) => e.id !== emp.id);
       return { ...prev, [cellKey]: updated };
+    });
+
+    setSummarizedEmpList((prevList) => {
+      return prevList.map((e) => {
+        if (e.id === emp.id) {
+          const summary = e.shiftTypeSummary?.[shiftType] || { count: 0, hours: 0 };
+
+          const matchingAssignment = rotaData.shiftAssignmentList.find((a) =>
+            a.shift.shiftTemplate.shiftType === shiftType &&
+            a.shift.shiftTemplate.startTime === shiftTime &&
+            a.shift.shiftTemplate.location === location &&
+            a.shift.shiftStart === date
+          );
+
+          const duration = matchingAssignment?.shift?.durationInHours || 0;
+          const updatedSummary = { ...e.shiftTypeSummary };
+          const newCount = Math.max(0, summary.count - 1);
+          const newHours = Math.max(0, summary.hours - duration);
+
+          if (newCount === 0 && newHours === 0) {
+            delete updatedSummary[shiftType];
+          } else {
+            updatedSummary[shiftType] = { count: newCount, hours: newHours };
+          }
+
+          return { ...e, shiftTypeSummary: updatedSummary };
+        }
+        return e;
+      });
     });
 
     setHighlighted((prev) => {
@@ -181,13 +298,26 @@ export default function ExpandedScheduleView() {
       const updated = current.filter((e) => e.id !== emp.id);
       return { ...prev, [cellKey]: updated };
     });
+  }, [rotaData]);
+
+  function handleDragStart({ active }) {
+    setActiveDragId(active.id);
+    const [, empIdStr] = active.id.split("|");
+    const empId = Number(empIdStr);
+    const emp = summarizedEmpList.find((e) => e.id === empId);
+    setDraggedEmployee(emp);
   }
 
-  function handleDrop({ active, over }) {
+  function handleDragEnd({ active, over }) {
+    setActiveDragId(null);
+    setDraggedEmployee(null);
+
+    if (!over) return;
+
     const [, empIdStr] = active.id.split("|");
     const empId = Number(empIdStr);
     const droppedEmp = summarizedEmpList.find((e) => e.id === empId);
-    if (!droppedEmp || !over) return;
+    if (!droppedEmp) return;
 
     const [, location, shiftType, date, shiftTime] = over.id.split("|");
     const cellKey = `${location}|${shiftType}|${date}|${shiftTime}`;
@@ -196,24 +326,50 @@ export default function ExpandedScheduleView() {
       const current = prev[cellKey] ?? [];
       const alreadyAssigned = current.some((e) => e.id === droppedEmp.id);
       if (alreadyAssigned) return prev;
-      droppedEmp.shiftTypeSummary[shiftType] = (droppedEmp.shiftTypeSummary[shiftType] ?? 0) + 1;
-      return {
-        ...prev,
-        [cellKey]: [...current, droppedEmp],
-      };
+
+      return { ...prev, [cellKey]: [...current, droppedEmp] };
     });
 
+    setSummarizedEmpList((prevList) => {
+      return prevList.map((e) => {
+        if (e.id === empId) {
+          const summary = e.shiftTypeSummary?.[shiftType] || { count: 0, hours: 0 };
+
+          const matchingAssignment = rotaData.shiftAssignmentList.find((a) =>
+            a.shift.shiftTemplate.shiftType === shiftType &&
+            a.shift.shiftTemplate.startTime === shiftTime &&
+            a.shift.shiftTemplate.location === location &&
+            a.shift.shiftStart === date
+          );
+
+          const duration = matchingAssignment?.shift?.durationInHours || 0;
+
+          return {
+            ...e,
+            shiftTypeSummary: {
+              ...e.shiftTypeSummary,
+              [shiftType]: {
+                count: summary.count + 1,
+                hours: summary.hours + duration
+              }
+            }
+          };
+        }
+        return e;
+      });
+    });
 
     setHighlighted((prev) => {
       const current = prev[cellKey] ?? [];
       const alreadyAssigned = current.some((e) => e.id === droppedEmp.id);
       if (alreadyAssigned) return prev;
-
-      return {
-        ...prev,
-        [cellKey]: [...current, droppedEmp],
-      };
+      return { ...prev, [cellKey]: [...current, droppedEmp] };
     });
+  }
+
+  function handleDragCancel() {
+    setActiveDragId(null);
+    setDraggedEmployee(null);
   }
 
   async function handleSave() {
@@ -224,20 +380,19 @@ export default function ExpandedScheduleView() {
         employees.map(emp => ({ id: emp.id })),
       ])
     );
-    try {
 
+    try {
       const response = await axiosInstance.post(`${API_ENDPOINTS.updateSolvedSol}`, {
-        method: 'POST',
-        body: JSON.stringify({ assignments: compactMap, rota: id }),
+        assignments: compactMap,
+        rota: id
+      }, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
           'Content-Type': 'application/json',
         },
       });
 
-
-
-      setSnackbar({ message: response.message || 'Saved successfully!', opened: true });
+      setSnackbar({ message: response.data.message || 'Saved successfully!', opened: true });
       navigate("/submit");
     } catch (error) {
       setSnackbar({ message: 'Save failed. Please try again.', opened: true });
@@ -245,164 +400,125 @@ export default function ExpandedScheduleView() {
     } finally {
       setLoading(false);
     }
-
-  }
-  function hasUnsavedChanges() {
-
-  }
-  if (!rotaData?.shiftAssignmentList?.length) {
-    return <Typography>Waiting for schedule to be solved...</Typography>;
   }
 
   if (loading) {
     return <LoadingSpinner />
   }
-  return (
 
-    <DndContext onDragEnd={handleDrop}>
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  const columnWidths = [200, 150, 150, 150, 150, 150, 150, 150];
+
+  return (
+    <DndContext
+      collisionDetection={pointerWithin}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
       <Typography variant="h6" gutterBottom>
         Schedule View (Grouped by Day)
       </Typography>
 
-      <Box
-        sx={{
-          paddingTop: 5,
-          maxHeight: 'calc(100vh - 90px)', // adjust based on footer height
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        <TableContainer component={Paper} sx={{
+      <Box sx={{
+        paddingTop: 5,
+        maxHeight: 'calc(100vh - 90px)',
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
+        <TableContainer
+          component={Paper}
+          ref={parentRef}
+          sx={{
+            overflow: 'auto',
+            maxHeight: 'calc(100vh - 200px)',
+            position: 'relative',
+          }}
+        >
+          {/* Sticky Header */}
+          <Box sx={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+            backgroundColor: '#f9f9f9',
+            display: 'flex',
+            borderBottom: '2px solid #ccc',
+          }}>
+            {["Location - Shift", ...weekdayOrder].map((label, i) => (
+              <Box
+                key={label}
+                sx={{
+                  width: columnWidths[i],
+                  fontWeight: 'bold',
+                  textAlign: i === 0 ? 'left' : 'center',
+                  p: 1.5,
+                  borderRight: i < columnWidths.length - 1 ? '1px solid #eee' : 'none',
+                }}
+              >
+                {label}
+              </Box>
+            ))}
+          </Box>
 
-          verticalAlign: "top",
-          position: 'sticky',
-          left: 0,
-          backgroundColor: 'white',
-          zIndex: 2,
-          fontWeight: 'bold',
-        }} >
-          <Table stickyHeader size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: "bold" }}>Location - Shift</TableCell>
-                {weekdayOrder.map((day) => (
-                  <TableCell key={day} sx={{ fontWeight: "bold", textAlign: "center" }}>
-                    {day}
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-              
-            <TableBody>
-              {Object.entries(groupedAssignments).map(([key, assignments], idx) => {
-                const [location, shiftType] = key.split("|");
-                //console.log("location shiftType ", location, shiftType);
-                return (
-                  <TableRow key={idx} sx={{ position: 'sticky', verticalAlign: "top" }}>
-                    <TableCell sx={{
-                      position: 'sticky',
-                      left: 0,
-                      backgroundColor: 'white',
-                      zIndex: 2,
-                      fontWeight: 'bold',
-                    }}>
-                      {`${location} - ${shiftType.replaceAll("_", " ") }`}
-                    </TableCell>
-                    {weekdayOrder.map((day) => (
-                      <TableCell key={day} sx={{ verticalAlign: "top" }}>
-                        {datesByWeekday[day].map((date) => {
-                          const dateStr = date; //format(date, "yyyy-MM-dd");
-                          //const matching = assignments.filter((a) => a.date === dateStr);
-                          const matching = assignments.filter((a) => {
-                            const shiftDateStr = format(new Date(a.shift.shiftStart), "yyyy-MM-dd");
-                            return shiftDateStr === dateStr;
-                          });
-
-
-                          return matching.map((assignment) => {
-                            //const cellKey = `${location}|${shiftType}|${assignment.date}`;
-                            const shiftDateStr = format(new Date(assignment.shift.shiftStart), "yyyy-MM-dd");
-                            const shiftStartTime = assignment.shift.shiftTemplate.startTime;
-                            const cellKey = `${location}|${shiftType}|${shiftDateStr}|${shiftStartTime}`;
-                            const droppableId = `cell|${cellKey}`;
-                            //const assigned = assignmentMap[cellKey] || [];
-
-                            return (
-                              <Table
-                                key={assignment.id}
-                                size="small"
-                                sx={{ borderCollapse: "separate", mb: 1, width: "100%" }}
-                              >
-                                <TableBody>
-                                  <TableRow sx={{ height: 24 }}>
-                                    <TableCell
-                                      sx={{
-                                        p: 0,
-                                        fontWeight: "bold",
-                                        verticalAlign: "top",
-                                        height: 24,
-                                        lineHeight: "24px",
-                                        borderBottom: "none",
-                                      }}
-                                    >
-                                      {format(new Date(assignment.shift.shiftStart), "MMM d")}
-                                    </TableCell>
-                                  </TableRow>
-                                  <TableRow>
-                                    <TableCell
-                                      sx={{
-                                        p: 0,
-                                        borderTop: "none",
-                                        width: "40%",
-                                        fontSize: "0.85rem",
-                                      }}
-                                    >
-                                      {assignment.shift.shiftTemplate.startTime}
-                                    </TableCell>
-                                    <TableCell sx={{ p: 0, borderTop: "none" }}>
-
-
-                                      <DroppableCell
-                                        id={droppableId}
-                                        assigned={assignmentMap[cellKey] ?? []}
-                                        highlighted={highlighted[cellKey] ?? []}
-                                        onRemove={handleRemove}
-                                      />
-
-                                    </TableCell>
-                                  </TableRow>
-                                </TableBody>
-                              </Table>
-                            );
-                          });
-                        })}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          {/* Virtualized Rows */}
+          <Box sx={{
+            position: 'relative',
+            height: `${rowVirtualizer.getTotalSize()}px`,
+          }}>
+            {virtualItems.map((virtualRow) => {
+              const row = rowData[virtualRow.index];
+              return (
+                <VirtualRow
+                  key={virtualRow.key}
+                  row={row}
+                  columnWidths={columnWidths}
+                  weekdayOrder={weekdayOrder}
+                  datesByWeekday={datesByWeekday}
+                  assignmentMap={assignmentMap}
+                  highlighted={highlighted}
+                  handleRemove={handleRemove}
+                  activeDragId={activeDragId}
+                  virtualRow={virtualRow}
+                  measureElement={rowVirtualizer.measureElement}
+                />
+              );
+            })}
+          </Box>
         </TableContainer>
       </Box>
-      <FloatingEmployeeList employees={summarizedEmpList || []} />
-      <Box
-        sx={{
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          height: 50,
-          width: "100%",
-          backgroundColor: "#f8f9fa",
-          borderTop: "1px solid #dee2e6",
-          padding: "12px 24px",
-          //paddingRight: 'calc(24px + 16px)',
-          textAlign: "right",
-          zIndex: 1000,
-        }}
-      >
 
-        <Button variant="contained" color="primary" onClick={handleSave} disabled={!hasUnsavedChanges}>
+      <FloatingEmployeeList employees={summarizedEmpList || []} />
+
+      <DragOverlay>
+        {draggedEmployee ? (
+          <Box sx={{
+            px: 2,
+            py: 1,
+            borderRadius: 1,
+            backgroundColor: "primary.main",
+            color: "white",
+            boxShadow: 3,
+            cursor: "grabbing",
+            fontWeight: "bold",
+          }}>
+            {draggedEmployee.firstName} {draggedEmployee.lastName}
+          </Box>
+        ) : null}
+      </DragOverlay>
+
+      <Box sx={{
+        position: "fixed",
+        bottom: 0,
+        left: 0,
+        height: 50,
+        width: "100%",
+        backgroundColor: "#f8f9fa",
+        borderTop: "1px solid #dee2e6",
+        padding: "12px 24px",
+        textAlign: "right",
+        zIndex: 1000,
+      }}>
+        <Button variant="contained" color="primary" onClick={handleSave}>
           Save Schedule
         </Button>
       </Box>

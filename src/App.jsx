@@ -7,7 +7,8 @@ import LoginPage from './pages/LoginPage';
 import SubmitSchedule from './pages/SubmitSchedule';
 import ViewSchedules from './pages/ViewSchedules';
 import PayCycleSchedule from './pages/PayCycleScheduleView';
-
+import ServiceStatsView from './pages/ServiceStatsView';
+import EmpStatsView from './pages/EmpStatsView';
 export default function App() {
 
 
@@ -24,6 +25,8 @@ export default function App() {
             <Route path="/paycycleSchedule" element={<PayCycleSchedule />} />
             <Route path="/submit" element={<SubmitSchedule />} />
             <Route path="/schedules" element={<ViewSchedules />} />
+            <Route path="/servicestats" element={<ServiceStatsView />} />
+            <Route path="/empstats" element={<EmpStatsView />} /> 
           </Routes>
         </Router>
        

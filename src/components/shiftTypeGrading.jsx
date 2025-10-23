@@ -1,4 +1,5 @@
 export  const shiftTypes = ["LONG_DAY", "DAY", "WAKING_NIGHT", "FLOATING"];
+export  const shiftTypeShortText = ["LD", "DY", "WN", "FL"];
 export  const shiftColors = {
     LONG_DAY: 20, // "#FFB74D", // Morning - orange
     DAY: 30, //"#64B5F6", // Afternoon - blue
