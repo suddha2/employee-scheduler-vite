@@ -10,7 +10,7 @@ import {
   Paper,
   CircularProgress,
   Box,
-  Alert,
+  Alert,TextField,
 } from "@mui/material";
 import { API_ENDPOINTS } from "../api/endpoint";
 import axiosInstance from "../components/axiosInstance";
@@ -64,6 +64,8 @@ export default function EmpStatsTable() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [nameFilter, setNameFilter] = useState('');
+
 
   useEffect(() => {
     const rotaId = new URLSearchParams(window.location.search).get("id");
@@ -122,7 +124,9 @@ export default function EmpStatsTable() {
       };
     });
   }
-
+const filteredData = data.filter((emp) =>
+    (emp.name || "").toLowerCase().includes(nameFilter.toLowerCase())
+  );
   return (
     <Box sx={{ mt: '64px' }}>
       <TableContainer
@@ -138,7 +142,32 @@ export default function EmpStatsTable() {
         <Table size="small" stickyHeader>
           <TableHead>
             <TableRow sx={{ height: '40px' }}>
-              <TableCell sx={{ ...stickyHeaderStyle, height: '40px' }} rowSpan={2}>Name</TableCell>
+              <TableCell sx={{ ...stickyHeaderStyle, height: '40px' }} rowSpan={2}>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                  <Typography variant="body2" sx={{ fontWeight: "bold", color: "#fff" }}>
+                    Name
+                  </Typography>
+                  <TextField
+                    placeholder="Filter"
+                    value={nameFilter}
+                    onChange={(e) => setNameFilter(e.target.value)}
+                    variant="standard"
+                    fullWidth
+                    InputProps={{
+                      disableUnderline: true,
+                      sx: {
+                        fontSize: "0.75rem",
+                        color: "#fff",
+                        backgroundColor: "rgba(255, 255, 255, 0.15)",
+                        borderRadius: 1,
+                        px: 1,
+                        height: 24,
+                      },
+                    }}
+                    inputProps={{ style: { padding: 0 } }}
+                  />
+                </Box>
+              </TableCell>
               <TableCell sx={{ ...stickyHeaderStyle, height: '40px' }} rowSpan={2}>Contract</TableCell>
               <TableCell sx={{ ...stickyHeaderStyle, height: '40px' }} rowSpan={2}>Type</TableCell>
               {weekNumbers.map((week) => {
@@ -188,7 +217,7 @@ export default function EmpStatsTable() {
           </TableHead>
 
           <TableBody>
-            {data.map((emp, empIndex) => {
+            {filteredData.map((emp, empIndex) => {
               const weekMap = new Map(emp.weeklyStats.map(w => [w.weekNumber, w]));
               const isEvenEmployee = empIndex % 2 === 0;
               

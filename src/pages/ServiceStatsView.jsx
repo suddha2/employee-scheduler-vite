@@ -15,8 +15,9 @@ import {
     Accordion,
     AccordionSummary,
     AccordionDetails,
-    Chip,
+    Chip,Tooltip,
 } from '@mui/material';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useEffect, useState } from 'react';
 import axiosInstance from '../components/axiosInstance';
@@ -164,78 +165,94 @@ export default function ServiceStatsView() {
                                             </Box>
 
                                             {/* Weekly Breakdown with Accordion */}
-                                            {service.weeks?.map((week, i) => (
-                                                <Accordion key={i} sx={{ mb: 2 }}>
-                                                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                                                        <Typography variant="subtitle2">
-                                                            Week {week.weekNumber} ({week.start} → {week.end})
-                                                        </Typography>
-                                                    </AccordionSummary>
-                                                    <AccordionDetails>
-                                                        <Table size="small">
-                                                            <TableHead>
-                                                                <TableRow>
-                                                                    <TableCell>Shift Type</TableCell>
-                                                                    <TableCell>Alloc Count</TableCell>
-                                                                    <TableCell>Unalloc Count</TableCell>
-                                                                    <TableCell>Shift Count</TableCell>
-                                                                    <TableCell>Coverage</TableCell>
-                                                                </TableRow>
-                                                            </TableHead>
-                                                            <TableBody>
-                                                                {week.shiftStats?.map((stat, j) => {
-                                                                    const percent = stat.shiftCount > 0 ? Math.round((stat.allocationCount / stat.shiftCount) * 100) : 0;
-                                                                    return (
-                                                                        <TableRow key={j}>
-                                                                            <TableCell>{stat.shiftType}</TableCell>
-                                                                            <TableCell>{stat.allocationCount}</TableCell>
-                                                                            <TableCell>{stat.shiftCount - stat.allocationCount}</TableCell>
-                                                                            <TableCell>{stat.shiftCount}</TableCell>
-                                                                            <TableCell sx={{ minWidth: 140 }}>
-                                                                                <Box sx={{ position: 'relative', width: '100%', maxWidth: 120 }}>
-                                                                                    <LinearProgress
-                                                                                        variant="determinate"
-                                                                                        value={percent}
-                                                                                        sx={{
-                                                                                            height: 10,
-                                                                                            borderRadius: 5,
-                                                                                            bgcolor: '#eee',
-                                                                                            '& .MuiLinearProgress-bar': {
-                                                                                                backgroundColor:
-                                                                                                    percent >= 80 ? 'success.main' :
-                                                                                                        percent >= 50 ? 'warning.main' :
-                                                                                                            'error.main',
-                                                                                            },
-                                                                                        }}
-                                                                                    />
-                                                                                    <Typography
-                                                                                        variant="caption"
-                                                                                        sx={{
-                                                                                            position: 'absolute',
-                                                                                            top: 0,
-                                                                                            left: 0,
-                                                                                            width: '100%',
-                                                                                            height: '100%',
-                                                                                            display: 'flex',
-                                                                                            alignItems: 'center',
-                                                                                            justifyContent: 'center',
-                                                                                            textAlign: 'center',
-                                                                                            fontWeight: 500,
-                                                                                            fontSize: '0.75rem',
-                                                                                        }}
-                                                                                    >
-                                                                                        {percent}%
-                                                                                    </Typography>
-                                                                                </Box>
-                                                                            </TableCell>
-                                                                        </TableRow>
-                                                                    );
-                                                                })}
-                                                            </TableBody>
-                                                        </Table>
-                                                    </AccordionDetails>
-                                                </Accordion>
-                                            ))}
+                                            {service.weeks?.map((week, i) => {
+                                                const hasIncompleteCoverage = week.shiftStats?.some(
+                                                    stat => stat.shiftCount > 0 && stat.allocationCount < stat.shiftCount
+                                                );
+
+                                                return (
+                                                    <Accordion key={i} sx={{ mb: 2 }}>
+                                                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                                <Typography variant="subtitle2">
+                                                                    Week {week.weekNumber} ({week.start} → {week.end})
+                                                                </Typography>
+                                                                {hasIncompleteCoverage && (
+                                                                    <Tooltip title="Incomplete coverage">
+                                                                        <WarningAmberIcon sx={{ color: 'error.main' }} />
+                                                                    </Tooltip>
+                                                                )}
+                                                            </Box>
+                                                        </AccordionSummary>
+                                                        <AccordionDetails>
+                                                            <Table size="small">
+                                                                <TableHead>
+                                                                    <TableRow>
+                                                                        <TableCell>Shift Type</TableCell>
+                                                                        <TableCell>Alloc Count</TableCell>
+                                                                        <TableCell>Unalloc Count</TableCell>
+                                                                        <TableCell>Shift Count</TableCell>
+                                                                        <TableCell>Coverage</TableCell>
+                                                                    </TableRow>
+                                                                </TableHead>
+                                                                <TableBody>
+                                                                    {week.shiftStats?.map((stat, j) => {
+                                                                        const percent = stat.shiftCount > 0
+                                                                            ? Math.round((stat.allocationCount / stat.shiftCount) * 100)
+                                                                            : 0;
+
+                                                                        return (
+                                                                            <TableRow key={j}>
+                                                                                <TableCell>{stat.shiftType}</TableCell>
+                                                                                <TableCell>{stat.allocationCount}</TableCell>
+                                                                                <TableCell>{stat.shiftCount - stat.allocationCount}</TableCell>
+                                                                                <TableCell>{stat.shiftCount}</TableCell>
+                                                                                <TableCell sx={{ minWidth: 140 }}>
+                                                                                    <Box sx={{ position: 'relative', width: '100%', maxWidth: 120 }}>
+                                                                                        <LinearProgress
+                                                                                            variant="determinate"
+                                                                                            value={percent}
+                                                                                            sx={{
+                                                                                                height: 15,
+                                                                                                borderRadius: 5,
+                                                                                                bgcolor: 'error.main',
+                                                                                                '& .MuiLinearProgress-bar': {
+                                                                                                    backgroundColor: percent === 100
+                                                                                                        ? 'success.main'
+                                                                                                        : 'error.main',
+                                                                                                },
+                                                                                            }}
+                                                                                        />
+                                                                                        <Typography
+                                                                                            variant="caption"
+                                                                                            sx={{
+                                                                                                position: 'absolute',
+                                                                                                top: 0,
+                                                                                                left: 0,
+                                                                                                width: '100%',
+                                                                                                height: '100%',
+                                                                                                display: 'flex',
+                                                                                                alignItems: 'center',
+                                                                                                justifyContent: 'center',
+                                                                                                textAlign: 'center',
+                                                                                                fontWeight: 500,
+                                                                                                fontSize: '0.75rem',
+                                                                                            }}
+                                                                                        >
+                                                                                            {percent}%
+                                                                                        </Typography>
+                                                                                    </Box>
+                                                                                </TableCell>
+                                                                            </TableRow>
+                                                                        );
+                                                                    })}
+                                                                </TableBody>
+                                                            </Table>
+                                                        </AccordionDetails>
+                                                    </Accordion>
+                                                );
+                                            })}
+
                                         </CardContent>
                                     </Card>
 
