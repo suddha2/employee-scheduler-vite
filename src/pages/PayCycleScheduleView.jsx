@@ -29,7 +29,7 @@ export default function PayCycleSchedule() {
     const [error, setError] = useState(null);
     const [submissionStatus, setSubmissionStatus] = useState({});
     const [requests, setRequests] = useState([]);
-
+    const [loading, setLoading] = useState(false);
 
     const updateRequestStatus = (periodUpdateList) => {
         if (!Array.isArray(periodUpdateList) || periodUpdateList.length === 0) return;
@@ -146,6 +146,61 @@ export default function PayCycleSchedule() {
             console.error("CSV download failed", err);
         }
     };
+
+    const handleExportStatsClick = async (rotaId) => {
+        try {
+            setLoading(true);
+            const response = await axiosInstance.get(`${API_ENDPOINTS.exportStats}`, {
+                params: { id: rotaId },
+                responseType: "blob",
+                withCredentials: true, // include cookies if your backend uses session auth
+                headers: {
+                    Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                }
+            });
+
+            // Extract filename from Content-Disposition header (supports filename* and filename)
+            const disposition = response.headers["content-disposition"] || "";
+            let filename = `rota-${rotaId}.xlsx`; // fallback
+
+            // RFC5987 filename* example: filename*=UTF-8''stats%20(1).xlsx
+            const filenameStarMatch = disposition.match(/filename\*\s*=\s*([^;]+)/i);
+            if (filenameStarMatch) {
+                try {
+                    const value = filenameStarMatch[1].trim().replace(/^UTF-8''/i, "");
+                    filename = decodeURIComponent(value.replace(/(^"|"$)/g, ""));
+                } catch (e) {
+                    // fall back to raw value if decode fails
+                    filename = filenameStarMatch[1].trim().replace(/(^"|"$)/g, "");
+                }
+            } else {
+                const filenameMatch = disposition.match(/filename\s*=\s*("?)([^";]+)\1/i);
+                if (filenameMatch) {
+                    filename = filenameMatch[2];
+                }
+            }
+
+            // Use correct mime type for XLSX
+            const blob = new Blob([response.data], {
+                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            });
+
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.setAttribute("download", filename);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error("Export download failed", err);
+            // Show user-friendly feedback as needed
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleCardSubmit = async (period) => {
         const { startDate, endDate } = period;
 
@@ -351,6 +406,19 @@ export default function PayCycleSchedule() {
                                                             onClick={() => handleViewClick(currentPeriod.rotaId)}
                                                         >
                                                             View
+                                                        </Button>
+                                                        <Button
+                                                            variant="contained"
+                                                            color="primary"
+                                                            size="small"
+                                                            sx={{ px: 2, py: 0.5 }}
+                                                            onClick={() => handleExportStatsClick(currentPeriod.rotaId)}
+                                                            disabled={loading}
+                                                        >
+                                                            {loading ? (
+                                                                <CircularProgress size={16} sx={{ mr: 1 }} />
+                                                            ) : null}
+                                                            {loading ? "Downloading..." : "Export Stats"}
                                                         </Button>
                                                     </Box>
                                                 ) : (

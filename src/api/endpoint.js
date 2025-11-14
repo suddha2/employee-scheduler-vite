@@ -9,6 +9,7 @@ export const  API_ENDPOINTS = {
   updateSolvedSol : `${API_BASE_URL}/api/save`,
   payCycleSchedule : `${API_BASE_URL}/api/payCycle`,
   csvDownload: `${API_BASE_URL}/api/download/schedule`,
+  exportStats: `${API_BASE_URL}/api/stats/exportStats`,
   websoc: `${API_BASE_URL}/ws`,
   serviceStats: `${API_BASE_URL}/api/stats/serviceStats`,
   empStats: `${API_BASE_URL}/api/stats/empStats`, 
