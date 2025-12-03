@@ -21,7 +21,7 @@ import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
 
 export default function PayCycleSchedule() {
-    const [location, setLocation] = useState([]);
+    const [location, setLocation] = useState([null]);
     const [locations, setLocations] = useState([]);
     const [periods, setPeriods] = useState([]);
     const [loadingLocations, setLoadingLocations] = useState(true);
@@ -87,7 +87,7 @@ export default function PayCycleSchedule() {
             })
             .then((res) => {
                 const formatted = res.data.map((loc) => ({
-                    value: loc.code,
+                    value: loc.id,
                     label: loc.region,
                 }));
                 setLocations(formatted);
@@ -275,6 +275,7 @@ export default function PayCycleSchedule() {
                         value={location}
                         onChange={(e, val) => {
                             const matched = locations.find(loc => loc.value === val?.value);
+                            console.log("Selected location: ", matched);
                             setLocation(matched || null);
                             if (matched) loadCardData(matched);
                         }}
