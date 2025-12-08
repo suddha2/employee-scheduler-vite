@@ -21,7 +21,7 @@ import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
 
 export default function PayCycleSchedule() {
-    const [location, setLocation] = useState([null]);
+    const [location, setLocation] = useState(null);
     const [locations, setLocations] = useState([]);
     const [periods, setPeriods] = useState([]);
     const [loadingLocations, setLoadingLocations] = useState(true);
@@ -36,29 +36,42 @@ export default function PayCycleSchedule() {
 
         const periodUpdate = periodUpdateList[0]; // extract the single object. This is required since the backend sends an array.
 
-        setPeriods(prev =>
-            prev.map(p => (p.id === periodUpdate.id ? { ...p, ...periodUpdate } : p))
-        );
-
-        setSubmissionStatus(prev => ({
-            ...prev,
-            [periodUpdate.id]: {
-                loading: false,
-                success: true,
-                error: null,
-                reloadedPeriod: periodUpdate,
-                showUpdateIndicator: true
+        // Only apply update if this period exists in current view
+        setPeriods(prev => {
+            const periodExists = prev.some(p => p.id === periodUpdate.id);
+            if (!periodExists) {
+                console.log(`Ignoring update for period ${periodUpdate.id} - not in current view`);
+                return prev; // Ignore updates for periods not in current location
             }
-        }));
-        setTimeout(() => {
-            setSubmissionStatus(prev => ({
-                ...prev,
-                [periodUpdate.id]: {
-                    ...prev[periodUpdate.id],
-                    showUpdateIndicator: false
-                }
-            }));
-        }, 2000);
+            return prev.map(p => (p.id === periodUpdate.id ? { ...p, ...periodUpdate } : p));
+        });
+
+        // Only update submission status if period is in current view
+        setPeriods(currentPeriods => {
+            const shouldUpdate = currentPeriods.some(p => p.id === periodUpdate.id);
+            if (shouldUpdate) {
+                setSubmissionStatus(prev => ({
+                    ...prev,
+                    [periodUpdate.id]: {
+                        loading: false,
+                        success: true,
+                        error: null,
+                        reloadedPeriod: periodUpdate,
+                        showUpdateIndicator: true
+                    }
+                }));
+                setTimeout(() => {
+                    setSubmissionStatus(prev => ({
+                        ...prev,
+                        [periodUpdate.id]: {
+                            ...prev[periodUpdate.id],
+                            showUpdateIndicator: false
+                        }
+                    }));
+                }, 2000);
+            }
+            return currentPeriods; // Return unchanged
+        });
     };
     const navigate = useNavigate();
     const ws = useRequestUpdates(setRequests, updateRequestStatus);
@@ -66,6 +79,7 @@ export default function PayCycleSchedule() {
         if (!location) return;
 
         setLoadingPeriods(true);
+        setError(null); // Clear any previous errors
         axiosInstance
             .get(`${API_ENDPOINTS.payCycleSchedule}?location=${location.label}`)
             .then((res) => setPeriods(res.data))
@@ -98,6 +112,18 @@ export default function PayCycleSchedule() {
             })
             .finally(() => setLoadingLocations(false));
     }, []);
+
+    // Reload card data when location changes
+    useEffect(() => {
+        if (location) {
+            setPeriods([]); // Clear old data to prevent showing stale data
+            setSubmissionStatus({}); // Clear submission status from previous location
+            loadCardData(location);
+        } else {
+            setPeriods([]); // Clear data when no location is selected
+            setSubmissionStatus({}); // Clear submission status
+        }
+    }, [location]);
     const handleViewClick = (id) => {
         console.log("handleViewClick = ", id);
         //navigate(`/schedules?id=${id}`);
@@ -301,7 +327,7 @@ export default function PayCycleSchedule() {
                         const currentPeriod = submissionStatus[period.id]?.reloadedPeriod || period;
 
                         return (
-                            <Grid item xs={12} sm={6} md={4} key={currentPeriod.id}>
+                            <Grid item xs={12} sm={6} md={4} key={`${location?.value}-${period.id}`}>
                                 <Card variant="outlined" sx={{
                                     position: 'relative',
                                     animation: submissionStatus[period.id]?.showUpdateIndicator ? 'pulse 1s ease-in-out infinite' : 'none',
@@ -479,7 +505,7 @@ export default function PayCycleSchedule() {
                                                 </Box>
                                                 {currentPeriod.shiftStats &&
                                                     Object.entries(currentPeriod.shiftStats).map(([type, count]) => (
-                                                        <Box key={`${currentPeriod.id}-${type}`} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                        <Box key={`${location?.value}-${period.id}-${type}`} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                                             <Typography variant="body2" key={type} sx={{ pl: 2 }}>
                                                                 • {type}: {count}
                                                             </Typography>

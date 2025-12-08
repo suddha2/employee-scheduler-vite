@@ -393,7 +393,7 @@ export default function ViewSchedules() {
       });
 
       setSnackbar({ message: response.data.message || 'Saved successfully!', opened: true });
-      navigate("/submit");
+      navigate("/paycycleSchedule");
     } catch (error) {
       setSnackbar({ message: 'Save failed. Please try again.', opened: true });
       console.error('Save error:', error);
