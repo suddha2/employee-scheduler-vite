@@ -16,12 +16,14 @@ import {
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useRequestUpdates } from '../components/useRequestUpdates';
+import { usePersistedState } from '../hooks/usePersistedState';
 
 import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
 
+
 export default function PayCycleSchedule() {
-    const [location, setLocation] = useState([]);
+    const [location, setLocation, clearLocation] = usePersistedState('paycycle_location', null);
     const [locations, setLocations] = useState([]);
     const [periods, setPeriods] = useState([]);
     const [loadingLocations, setLoadingLocations] = useState(true);
@@ -29,47 +31,69 @@ export default function PayCycleSchedule() {
     const [error, setError] = useState(null);
     const [submissionStatus, setSubmissionStatus] = useState({});
     const [requests, setRequests] = useState([]);
-
+    const [loading, setLoading] = useState(false);
 
     const updateRequestStatus = (periodUpdateList) => {
         if (!Array.isArray(periodUpdateList) || periodUpdateList.length === 0) return;
 
         const periodUpdate = periodUpdateList[0]; // extract the single object. This is required since the backend sends an array.
 
-        setPeriods(prev =>
-            prev.map(p => (p.id === periodUpdate.id ? { ...p, ...periodUpdate } : p))
-        );
-
-        setSubmissionStatus(prev => ({
-            ...prev,
-            [periodUpdate.id]: {
-                loading: false,
-                success: true,
-                error: null,
-                reloadedPeriod: periodUpdate,
-                showUpdateIndicator: true
+        // Only apply update if this period exists in current view
+        setPeriods(prev => {
+            const periodExists = prev.some(p => p.id === periodUpdate.id);
+            if (!periodExists) {
+                console.log(`Ignoring update for period ${periodUpdate.id} - not in current view`);
+                return prev; // Ignore updates for periods not in current location
             }
-        }));
-        setTimeout(() => {
-            setSubmissionStatus(prev => ({
-                ...prev,
-                [periodUpdate.id]: {
-                    ...prev[periodUpdate.id],
-                    showUpdateIndicator: false
-                }
-            }));
-        }, 2000);
+            return prev.map(p => (p.id === periodUpdate.id ? { ...p, ...periodUpdate } : p));
+        });
+
+        // Only update submission status if period is in current view
+        setPeriods(currentPeriods => {
+            const shouldUpdate = currentPeriods.some(p => p.id === periodUpdate.id);
+            if (shouldUpdate) {
+                setSubmissionStatus(prev => ({
+                    ...prev,
+                    [periodUpdate.id]: {
+                        loading: false,
+                        success: true,
+                        error: null,
+                        reloadedPeriod: periodUpdate,
+                        showUpdateIndicator: true
+                    }
+                }));
+                setTimeout(() => {
+                    setSubmissionStatus(prev => ({
+                        ...prev,
+                        [periodUpdate.id]: {
+                            ...prev[periodUpdate.id],
+                            showUpdateIndicator: false
+                        }
+                    }));
+                }, 2000);
+            }
+            return currentPeriods; // Return unchanged
+        });
     };
     const navigate = useNavigate();
     const ws = useRequestUpdates(setRequests, updateRequestStatus);
-    function loadCardData(location) {
+
+    function loadCardData(location, signal) {
         if (!location) return;
 
         setLoadingPeriods(true);
+        setError(null); // Clear any previous errors
         axiosInstance
-            .get(`${API_ENDPOINTS.payCycleSchedule}?location=${location.label}`)
+            .get(`${API_ENDPOINTS.payCycleSchedule}?location=${location.label}`, {
+                signal // Pass abort signal to axios
+            })
             .then((res) => setPeriods(res.data))
             .catch((err) => {
+                // Ignore abort errors
+                if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+                    console.log('Request cancelled');
+                    return;
+                }
                 console.error(err);
                 setError('Failed to load schedule periods');
             })
@@ -78,30 +102,191 @@ export default function PayCycleSchedule() {
 
     // Fetch available locations on mount
     useEffect(() => {
+        const abortController = new AbortController();
+
         axiosInstance
             .get(API_ENDPOINTS.locations, {
                 headers: {
                     Authorization: `Bearer ${localStorage.getItem('token')}`,
                     'Content-Type': 'application/json',
                 },
+                signal: abortController.signal
             })
             .then((res) => {
                 const formatted = res.data.map((loc) => ({
-                    value: loc.code,
+                    value: loc.id,
                     label: loc.region,
                 }));
                 setLocations(formatted);
             })
             .catch((err) => {
+                if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+                    console.log('Locations request cancelled');
+                    return;
+                }
                 console.error(err);
                 setError('Failed to load locations');
             })
             .finally(() => setLoadingLocations(false));
+
+        return () => {
+            abortController.abort(); // Cancel request on unmount
+        };
     }, []);
-    const handleViewClick = (id) => {
-        console.log("handleViewClick = ", id);
-        navigate(`/schedules?id=${id}`);
+
+    // Reload card data when location changes
+    useEffect(() => {
+        const abortController = new AbortController();
+
+        if (location) {
+            setPeriods([]); // Clear old data to prevent showing stale data
+            setSubmissionStatus({}); // Clear submission status from previous location
+            loadCardData(location, abortController.signal);
+        } else {
+            setPeriods([]); // Clear data when no location is selected
+            setSubmissionStatus({}); // Clear submission status
+        }
+
+        return () => {
+            abortController.abort(); // Cancel pending request when location changes
+        };
+    }, [location]);
+    // const handleViewClick = (id) => {
+    //     console.log("handleViewClick = ", id);
+    //     //navigate(`/schedules?id=${id}`);
+    //     window.open(`/schedules?id=${id}`, '_blank');
+    // }
+
+    const handleViewClick = (period) => {
+        navigate(`/schedules?id=${period.rotaId}`, {  // ✅ Same tab navigation
+            state: {
+                periodId: period.id,
+                periodName: period.name,
+                location: location.label,
+                returnTo: '/paycycleSchedule'
+            }
+        });
+    };
+    
+    const handleServiceStatsClick = (period) => {
+        // console.log("handleViewClick = ", id);
+        // //navigate(`/schedules?id=${id}`);
+        // window.open(`/servicestats?id=${id}`, '_blank');
+        navigate(`/servicestats?id=${period.rotaId}`, {  // ✅ Same tab navigation
+            state: {
+                periodId: period.id,
+                periodName: period.name,
+                location: location.label,
+                returnTo: '/paycycleSchedule'
+            }
+        });
     }
+
+
+
+    const handleEmpStatsClick = (period) => {
+        // console.log("handleViewClick = ", id);
+        // //navigate(`/schedules?id=${id}`);
+        // window.open(`/empstats?id=${id}`, '_blank');
+    navigate(`/empstats?id=${period.rotaId}`, {
+        state: {
+                periodId: period.id,
+                periodName: period.name,
+                location: location.label,
+                returnTo: '/paycycleSchedule'
+            }
+        });
+
+
+    }
+
+    const handleDownloadClick = async (rotaId) => {
+        try {
+            const response = await axiosInstance.get(`${API_ENDPOINTS.csvDownload}?id=${rotaId}`, {
+                responseType: "blob",
+            });
+
+            // Extract filename from Content-Disposition header
+            const disposition = response.headers["content-disposition"];
+            let filename = `rota-${rotaId}.csv`; // fallback
+
+            if (disposition && disposition.includes("filename=")) {
+                const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (match && match[1]) {
+                    filename = match[1].replace(/['"]/g, ""); // remove quotes
+                }
+            }
+
+            const blob = new Blob([response.data], { type: "text/csv" });
+            const url = window.URL.createObjectURL(blob);
+
+            const link = document.createElement("a");
+            link.href = url;
+            link.setAttribute("download", filename);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error("CSV download failed", err);
+        }
+    };
+
+    const handleExportStatsClick = async (rotaId) => {
+        try {
+            setLoading(true);
+            const response = await axiosInstance.get(`${API_ENDPOINTS.exportStats}`, {
+                params: { id: rotaId },
+                responseType: "blob",
+                withCredentials: true, // include cookies if your backend uses session auth
+                headers: {
+                    Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                }
+            });
+
+            // Extract filename from Content-Disposition header (supports filename* and filename)
+            const disposition = response.headers["content-disposition"] || "";
+            let filename = `rota-${rotaId}.xlsx`; // fallback
+
+            // RFC5987 filename* example: filename*=UTF-8''stats%20(1).xlsx
+            const filenameStarMatch = disposition.match(/filename\*\s*=\s*([^;]+)/i);
+            if (filenameStarMatch) {
+                try {
+                    const value = filenameStarMatch[1].trim().replace(/^UTF-8''/i, "");
+                    filename = decodeURIComponent(value.replace(/(^"|"$)/g, ""));
+                } catch (e) {
+                    // fall back to raw value if decode fails
+                    filename = filenameStarMatch[1].trim().replace(/(^"|"$)/g, "");
+                }
+            } else {
+                const filenameMatch = disposition.match(/filename\s*=\s*("?)([^";]+)\1/i);
+                if (filenameMatch) {
+                    filename = filenameMatch[2];
+                }
+            }
+
+            // Use correct mime type for XLSX
+            const blob = new Blob([response.data], {
+                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            });
+
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.setAttribute("download", filename);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error("Export download failed", err);
+            // Show user-friendly feedback as needed
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleCardSubmit = async (period) => {
         const { startDate, endDate } = period;
 
@@ -176,6 +361,7 @@ export default function PayCycleSchedule() {
                         value={location}
                         onChange={(e, val) => {
                             const matched = locations.find(loc => loc.value === val?.value);
+                            console.log("Selected location: ", matched);
                             setLocation(matched || null);
                             if (matched) loadCardData(matched);
                         }}
@@ -201,7 +387,7 @@ export default function PayCycleSchedule() {
                         const currentPeriod = submissionStatus[period.id]?.reloadedPeriod || period;
 
                         return (
-                            <Grid item xs={12} sm={6} md={4} key={currentPeriod.id}>
+                            <Grid item xs={12} sm={6} md={4} key={`${location?.value}-${period.id}`}>
                                 <Card variant="outlined" sx={{
                                     position: 'relative',
                                     animation: submissionStatus[period.id]?.showUpdateIndicator ? 'pulse 1s ease-in-out infinite' : 'none',
@@ -271,14 +457,63 @@ export default function PayCycleSchedule() {
                                                         ⏳ Waiting for completion...
                                                     </Button>
                                                 ) : currentPeriod.hasSolveRequest && currentPeriod.solevReqStatus === 'COMPLETED' ? (
-                                                    <Button variant="contained" color="primary" onClick={() => handleViewClick(currentPeriod.rotaId)}>
-                                                        View
-                                                    </Button>
+                                                    <Box display="flex" gap={1} flexWrap="wrap" alignItems={"right"}>
+                                                        <Button
+                                                            variant="contained"
+                                                            color="primary"
+                                                            size="small"
+                                                            sx={{ px: 2, py: 0.5 }}
+                                                            onClick={() => handleServiceStatsClick(currentPeriod)}
+                                                        >
+                                                            Service Stats
+                                                        </Button>
+                                                        <Button
+                                                            variant="contained"
+                                                            color="primary"
+                                                            size="small"
+                                                            sx={{ px: 2, py: 0.5 }}
+                                                            onClick={() => handleEmpStatsClick(currentPeriod)}
+                                                        >
+                                                            Employee Stats
+                                                        </Button>
+                                                        <Button
+                                                            variant="contained"
+                                                            color="primary"
+                                                            size="small"
+                                                            sx={{ px: 2, py: 0.5 }}
+                                                            onClick={() => handleViewClick(currentPeriod)}
+                                                        >
+                                                            View
+                                                        </Button>
+                                                        <Button
+                                                            variant="contained"
+                                                            color="primary"
+                                                            size="small"
+                                                            sx={{ px: 2, py: 0.5 }}
+                                                            onClick={() => handleExportStatsClick(currentPeriod.rotaId)}
+                                                            disabled={loading}
+                                                        >
+                                                            {loading ? (
+                                                                <CircularProgress size={16} sx={{ mr: 1 }} />
+                                                            ) : null}
+                                                            {loading ? "Downloading..." : "Export Stats"}
+                                                        </Button>
+                                                        <Button
+                                                            variant="contained"
+                                                            color="primary"
+                                                            size="small"
+                                                            sx={{ px: 2, py: 0.5 }}
+                                                            onClick={() => handleCardSubmit(period)}
+                                                        >
+                                                            Re-Generate
+                                                        </Button>
+                                                    </Box>
                                                 ) : (
                                                     <Button variant="contained" color="primary" onClick={() => handleCardSubmit(period)}>
                                                         Generate
                                                     </Button>
                                                 )}
+
                                             </Alert>
                                         </Box>
 
@@ -330,7 +565,7 @@ export default function PayCycleSchedule() {
                                                 </Box>
                                                 {currentPeriod.shiftStats &&
                                                     Object.entries(currentPeriod.shiftStats).map(([type, count]) => (
-                                                        <Box key={`${currentPeriod.id}-${type}`} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                        <Box key={`${location?.value}-${period.id}-${type}`} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                                             <Typography variant="body2" key={type} sx={{ pl: 2 }}>
                                                                 • {type}: {count}
                                                             </Typography>

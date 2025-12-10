@@ -1,93 +1,137 @@
-// src/App.jsx
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Box } from '@mui/material';
-import MainLayout from './pages/layout/MainLayout';
-import MinimalLayout from './pages/layout/MinimalLayout';
+import { LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { AuthProvider } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import ErrorBoundary from './components/ErrorBoundary';
+import Layout from './components/Layout';
+import Navbar from './components/Navbar';
+import LoginPage from './pages/LoginPage';
+import Dashboard from './pages/Dashboard';
+import EmployeeList from './pages/EmployeeList';
+import EmployeeForm from './pages/EmployeeForm';
+import SubmitSchedule from './pages/SubmitSchedule';
+import ViewSchedules from './pages/ViewSchedules';
+import PayCycleSchedule from './pages/PayCycleScheduleView';
+import ServiceStatsView from './pages/ServiceStatsView';
+import EmpStatsView from './pages/EmpStatsView';
+import { AxiosInterceptorSetup } from './components/AxiosInterceptorSetup';
 
-import LoginPage from './pages/authentication/Login';
-import ForgotPassword from './pages/authentication/ForgotPassword';
-import Dashboard from './pages/dashboard/Dashboard';
-// import ShiftsPage from './pages/shifts/ShiftsPage';
-// import EmployeesPage from './pages/employees/EmployeesPage';
-
-import PrivateRoute from './components/PrivateRoute';
-
-function App() {
+export default function App() {
   return (
-    <Router>
-
-      <Routes>
-        {/* Default redirect */}
-        <Route
-          path="/"
-          element={
-            localStorage.getItem('token')
-              ? <Navigate to="/dashboard" replace />
-              : <Navigate to="/login" replace />
-          }
-        />
-        {/* Login route */}
-        <Route
-          path="/login"
-          element={
-            <Box
-              sx={{
-                width: '100vw',
-                height: '100vh',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                bgcolor: 'background.default',
-                px: 2, // small padding for mobile
-              }}
-            >
-              <LoginPage />
-            </Box>
-          }
-        />
-        <Route
-          path="/forgot-password"
-          element={
-            <MinimalLayout>
-              <ForgotPassword />
-            </MinimalLayout>
-          }
-        />
-
-        {/* Protected Pages */}
-        <Route
-          path="/dashboard"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                <Dashboard />
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/shifts"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                {/* <ShiftsPage /> */}
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/employees"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                {/* <EmployeesPage /> */}
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
-      </Routes>
-    </Router>
+    <ErrorBoundary>
+      <LocalizationProvider dateAdapter={AdapterDateFns}>
+        <Router>
+          <AuthProvider>
+            <AxiosInterceptorSetup />
+            <Navbar />
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/" element={<Navigate to="/dashboard" />} />
+              <Route path="/login" element={<LoginPage />} />
+              
+              {/* Protected Routes - Wrapped in Layout */}
+              <Route 
+                path="/dashboard" 
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Dashboard />
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+              
+              {/* Employee Management */}
+              <Route 
+                path="/employees" 
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <EmployeeList />
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/employees/create" 
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <EmployeeForm />
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/employees/edit/:id" 
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <EmployeeForm />
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+              
+              {/* Scheduling */}
+              <Route 
+                path="/paycycleSchedule" 
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <PayCycleSchedule />
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/submit" 
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <SubmitSchedule />
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/schedules" 
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <ViewSchedules />
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+              
+              {/* Statistics */}
+              <Route 
+                path="/servicestats" 
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <ServiceStatsView />
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/empstats" 
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <EmpStatsView />
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              /> 
+            </Routes>
+          </AuthProvider>
+        </Router>
+      </LocalizationProvider>
+    </ErrorBoundary>
   );
 }
 

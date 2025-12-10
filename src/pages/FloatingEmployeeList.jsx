@@ -1,4 +1,4 @@
-import React, { useState, useRef,useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Paper,
   Typography,
@@ -10,16 +10,19 @@ import {
 } from "@mui/material";
 import { ExpandLess, ExpandMore } from "@mui/icons-material";
 import { useDraggable, DragOverlay } from "@dnd-kit/core";
-import { shiftColors, shiftTypes,getPriorityColor } from "../components/shiftTypeGrading";
+import { shiftColors, shiftTypes, getPriorityColor, shiftTypeShortText } from "../components/shiftTypeGrading";
 
-
+const SHIFT_COLUMN_WIDTH = 24;
 
 function EmployeeItem({ employee }) {
-  //const id = `${employee.firstName} ${employee.lastName}`;
   const id = `emp|${employee.id}`;
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id,
-  });
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id });
+
+  // Compute total allocated hours across all shift types
+  const totalHours = Object.values(employee.shiftTypeSummary || {}).reduce(
+    (sum, summary) => sum + (summary.hours || 0),
+    0
+  );
 
   return (
     <Box
@@ -44,50 +47,91 @@ function EmployeeItem({ employee }) {
         alignItems: "center",
       }}
     >
-      <Box sx={{ flexGrow: 1 }}>
-        {employee.firstName} {employee.lastName}
+      <Box sx={{ flexGrow: 1, display: "flex", alignItems: "center" }}>
+        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+          {employee.firstName} {employee.lastName}
+        </Typography>
+        <Typography
+          variant="caption"
+          sx={{
+            ml: 1,
+            px: 0.6,
+            py: 0.2,
+            borderRadius: 1,
+            backgroundColor: "grey.300",
+            color: "text.primary",
+            fontSize: 11,
+            fontWeight: 500,
+          }}
+        >
+          {totalHours}
+        </Typography>
       </Box>
 
-      <Box sx={{ display: "flex", gap: 0.5 }}>
-        {shiftTypes.map((type) => (
-          <Box
-            key={type}
-            sx={{
-              width: 20,
-              height: 20,
-              borderRadius: "50%",
-              backgroundColor: getPriorityColor(shiftColors[type]),
-              color: "white",
-              fontSize: 12,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-            title={`${type} shift`}
-          >
-            {employee.shiftTypeSummary?.[type] ?? 0}
-          </Box>
-        ))}
+      <Box sx={{ display: "flex" }}>
+        {shiftTypes.map((type) => {
+          const summary = employee.shiftTypeSummary?.[type];
+          const count = summary?.count ?? 0;
+          const hours = summary?.hours ?? 0;
+
+          return (
+            <Box
+              key={type}
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                width: SHIFT_COLUMN_WIDTH,
+                boxSizing: "border-box",
+              }}
+            >
+              <Box
+                sx={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: "50%",
+                  backgroundColor: getPriorityColor(shiftColors[type]),
+                  color: "white",
+                  fontSize: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                title={`${type} shift count`}
+              >
+                {count}
+              </Box>
+              <Typography
+                variant="caption"
+                sx={{ fontSize: 10, color: "text.secondary", lineHeight: 1.2 }}
+              >
+                {hours}
+              </Typography>
+            </Box>
+          );
+        })}
       </Box>
     </Box>
   );
 }
 
-export default function FloatingEmployeeList({ employees = [] })  {
+
+export default function FloatingEmployeeList({ employees = [] }) {
   const [open, setOpen] = useState(true);
   const [activeId, setActiveId] = useState(null);
-  const [position, setPosition] = useState({ top: 100, left: 30 });
+  const columnWidths = [200, 150, 150, 150, 150, 150, 150, 150];
   const [searchQuery, setSearchQuery] = useState("");
   const dragging = useRef(false);
   const offset = useRef({ x: 0, y: 0 });
-const NAVBAR_HEIGHT = 64;
-const BOTTOM_BAR_HEIGHT = 56;
-const LIST_HEIGHT = 400; // or measure dynamically if needed
-const LIST_WIDTH = 260;
-  // useEffect(() => {
-  //   console.log("Updated employees:", employees);
-  // }, [employees]);
-
+  const NAVBAR_HEIGHT = 64;
+  const BOTTOM_BAR_HEIGHT = 56;
+  const LIST_HEIGHT = 400; // or measure dynamically if needed
+  const LIST_WIDTH = 260;
+  const [position, setPosition] = useState({
+    top: 100,
+    left: window.innerWidth - LIST_WIDTH - 30, // 30px margin from right edge
+  });
+  const [contractFilter, setContractFilter] = useState("All");
   const handleMouseDown = (e) => {
     dragging.current = true;
     offset.current = {
@@ -101,16 +145,16 @@ const LIST_WIDTH = 260;
   const handleMouseMove = (e) => {
     if (!dragging.current) return;
 
-  const rawTop = e.clientY - offset.current.y;
-  const rawLeft = e.clientX - offset.current.x;
+    const rawTop = e.clientY - offset.current.y;
+    const rawLeft = e.clientX - offset.current.x;
 
-  const maxTop = window.innerHeight - BOTTOM_BAR_HEIGHT - LIST_HEIGHT;
-  const clampedTop = Math.max(NAVBAR_HEIGHT, Math.min(rawTop, maxTop));
+    const maxTop = window.innerHeight - BOTTOM_BAR_HEIGHT - LIST_HEIGHT;
+    const clampedTop = Math.max(NAVBAR_HEIGHT, Math.min(rawTop, maxTop));
 
-  const maxLeft = window.innerWidth - LIST_WIDTH;
-  const clampedLeft = Math.max(0, Math.min(rawLeft, maxLeft));
+    const maxLeft = window.innerWidth - LIST_WIDTH;
+    const clampedLeft = Math.max(0, Math.min(rawLeft, maxLeft));
 
-  setPosition({ top: clampedTop, left: clampedLeft });
+    setPosition({ top: clampedTop, left: clampedLeft });
   };
 
   const handleMouseUp = () => {
@@ -120,10 +164,16 @@ const LIST_WIDTH = 260;
   };
 
   // Filter employees by search query
-  const filteredEmployees = employees.filter((emp) =>
-    emp.lastName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
+  const filteredEmployees = employees.filter((emp) => {
+    const matchesSearch = `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesContract = contractFilter === "All" || emp.contractType === contractFilter;
+    return matchesSearch && matchesContract;
+  });
+
+
+
+ 
   return (
     <Paper
       elevation={10}
@@ -180,10 +230,61 @@ const LIST_WIDTH = 260;
             onChange={(e) => setSearchQuery(e.target.value)}
             sx={{ mb: 2 }}
           />
-          <Box sx={{ maxHeight: 350, overflowY: "auto" }}>
+
+          <TextField
+            select
+            label="Contract Type"
+            size="small"
+            fullWidth
+            value={contractFilter}
+            onChange={(e) => setContractFilter(e.target.value)}
+            SelectProps={{ native: true }}
+            sx={{ mb: 2 }}
+          >
+            <option value="All">All</option>
+            {[...new Set(employees.map(emp => emp.contractType))].map((type) => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </TextField>
+
+
+          <Box sx={{ maxHeight: 350, overflowY: "auto", position: "relative" }}>
+            <Box
+              sx={{
+                position: "sticky",
+                top: 0,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                px: 1,
+                py: 0.5,
+                fontSize: 13,
+                fontWeight: "bold",
+                color: "text.secondary",
+                backgroundColor: "grey.100",
+                borderRadius: 1,
+                mb: 1,
+              }}
+            >
+              <Box sx={{ flexGrow: 1 }}>Name</Box>
+              <Box sx={{ display: "flex" }}>
+                {shiftTypeShortText.map((type) => (
+                  <Box
+                    key={type}
+                    sx={{
+                      width: SHIFT_COLUMN_WIDTH,
+                      textAlign: "center",
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    {type}
+                  </Box>
+                ))}
+              </Box>
+            </Box>
             {filteredEmployees.length > 0 ? (
               filteredEmployees.map((emp) => (
-                <EmployeeItem key={emp.id} employee={emp}/>
+                <EmployeeItem key={emp.id} employee={emp} />
               ))
             ) : (
               <Typography variant="body2" color="text.secondary">
@@ -193,21 +294,6 @@ const LIST_WIDTH = 260;
           </Box>
         </Box>
       </Collapse>
-
-      <DragOverlay>
-        {activeId ? (
-          <Box
-            sx={{
-              p: 1,
-              borderRadius: 1,
-              backgroundColor: "primary.light",
-              cursor: "grabbing",
-            }}
-          >
-            {activeId}
-          </Box>
-        ) : null}
-      </DragOverlay>
     </Paper>
   );
 }
