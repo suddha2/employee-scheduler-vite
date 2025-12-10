@@ -16,12 +16,14 @@ import {
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useRequestUpdates } from '../components/useRequestUpdates';
+import { usePersistedState } from '../hooks/usePersistedState';
 
 import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
 
+
 export default function PayCycleSchedule() {
-    const [location, setLocation] = useState(null);
+    const [location, setLocation, clearLocation] = usePersistedState('paycycle_location', null);
     const [locations, setLocations] = useState([]);
     const [periods, setPeriods] = useState([]);
     const [loadingLocations, setLoadingLocations] = useState(true);
@@ -75,15 +77,23 @@ export default function PayCycleSchedule() {
     };
     const navigate = useNavigate();
     const ws = useRequestUpdates(setRequests, updateRequestStatus);
-    function loadCardData(location) {
+
+    function loadCardData(location, signal) {
         if (!location) return;
 
         setLoadingPeriods(true);
         setError(null); // Clear any previous errors
         axiosInstance
-            .get(`${API_ENDPOINTS.payCycleSchedule}?location=${location.label}`)
+            .get(`${API_ENDPOINTS.payCycleSchedule}?location=${location.label}`, {
+                signal // Pass abort signal to axios
+            })
             .then((res) => setPeriods(res.data))
             .catch((err) => {
+                // Ignore abort errors
+                if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+                    console.log('Request cancelled');
+                    return;
+                }
                 console.error(err);
                 setError('Failed to load schedule periods');
             })
@@ -92,12 +102,15 @@ export default function PayCycleSchedule() {
 
     // Fetch available locations on mount
     useEffect(() => {
+        const abortController = new AbortController();
+
         axiosInstance
             .get(API_ENDPOINTS.locations, {
                 headers: {
                     Authorization: `Bearer ${localStorage.getItem('token')}`,
                     'Content-Type': 'application/json',
                 },
+                signal: abortController.signal
             })
             .then((res) => {
                 const formatted = res.data.map((loc) => ({
@@ -107,37 +120,84 @@ export default function PayCycleSchedule() {
                 setLocations(formatted);
             })
             .catch((err) => {
+                if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+                    console.log('Locations request cancelled');
+                    return;
+                }
                 console.error(err);
                 setError('Failed to load locations');
             })
             .finally(() => setLoadingLocations(false));
+
+        return () => {
+            abortController.abort(); // Cancel request on unmount
+        };
     }, []);
 
     // Reload card data when location changes
     useEffect(() => {
+        const abortController = new AbortController();
+
         if (location) {
             setPeriods([]); // Clear old data to prevent showing stale data
             setSubmissionStatus({}); // Clear submission status from previous location
-            loadCardData(location);
+            loadCardData(location, abortController.signal);
         } else {
             setPeriods([]); // Clear data when no location is selected
             setSubmissionStatus({}); // Clear submission status
         }
+
+        return () => {
+            abortController.abort(); // Cancel pending request when location changes
+        };
     }, [location]);
-    const handleViewClick = (id) => {
-        console.log("handleViewClick = ", id);
-        //navigate(`/schedules?id=${id}`);
-        window.open(`/schedules?id=${id}`, '_blank');
+    // const handleViewClick = (id) => {
+    //     console.log("handleViewClick = ", id);
+    //     //navigate(`/schedules?id=${id}`);
+    //     window.open(`/schedules?id=${id}`, '_blank');
+    // }
+
+    const handleViewClick = (period) => {
+        navigate(`/schedules?id=${period.rotaId}`, {  // ✅ Same tab navigation
+            state: {
+                periodId: period.id,
+                periodName: period.name,
+                location: location.label,
+                returnTo: '/paycycleSchedule'
+            }
+        });
+    };
+    
+    const handleServiceStatsClick = (period) => {
+        // console.log("handleViewClick = ", id);
+        // //navigate(`/schedules?id=${id}`);
+        // window.open(`/servicestats?id=${id}`, '_blank');
+        navigate(`/servicestats?id=${period.rotaId}`, {  // ✅ Same tab navigation
+            state: {
+                periodId: period.id,
+                periodName: period.name,
+                location: location.label,
+                returnTo: '/paycycleSchedule'
+            }
+        });
     }
-    const handleServiceStatsClick = (id) => {
-        console.log("handleViewClick = ", id);
-        //navigate(`/schedules?id=${id}`);
-        window.open(`/servicestats?id=${id}`, '_blank');
-    }
-    const handleEmpStatsClick = (id) => {
-        console.log("handleViewClick = ", id);
-        //navigate(`/schedules?id=${id}`);
-        window.open(`/empstats?id=${id}`, '_blank');
+
+
+
+    const handleEmpStatsClick = (period) => {
+        // console.log("handleViewClick = ", id);
+        // //navigate(`/schedules?id=${id}`);
+        // window.open(`/empstats?id=${id}`, '_blank');
+    navigate(`/empstats?id=${period.rotaId}`, {
+        state: {
+                periodId: period.id,
+                periodName: period.name,
+                location: location.label,
+                returnTo: '/paycycleSchedule'
+            }
+        });
+
+
     }
 
     const handleDownloadClick = async (rotaId) => {
@@ -403,7 +463,7 @@ export default function PayCycleSchedule() {
                                                             color="primary"
                                                             size="small"
                                                             sx={{ px: 2, py: 0.5 }}
-                                                            onClick={() => handleServiceStatsClick(currentPeriod.rotaId)}
+                                                            onClick={() => handleServiceStatsClick(currentPeriod)}
                                                         >
                                                             Service Stats
                                                         </Button>
@@ -412,25 +472,16 @@ export default function PayCycleSchedule() {
                                                             color="primary"
                                                             size="small"
                                                             sx={{ px: 2, py: 0.5 }}
-                                                            onClick={() => handleEmpStatsClick(currentPeriod.rotaId)}
+                                                            onClick={() => handleEmpStatsClick(currentPeriod)}
                                                         >
                                                             Employee Stats
-                                                        </Button>
-                                                        <Button
-                                                            variant="outlined"
-                                                            color="secondary"
-                                                            size="small"
-                                                            sx={{ px: 2, py: 0.5 }}
-                                                            onClick={() => handleDownloadClick(currentPeriod.rotaId)}
-                                                        >
-                                                            Download CSV
                                                         </Button>
                                                         <Button
                                                             variant="contained"
                                                             color="primary"
                                                             size="small"
                                                             sx={{ px: 2, py: 0.5 }}
-                                                            onClick={() => handleViewClick(currentPeriod.rotaId)}
+                                                            onClick={() => handleViewClick(currentPeriod)}
                                                         >
                                                             View
                                                         </Button>
@@ -446,6 +497,15 @@ export default function PayCycleSchedule() {
                                                                 <CircularProgress size={16} sx={{ mr: 1 }} />
                                                             ) : null}
                                                             {loading ? "Downloading..." : "Export Stats"}
+                                                        </Button>
+                                                        <Button
+                                                            variant="contained"
+                                                            color="primary"
+                                                            size="small"
+                                                            sx={{ px: 2, py: 0.5 }}
+                                                            onClick={() => handleCardSubmit(period)}
+                                                        >
+                                                            Re-Generate
                                                         </Button>
                                                     </Box>
                                                 ) : (

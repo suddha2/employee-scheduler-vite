@@ -9,6 +9,13 @@ const axiosInstance = axios.create({
   },
 });
 
+// Store the session expiry handler that will be set by setupInterceptors
+let sessionExpiryHandler = null;
+
+export function setupAuthInterceptor(handleSessionExpiry) {
+  sessionExpiryHandler = handleSessionExpiry;
+}
+
 axiosInstance.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -16,12 +23,22 @@ axiosInstance.interceptors.request.use((config) => {
   }
   return config;
 });
-axiosInstance.interceptors.response.use(response => response, error => {
-  if (error.response?.status === 401) { // Token expired or invalid 
-   localStorage.removeItem('token'); // optional: clear stale token
-    window.location.href = '/login'; // force redirect 
-   } 
-   return Promise.reject(error); 
-  } );
+
+axiosInstance.interceptors.response.use(
+  response => response, 
+  error => {
+    if (error.response?.status === 401) { 
+      // Call the session expiry handler if it's set
+      if (sessionExpiryHandler) {
+        sessionExpiryHandler();
+      } else {
+        // Fallback to direct localStorage clear and redirect
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      }
+    } 
+    return Promise.reject(error); 
+  }
+);
     
 export default axiosInstance;

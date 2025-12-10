@@ -195,6 +195,8 @@ export default function ViewSchedules() {
 
   const parentRef = useRef(null);
 
+   const handleBack = () => navigate('/paycycleSchedule');
+
   useEffect(() => {
     if (!id) return;
     const fetchSchedule = async () => {
@@ -399,6 +401,7 @@ export default function ViewSchedules() {
       console.error('Save error:', error);
     } finally {
       setLoading(false);
+      setTimeout(() => handleBack(), 1500);
     }
   }
 
