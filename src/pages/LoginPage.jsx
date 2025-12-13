@@ -15,7 +15,7 @@ import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-function LoginPage() {
+export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState({ email: false, password: false, message: null });
@@ -126,4 +126,3 @@ function LoginPage() {
   );
 }
 
-export default LoginPage_old;

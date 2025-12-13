@@ -15,6 +15,8 @@ import ViewSchedules from './pages/ViewSchedules';
 import PayCycleSchedule from './pages/PayCycleScheduleView';
 import ServiceStatsView from './pages/ServiceStatsView';
 import EmpStatsView from './pages/EmpStatsView';
+import ShiftTemplatesList from './pages/ShiftTemplatesList';
+import ShiftTemplateForm from './pages/ShiftTemplateForm';
 import { AxiosInterceptorSetup } from './components/AxiosInterceptorSetup';
 
 export default function App() {
@@ -29,104 +31,113 @@ export default function App() {
               {/* Public Routes */}
               <Route path="/" element={<Navigate to="/dashboard" />} />
               <Route path="/login" element={<LoginPage />} />
-              
+
               {/* Protected Routes - Wrapped in Layout */}
-              <Route 
-                path="/dashboard" 
+              <Route
+                path="/dashboard"
                 element={
                   <ProtectedRoute>
                     <Layout>
                       <Dashboard />
                     </Layout>
                   </ProtectedRoute>
-                } 
+                }
               />
-              
+
               {/* Employee Management */}
-              <Route 
-                path="/employees" 
+              <Route
+                path="/employees"
                 element={
                   <ProtectedRoute>
                     <Layout>
                       <EmployeeList />
                     </Layout>
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
-                path="/employees/create" 
+              <Route
+                path="/employees/create"
                 element={
                   <ProtectedRoute>
                     <Layout>
                       <EmployeeForm />
                     </Layout>
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
-                path="/employees/edit/:id" 
+              <Route
+                path="/employees/edit/:id"
                 element={
                   <ProtectedRoute>
                     <Layout>
                       <EmployeeForm />
                     </Layout>
                   </ProtectedRoute>
-                } 
+                }
               />
-              
+              <Route path="/shift-templates" element={<ProtectedRoute>
+                    <Layout><ShiftTemplatesList /> </Layout>
+                  </ProtectedRoute>}/>
+
+              <Route path="/shift-templates/new" element={<ProtectedRoute>
+                    <Layout><ShiftTemplateForm /></Layout>
+                  </ProtectedRoute>} />
+              <Route path="/shift-templates/edit/:id" element={<ProtectedRoute>
+                    <Layout><ShiftTemplateForm /></Layout>
+                  </ProtectedRoute>} />
               {/* Scheduling */}
-              <Route 
-                path="/paycycleSchedule" 
+              <Route
+                path="/paycycleSchedule"
                 element={
                   <ProtectedRoute>
                     <Layout>
                       <PayCycleSchedule />
                     </Layout>
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
-                path="/submit" 
+              <Route
+                path="/submit"
                 element={
                   <ProtectedRoute>
                     <Layout>
                       <SubmitSchedule />
                     </Layout>
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
-                path="/schedules" 
+              <Route
+                path="/schedules"
                 element={
                   <ProtectedRoute>
                     <Layout>
                       <ViewSchedules />
                     </Layout>
                   </ProtectedRoute>
-                } 
+                }
               />
-              
+
               {/* Statistics */}
-              <Route 
-                path="/servicestats" 
+              <Route
+                path="/servicestats"
                 element={
                   <ProtectedRoute>
                     <Layout>
                       <ServiceStatsView />
                     </Layout>
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
-                path="/empstats" 
+              <Route
+                path="/empstats"
                 element={
                   <ProtectedRoute>
                     <Layout>
                       <EmpStatsView />
                     </Layout>
                   </ProtectedRoute>
-                } 
-              /> 
+                }
+              />
             </Routes>
           </AuthProvider>
         </Router>

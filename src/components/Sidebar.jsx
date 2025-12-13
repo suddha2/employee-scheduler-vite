@@ -53,6 +53,11 @@ export default function Sidebar({ open, onClose, onToggle }) {
             path: '/employees'
         },
         {
+            title: 'Shift Templates',
+            icon: <PeopleIcon />,
+            path: '/shift-templates'
+        },
+        {
             title: 'Pay Cycle Schedule',
             icon: <CalendarIcon />,
             path: '/paycycleSchedule'

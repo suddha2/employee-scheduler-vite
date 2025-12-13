@@ -6,10 +6,18 @@ export const API_ENDPOINTS = {
   
   // Locations/Regions
   locations: `${API_BASE_URL}/api/regions`,
+
+  // Service Location
+  services: `${API_BASE_URL}/api/service-locations`,
   
   // Employee Management
   employees: `${API_BASE_URL}/api/employees`,
   employeeById: (id) => `${API_BASE_URL}/api/employees/${id}`,
+
+  // Shift Templates Managemet  
+  shiftTemplates: `${API_BASE_URL}/api/shift-templates`,
+  shiftTemplateById: (id) => `${API_BASE_URL}/api/shift-templates/${id}`,
+  
   
   // Scheduling
   enqueueRequest: `${API_BASE_URL}/api/enqueueRequest`,

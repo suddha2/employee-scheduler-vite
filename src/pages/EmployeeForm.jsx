@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     Box,
     Paper,
@@ -44,8 +44,8 @@ export default function EmployeeForm() {
         rateCode: '',
         restDays: '',
         preferredRegion: '',
-        preferredService: [],
-        restrictedService: [],
+        preferredService: [],      // Services within region
+        restrictedService: [],     // Services within region
         preferredDays: [],
         restrictedDays: [],
         preferredShifts: [],
@@ -58,10 +58,10 @@ export default function EmployeeForm() {
         invertPattern: false
     });
 
-    // Service weight state (for preferred locations)
+    // Service weight state (stores services with weights)
+    // Note: Named "serviceWeights" historically but actually stores services
+    // Format: [{location: "ServiceName", weight: "100"}, ...]
     const [serviceWeights, setServiceWeights] = useState([]);
-    const [newLocation, setNewLocation] = useState('');
-    const [newWeight, setNewWeight] = useState('100');
 
     // UI state
     const [loading, setLoading] = useState(false);
@@ -69,24 +69,26 @@ export default function EmployeeForm() {
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(false);
     const [errors, setErrors] = useState({});
+    const [loadingServices, setLoadingServices] = useState(false);
 
     // Dropdown options
     const [regions, setRegions] = useState([]);
     const [locations, setLocations] = useState([]);
-    const genders = ['MALE', 'FEMALE', 'OTHER'];
-    const contractTypes = ['PERMANENT', 'ZERO_HOURS', 'FIXED_TERM', 'PART_TIME'];
-    const rateCodes = ['STANDARD', 'SENIOR', 'JUNIOR', 'SPECIALIST'];
+    const [availableServices, setAvailableServices] = useState([]);  // Services for selected region
+    const genders = ['MALE', 'FEMALE'];
+    const contractTypes = ['PERMANENT', 'ZERO_HOURS'];
+    const rateCodes = ['L1', 'L2', 'L3','ZERO_HOURS'];
     const daysOfWeek = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
-    const shiftTypes = ['MORNING', 'AFTERNOON', 'EVENING', 'NIGHT', 'SPLIT'];
-    const skillsList = ['First Aid', 'Manual Handling', 'Medication', 'Driving', 'Personal Care', 'Dementia Care'];
+    const shiftTypes = ['LONG_DAY', 'DAY', 'SLEEP_IN', 'WAKING_NIGHT', 'FLOATING'];
+    const skillsList = ['BUCALL','DRIVING'];
 
-    // Fetch dropdown data
+    // Fetch regions and locations on mount
     useEffect(() => {
         const fetchDropdownData = async () => {
             try {
                 const response = await axiosInstance.get(API_ENDPOINTS.locations);
                 const regionsList = [...new Set(response.data.map(loc => loc.region))];
-                const locationsList = response.data.map(loc => loc.region);
+                const locationsList = response.data.map(loc => loc.name);
                 setRegions(regionsList);
                 setLocations(locationsList);
             } catch (err) {
@@ -95,6 +97,124 @@ export default function EmployeeForm() {
         };
         fetchDropdownData();
     }, []);
+
+    // Fetch services when preferred region changes
+    useEffect(() => {
+        if (formData.preferredRegion) {
+            fetchServicesForRegion(formData.preferredRegion);
+        } else {
+            setAvailableServices([]);
+            // Clear service selections if region is cleared
+            setFormData(prev => ({
+                ...prev,
+                preferredService: [],
+                restrictedService: []
+            }));
+        }
+    }, [formData.preferredRegion]);
+
+    const fetchServicesForRegion = async (region) => {
+        setLoadingServices(true);
+        try {
+            // Update this endpoint to match your backend
+            const response = await axiosInstance.get(`${API_ENDPOINTS.services}/${region}`);
+            // Assuming response.data is array of service names: ["Service A", "Service B", ...]
+            setAvailableServices(response.data);
+        } catch (err) {
+            console.error('Failed to fetch services:', err);
+            setError('Failed to load services for selected region');
+            setAvailableServices([]);
+        } finally {
+            setLoadingServices(false);
+        }
+    };
+
+    // Get filtered services for Preferred Service dropdown
+    const getAvailablePreferredServices = () => {
+        // Exclude services already in restrictedService
+        return availableServices.filter(
+            service => !formData.restrictedService.includes(service)
+        );
+    };
+
+    // Get filtered services for Restricted Service dropdown
+    const getAvailableRestrictedServices = () => {
+        // Exclude services already in preferredService
+        return availableServices.filter(
+            service => !formData.preferredService.includes(service)
+        );
+    };
+
+    // Get filtered days for Preferred Days dropdown
+    const getAvailablePreferredDays = () => {
+        // Exclude days already in restrictedDays
+        return daysOfWeek.filter(
+            day => !formData.restrictedDays.includes(day)
+        );
+    };
+
+    // Get filtered days for Restricted Days dropdown
+    const getAvailableRestrictedDays = () => {
+        // Exclude days already in preferredDays
+        return daysOfWeek.filter(
+            day => !formData.preferredDays.includes(day)
+        );
+    };
+
+    // Get filtered shifts for Preferred Shifts dropdown
+    const getAvailablePreferredShifts = () => {
+        // Exclude shifts already in restrictedShifts
+        return shiftTypes.filter(
+            shift => !formData.restrictedShifts.includes(shift)
+        );
+    };
+
+    // Get filtered shifts for Restricted Shifts dropdown
+    const getAvailableRestrictedShifts = () => {
+        // Exclude shifts already in preferredShifts
+        return shiftTypes.filter(
+            shift => !formData.preferredShifts.includes(shift)
+        );
+    };
+
+    // Track if component just mounted (to prevent sync on initial load)
+    const isInitialMount = useRef(true);
+
+    // Sync preferredService with serviceWeights (only after initial load)
+    useEffect(() => {
+        // Skip sync on initial mount (edit mode loads data separately)
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+
+        if (formData.preferredService && formData.preferredService.length > 0) {
+            // Add new services that aren't already in serviceWeights
+            const newServices = formData.preferredService.filter(
+                service => !serviceWeights.some(sw => sw.location === service)
+            );
+            
+            if (newServices.length > 0) {
+                const newWeights = newServices.map(service => ({
+                    location: service,
+                    weight: '100' // Default weight
+                }));
+                setServiceWeights(prev => [...prev, ...newWeights]);
+            }
+
+            // Remove services that are no longer in preferredService
+            const updatedWeights = serviceWeights.filter(
+                sw => formData.preferredService.includes(sw.location)
+            );
+            
+            if (updatedWeights.length !== serviceWeights.length) {
+                setServiceWeights(updatedWeights);
+            }
+        } else {
+            // Clear all if preferredService is empty
+            setServiceWeights([]);
+        }
+    }, [formData.preferredService, serviceWeights]);
 
     // Fetch employee data if edit mode
     useEffect(() => {
@@ -109,15 +229,66 @@ export default function EmployeeForm() {
             const response = await axiosInstance.get(`${API_ENDPOINTS.employees}/${id}`);
             const employee = response.data;
             
-            // Parse preferred service into location:weight format
-            const parsedWeights = (employee.preferredService || []).map(service => {
-                if (service.includes(':')) {
-                    const [loc, weight] = service.split(':');
-                    return { location: loc.trim(), weight: weight.trim() };
+            console.log('=== EDIT MODE DEBUG ===');
+            console.log('preferredService:', employee.preferredService);
+            console.log('preferredLocations:', employee.preferredLocations);
+            
+            // Determine source of service data with weights
+            // Check which field actually has the weights (format: "Name:Weight")
+            let servicesWithWeights = [];
+            
+            // Check preferredService FIRST (your backend currently has weights here)
+            if (employee.preferredService && employee.preferredService.length > 0) {
+                const firstService = employee.preferredService[0];
+                
+                if (typeof firstService === 'string' && firstService.includes(':')) {
+                    // preferredService has weights
+                    servicesWithWeights = employee.preferredService;
+                    console.log('✓ Using preferredService (has weights)');
+                } else if (employee.preferredLocations && employee.preferredLocations.length > 0) {
+                    // preferredService doesn't have weights, check preferredLocations
+                    const firstLocation = employee.preferredLocations[0];
+                    if (typeof firstLocation === 'string' && firstLocation.includes(':')) {
+                        servicesWithWeights = employee.preferredLocations;
+                        console.log('✓ Using preferredLocations (has weights)');
+                    } else {
+                        // Neither has weights, use preferredService as-is
+                        servicesWithWeights = employee.preferredService;
+                        console.log('⚠ No weights found, using preferredService');
+                    }
+                } else {
+                    // Only preferredService available
+                    servicesWithWeights = employee.preferredService;
+                    console.log('⚠ Only preferredService available (no weights)');
                 }
-                return { location: service.trim(), weight: '100' };
+            } else if (employee.preferredLocations && employee.preferredLocations.length > 0) {
+                servicesWithWeights = employee.preferredLocations;
+                console.log('✓ Using preferredLocations (fallback)');
+            }
+            
+            // Handle string or array
+            if (typeof servicesWithWeights === 'string') {
+                servicesWithWeights = servicesWithWeights.split(',').map(s => s.trim());
+            }
+            
+            // Parse services with weights
+            const parsedWeights = servicesWithWeights.map(service => {
+                if (typeof service === 'string' && service.includes(':')) {
+                    const parts = service.split(':');
+                    const location = parts[0].trim();
+                    const weight = parts[1] ? parts[1].trim() : '100';
+                    return { location, weight };
+                }
+                // Service without weight
+                return { location: String(service).trim(), weight: '100' };
             });
+            
+            console.log('Parsed weights:', parsedWeights);
             setServiceWeights(parsedWeights);
+
+            // Extract service names WITHOUT weights for dropdown
+            const serviceNames = parsedWeights.map(sw => sw.location);
+            console.log('Service names for dropdown:', serviceNames);
 
             setFormData({
                 firstName: employee.firstName || '',
@@ -129,7 +300,7 @@ export default function EmployeeForm() {
                 rateCode: employee.rateCode || '',
                 restDays: employee.restDays || '',
                 preferredRegion: employee.preferredRegion || '',
-                preferredService: employee.preferredService || [],
+                preferredService: serviceNames,  // Service names ONLY (no weights!)
                 restrictedService: employee.restrictedService || [],
                 preferredDays: employee.preferredDays || [],
                 restrictedDays: employee.restrictedDays || [],
@@ -142,6 +313,8 @@ export default function EmployeeForm() {
                 weekOff: employee.weekOff || '',
                 invertPattern: employee.invertPattern || false
             });
+            
+            console.log('=== END DEBUG ===');
         } catch (err) {
             console.error('Failed to fetch employee:', err);
             setError('Failed to load employee data.');
@@ -205,7 +378,13 @@ export default function EmployeeForm() {
             return isNaN(weight) || weight < 0 || weight > 100;
         });
         if (invalidWeights.length > 0) {
-            newErrors.serviceWeights = 'All location weights must be between 0 and 100';
+            newErrors.serviceWeights = 'All service weights must be between 0 and 100';
+        }
+
+        // Services validation
+        if (formData.preferredRegion && formData.preferredService.length === 0 && formData.restrictedService.length === 0) {
+            // Optional warning - you can remove this if not needed
+            // newErrors.services = 'Consider selecting at least one preferred or restricted service';
         }
 
         setErrors(newErrors);
@@ -224,30 +403,96 @@ export default function EmployeeForm() {
         }
     };
 
-    // Handle service weight management
-    const handleAddLocation = () => {
-        if (!newLocation.trim()) return;
-
-        const weight = parseInt(newWeight);
-        if (isNaN(weight) || weight < 0 || weight > 100) {
-            setErrors({ ...errors, serviceWeights: 'Weight must be between 0 and 100' });
-            return;
-        }
-
-        // Check if location already exists
-        if (serviceWeights.some(sw => sw.location === newLocation)) {
-            setErrors({ ...errors, serviceWeights: 'Location already added' });
-            return;
-        }
-
-        setServiceWeights([...serviceWeights, { location: newLocation, weight: newWeight }]);
-        setNewLocation('');
-        setNewWeight('100');
-        setErrors({ ...errors, serviceWeights: undefined });
+    // Handle service weight change
+    const handleWeightChange = (service, newWeight) => {
+        setServiceWeights(prev => 
+            prev.map(sw => 
+                sw.location === service 
+                    ? { ...sw, weight: newWeight }
+                    : sw
+            )
+        );
     };
 
-    const handleRemoveLocation = (location) => {
-        setServiceWeights(serviceWeights.filter(sw => sw.location !== location));
+    // Handle service removal
+    const handleRemoveService = (service) => {
+        // Remove from serviceWeights
+        setServiceWeights(serviceWeights.filter(sw => sw.location !== service));
+        // Remove from preferredService field
+        setFormData(prev => ({
+            ...prev,
+            preferredService: prev.preferredService.filter(s => s !== service)
+        }));
+    };
+
+    // Handle Preferred Shifts change with LONG_DAY and SLEEP_IN pairing
+    const handlePreferredShiftsChange = (e, value) => {
+        let updatedShifts = [...value];
+        
+        // Check if LONG_DAY was added
+        if (value.includes('LONG_DAY') && !formData.preferredShifts.includes('LONG_DAY')) {
+            // Add SLEEP_IN if not already there
+            if (!updatedShifts.includes('SLEEP_IN')) {
+                updatedShifts.push('SLEEP_IN');
+            }
+        }
+        
+        // Check if SLEEP_IN was added
+        if (value.includes('SLEEP_IN') && !formData.preferredShifts.includes('SLEEP_IN')) {
+            // Add LONG_DAY if not already there
+            if (!updatedShifts.includes('LONG_DAY')) {
+                updatedShifts.push('LONG_DAY');
+            }
+        }
+        
+        // Check if LONG_DAY was removed
+        if (!value.includes('LONG_DAY') && formData.preferredShifts.includes('LONG_DAY')) {
+            // Remove SLEEP_IN as well
+            updatedShifts = updatedShifts.filter(shift => shift !== 'SLEEP_IN');
+        }
+        
+        // Check if SLEEP_IN was removed
+        if (!value.includes('SLEEP_IN') && formData.preferredShifts.includes('SLEEP_IN')) {
+            // Remove LONG_DAY as well
+            updatedShifts = updatedShifts.filter(shift => shift !== 'LONG_DAY');
+        }
+        
+        setFormData({ ...formData, preferredShifts: updatedShifts });
+    };
+
+    // Handle Restricted Shifts change with LONG_DAY and SLEEP_IN pairing
+    const handleRestrictedShiftsChange = (e, value) => {
+        let updatedShifts = [...value];
+        
+        // Check if LONG_DAY was added
+        if (value.includes('LONG_DAY') && !formData.restrictedShifts.includes('LONG_DAY')) {
+            // Add SLEEP_IN if not already there
+            if (!updatedShifts.includes('SLEEP_IN')) {
+                updatedShifts.push('SLEEP_IN');
+            }
+        }
+        
+        // Check if SLEEP_IN was added
+        if (value.includes('SLEEP_IN') && !formData.restrictedShifts.includes('SLEEP_IN')) {
+            // Add LONG_DAY if not already there
+            if (!updatedShifts.includes('LONG_DAY')) {
+                updatedShifts.push('LONG_DAY');
+            }
+        }
+        
+        // Check if LONG_DAY was removed
+        if (!value.includes('LONG_DAY') && formData.restrictedShifts.includes('LONG_DAY')) {
+            // Remove SLEEP_IN as well
+            updatedShifts = updatedShifts.filter(shift => shift !== 'SLEEP_IN');
+        }
+        
+        // Check if SLEEP_IN was removed
+        if (!value.includes('SLEEP_IN') && formData.restrictedShifts.includes('SLEEP_IN')) {
+            // Remove LONG_DAY as well
+            updatedShifts = updatedShifts.filter(shift => shift !== 'LONG_DAY');
+        }
+        
+        setFormData({ ...formData, restrictedShifts: updatedShifts });
     };
 
     // Handle form submission
@@ -264,14 +509,17 @@ export default function EmployeeForm() {
         setSuccess(false);
 
         try {
-            // Convert service weights to "Location:Weight" format
-            const preferredServiceFormatted = serviceWeights.map(
+            // Convert service weights to "ServiceName:Weight" format
+            // Store in preferredService (no more preferredLocations field)
+            const preferredServiceWithWeights = serviceWeights.map(
                 sw => `${sw.location}:${sw.weight}`
             );
 
             const payload = {
                 ...formData,
-                preferredService: preferredServiceFormatted,
+                preferredService: preferredServiceWithWeights,  // Services WITH weights
+                restrictedService: formData.restrictedService,  // Services array
+                // REMOVED: No more preferredLocations field
                 minHrs: formData.minHrs ? parseFloat(formData.minHrs) : null,
                 maxHrs: formData.maxHrs ? parseFloat(formData.maxHrs) : null,
                 restDays: formData.restDays ? parseInt(formData.restDays) : null,
@@ -307,7 +555,7 @@ export default function EmployeeForm() {
     }
 
     return (
-        <Box sx={{ p: 3, mt: 8 }}>
+        <Box sx={{ p: 3 }}>
             <Paper sx={{ p: 4, maxWidth: 1200, mx: 'auto' }}>
                 {/* Header */}
                 <Typography variant="h4" gutterBottom>
@@ -446,110 +694,137 @@ export default function EmployeeForm() {
                         </Grid>
                     </Grid>
 
-                    {/* Location Preferences with Weights */}
+                    {/* Region and Services */}
                     <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
-                        Location Preferences (with Weightage)
+                        Region & Services
                     </Typography>
                     <Divider sx={{ mb: 2 }} />
-                    <Grid container spacing={2}>
+                    <Grid container spacing={3}>
                         <Grid item xs={12} md={4}>
                             <FormControl fullWidth>
-                                <InputLabel>Preferred Region</InputLabel>
+                                <InputLabel>Preferred Region *</InputLabel>
                                 <Select
                                     value={formData.preferredRegion}
                                     onChange={handleChange('preferredRegion')}
-                                    label="Preferred Region"
+                                    label="Preferred Region *"
                                 >
                                     <MenuItem value="">None</MenuItem>
                                     {regions.map(region => (
                                         <MenuItem key={region} value={region}>{region}</MenuItem>
                                     ))}
                                 </Select>
+                                <FormHelperText>Select region first to load services</FormHelperText>
+                            </FormControl>
+                        </Grid>
+                        
+                        <Grid item xs={12} md={4}>
+                            <FormControl fullWidth disabled={!formData.preferredRegion || loadingServices}>
+                                <Autocomplete
+                                    multiple
+                                    options={getAvailablePreferredServices()}
+                                    value={formData.preferredService}
+                                    onChange={(e, value) => setFormData({ ...formData, preferredService: value })}
+                                    disabled={!formData.preferredRegion || loadingServices}
+                                    getOptionLabel={(option) => {
+                                        // Strip weight if present (safety measure)
+                                        return typeof option === 'string' && option.includes(':') 
+                                            ? option.split(':')[0].trim() 
+                                            : option;
+                                    }}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            label="Preferred Services"
+                                            placeholder={
+                                                !formData.preferredRegion 
+                                                    ? "Select region first" 
+                                                    : loadingServices 
+                                                    ? "Loading services..." 
+                                                    : "Select services"
+                                            }
+                                        />
+                                    )}
+                                />
+                                {loadingServices && <FormHelperText>Loading services...</FormHelperText>}
+                            </FormControl>
+                        </Grid>
+
+                        <Grid item xs={12} md={4}>
+                            <FormControl fullWidth disabled={!formData.preferredRegion || loadingServices}>
+                                <Autocomplete
+                                    multiple
+                                    options={getAvailableRestrictedServices()}
+                                    value={formData.restrictedService}
+                                    onChange={(e, value) => setFormData({ ...formData, restrictedService: value })}
+                                    disabled={!formData.preferredRegion || loadingServices}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            label="Restricted Services"
+                                            placeholder={
+                                                !formData.preferredRegion 
+                                                    ? "Select region first" 
+                                                    : loadingServices 
+                                                    ? "Loading services..." 
+                                                    : "Select services"
+                                            }
+                                        />
+                                    )}
+                                />
                             </FormControl>
                         </Grid>
                     </Grid>
 
-                    {/* Add Preferred Service with Weight */}
-                    <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                        <Typography variant="subtitle2" gutterBottom>
-                            Add Preferred Location with Weight (0-100)
+                    {/* Service Weights */}
+                    <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
+                        Service Weights
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
+                    <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                        <Typography variant="subtitle2" gutterBottom color="text.secondary">
+                            Services selected in "Preferred Services" above will appear here automatically. Set weight for each service (0-100, where 100 = dedicated).
                         </Typography>
-                        <Grid container spacing={2} alignItems="flex-start">
-                            <Grid item xs={12} md={5}>
-                                <Autocomplete
-                                    freeSolo
-                                    options={locations}
-                                    value={newLocation}
-                                    onChange={(e, value) => setNewLocation(value || '')}
-                                    onInputChange={(e, value) => setNewLocation(value)}
-                                    renderInput={(params) => (
-                                        <TextField
-                                            {...params}
-                                            label="Location"
-                                            placeholder="Type or select location"
-                                        />
-                                    )}
-                                />
+
+                        {/* Display services with editable weights */}
+                        {serviceWeights.length === 0 ? (
+                            <Alert severity="info" sx={{ mt: 2 }}>
+                                No services selected yet. Select services in "Preferred Services" field above.
+                            </Alert>
+                        ) : (
+                            <Grid container spacing={2} sx={{ mt: 2 }}>
+                                {serviceWeights.map((sw) => (
+                                    <Grid item xs={12} md={6} key={sw.location}>
+                                        <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                                            <Typography sx={{ flexGrow: 1, fontWeight: 'medium' }}>
+                                                {sw.location}
+                                            </Typography>
+                                            <TextField
+                                                type="number"
+                                                label="Weight"
+                                                value={sw.weight}
+                                                onChange={(e) => handleWeightChange(sw.location, e.target.value)}
+                                                inputProps={{ min: '0', max: '100', style: { width: '80px' } }}
+                                                size="small"
+                                                helperText={sw.weight === '100' ? 'Dedicated' : ''}
+                                            />
+                                            <IconButton 
+                                                onClick={() => handleRemoveService(sw.location)}
+                                                color="error"
+                                                size="small"
+                                                title="Remove service"
+                                            >
+                                                <DeleteIcon />
+                                            </IconButton>
+                                        </Paper>
+                                    </Grid>
+                                ))}
                             </Grid>
-                            <Grid item xs={12} md={3}>
-                                <TextField
-                                    fullWidth
-                                    type="number"
-                                    label="Weight (0-100)"
-                                    value={newWeight}
-                                    onChange={(e) => setNewWeight(e.target.value)}
-                                    inputProps={{ min: '0', max: '100' }}
-                                    helperText="100 = dedicated"
-                                />
-                            </Grid>
-                            <Grid item xs={12} md={4}>
-                                <Button
-                                    fullWidth
-                                    variant="contained"
-                                    startIcon={<AddIcon />}
-                                    onClick={handleAddLocation}
-                                    sx={{ height: 56 }}
-                                >
-                                    Add Location
-                                </Button>
-                            </Grid>
-                        </Grid>
-                        {errors.serviceWeights && (
-                            <FormHelperText error>{errors.serviceWeights}</FormHelperText>
                         )}
-
-                        {/* Display Added Locations */}
-                        <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                            {serviceWeights.map((sw) => (
-                                <Chip
-                                    key={sw.location}
-                                    label={`${sw.location}: ${sw.weight}%`}
-                                    onDelete={() => handleRemoveLocation(sw.location)}
-                                    color={parseInt(sw.weight) === 100 ? 'primary' : 'default'}
-                                />
-                            ))}
-                        </Box>
+                        
+                        {errors.serviceWeights && (
+                            <FormHelperText error sx={{ mt: 2 }}>{errors.serviceWeights}</FormHelperText>
+                        )}
                     </Box>
-
-                    {/* Restricted Services */}
-                    <Grid container spacing={2} sx={{ mt: 2 }}>
-                        <Grid item xs={12}>
-                            <Autocomplete
-                                multiple
-                                freeSolo
-                                options={locations}
-                                value={formData.restrictedService}
-                                onChange={(e, value) => setFormData({ ...formData, restrictedService: value })}
-                                renderInput={(params) => (
-                                    <TextField
-                                        {...params}
-                                        label="Restricted Locations"
-                                        placeholder="Add restricted locations"
-                                    />
-                                )}
-                            />
-                        </Grid>
-                    </Grid>
 
                     {/* Days and Shifts Preferences */}
                     <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
@@ -560,7 +835,7 @@ export default function EmployeeForm() {
                         <Grid item xs={12} md={6}>
                             <Autocomplete
                                 multiple
-                                options={daysOfWeek}
+                                options={getAvailablePreferredDays()}
                                 value={formData.preferredDays}
                                 onChange={(e, value) => setFormData({ ...formData, preferredDays: value })}
                                 renderInput={(params) => (
@@ -571,7 +846,7 @@ export default function EmployeeForm() {
                         <Grid item xs={12} md={6}>
                             <Autocomplete
                                 multiple
-                                options={daysOfWeek}
+                                options={getAvailableRestrictedDays()}
                                 value={formData.restrictedDays}
                                 onChange={(e, value) => setFormData({ ...formData, restrictedDays: value })}
                                 renderInput={(params) => (
@@ -582,22 +857,30 @@ export default function EmployeeForm() {
                         <Grid item xs={12} md={6}>
                             <Autocomplete
                                 multiple
-                                options={shiftTypes}
+                                options={getAvailablePreferredShifts()}
                                 value={formData.preferredShifts}
-                                onChange={(e, value) => setFormData({ ...formData, preferredShifts: value })}
+                                onChange={handlePreferredShiftsChange}
                                 renderInput={(params) => (
-                                    <TextField {...params} label="Preferred Shifts" />
+                                    <TextField 
+                                        {...params} 
+                                        label="Preferred Shifts"
+                                        helperText="LONG_DAY and SLEEP_IN are paired - selecting one adds the other"
+                                    />
                                 )}
                             />
                         </Grid>
                         <Grid item xs={12} md={6}>
                             <Autocomplete
                                 multiple
-                                options={shiftTypes}
+                                options={getAvailableRestrictedShifts()}
                                 value={formData.restrictedShifts}
-                                onChange={(e, value) => setFormData({ ...formData, restrictedShifts: value })}
+                                onChange={handleRestrictedShiftsChange}
                                 renderInput={(params) => (
-                                    <TextField {...params} label="Restricted Shifts" />
+                                    <TextField 
+                                        {...params} 
+                                        label="Restricted Shifts"
+                                        helperText="LONG_DAY and SLEEP_IN are paired - selecting one adds the other"
+                                    />
                                 )}
                             />
                         </Grid>
