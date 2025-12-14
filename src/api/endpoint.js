@@ -1,3 +1,5 @@
+// src/api/endpoint.js - FIXED VERSION
+
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export const API_ENDPOINTS = {
@@ -14,10 +16,12 @@ export const API_ENDPOINTS = {
   employees: `${API_BASE_URL}/api/employees`,
   employeeById: (id) => `${API_BASE_URL}/api/employees/${id}`,
 
-  // Shift Templates Managemet  
+  // Shift Templates Management  
   shiftTemplates: `${API_BASE_URL}/api/shift-templates`,
   shiftTemplateById: (id) => `${API_BASE_URL}/api/shift-templates/${id}`,
-  
+
+  // ✅ FIXED: Add base URL to scheduleVersions
+  scheduleVersions: `${API_BASE_URL}/api/schedules`,
   
   // Scheduling
   enqueueRequest: `${API_BASE_URL}/api/enqueueRequest`,

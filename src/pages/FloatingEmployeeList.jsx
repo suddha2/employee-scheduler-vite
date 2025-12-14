@@ -128,9 +128,10 @@ export default function FloatingEmployeeList({ employees = [] }) {
   const LIST_HEIGHT = 400; // or measure dynamically if needed
   const LIST_WIDTH = 260;
   const [position, setPosition] = useState({
-    top: 100,
+    top: 250,
     left: window.innerWidth - LIST_WIDTH - 30, // 30px margin from right edge
   });
+  
   const [contractFilter, setContractFilter] = useState("All");
   const handleMouseDown = (e) => {
     dragging.current = true;
@@ -182,7 +183,7 @@ export default function FloatingEmployeeList({ employees = [] }) {
         top: position.top,
         left: position.left,
         width: 260,
-        zIndex: 2000,
+        zIndex: 100,
         borderRadius: 2,
         border: "1px solid #ccc",
         boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
