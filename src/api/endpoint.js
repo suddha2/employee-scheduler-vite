@@ -29,6 +29,10 @@ export const API_ENDPOINTS = {
   solvedSchedule: `${API_BASE_URL}/api/solved`,
   updateSolvedSol: `${API_BASE_URL}/api/save`,
   payCycleSchedule: `${API_BASE_URL}/api/payCycle`,
+  regenerateSchedule: `${API_BASE_URL}/api/reenqueue`,
+  learningSchedule: `${API_BASE_URL}/api/learning/cycle/custom`,
+
+  
   
   // Downloads & Exports
   csvDownload: `${API_BASE_URL}/api/download/schedule`,

@@ -14,6 +14,8 @@ import {
     Autocomplete, TextField, Button, LinearProgress
 
 } from '@mui/material';
+import { Autorenew as RegenerateIcon, Psychology as LearnIcon ,Home  , People,FileDownload } from '@mui/icons-material';
+
 import { useNavigate } from 'react-router-dom';
 import { useRequestUpdates } from '../components/useRequestUpdates';
 import { usePersistedState } from '../hooks/usePersistedState';
@@ -32,6 +34,11 @@ export default function PayCycleSchedule() {
     const [submissionStatus, setSubmissionStatus] = useState({});
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(false);
+
+
+
+    const [regenerateLoading, setRegenerateLoading] = useState(false);
+    const [learnLoading, setLearnLoading] = useState(false);
 
     const updateRequestStatus = (periodUpdateList) => {
         if (!Array.isArray(periodUpdateList) || periodUpdateList.length === 0) return;
@@ -167,7 +174,7 @@ export default function PayCycleSchedule() {
             }
         });
     };
-    
+
     const handleServiceStatsClick = (period) => {
         // console.log("handleViewClick = ", id);
         // //navigate(`/schedules?id=${id}`);
@@ -188,8 +195,8 @@ export default function PayCycleSchedule() {
         // console.log("handleViewClick = ", id);
         // //navigate(`/schedules?id=${id}`);
         // window.open(`/empstats?id=${id}`, '_blank');
-    navigate(`/empstats?id=${period.rotaId}`, {
-        state: {
+        navigate(`/empstats?id=${period.rotaId}`, {
+            state: {
                 periodId: period.id,
                 periodName: period.name,
                 location: location.label,
@@ -338,7 +345,126 @@ export default function PayCycleSchedule() {
             }));
         }
     };
+    const handleRegenerate = async (period) => {
+        const { startDate, endDate } = period;
 
+        // Confirmation dialog
+        const confirmed = window.confirm(
+            '⚠️ Re-generate Schedule?\n\n' +
+            'This will:\n' +
+            '• Reset the schedule generation request\n' +
+            '• Queue it for the solver to process again\n' +
+            '• May take several minutes to complete\n\n' +
+            'Current assignments will remain until new solution is ready.\n\n' +
+            'Continue?'
+        );
+
+        if (!confirmed) return;
+
+        setSubmissionStatus(prev => ({
+            ...prev,
+            [period.id]: { loading: true, success: false, error: null, reloadedPeriod: null }
+        }));
+
+        try {
+            const payload = {
+                location: location.label,
+                startDate,
+                endDate
+            };
+
+            const response = await fetch(`${API_ENDPOINTS.regenerateSchedule}`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) throw new Error('Regeneration failed');
+
+            // Re-fetch just this period (SAME as handleCardSubmit)
+            const refreshed = await axiosInstance.get(
+                `${API_ENDPOINTS.payCycleSchedule}?location=${location.label}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem('token')}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+            const updatedPeriod = refreshed.data.find(p => p.id === period.id);
+
+            setSubmissionStatus(prev => ({
+                ...prev,
+                [period.id]: {
+                    loading: false,
+                    success: true,
+                    error: null,
+                    reloadedPeriod: updatedPeriod || null
+                }
+            }));
+
+        } catch (err) {
+            setSubmissionStatus(prev => ({
+                ...prev,
+                [period.id]: {
+                    loading: false,
+                    success: false,
+                    error: err.message,
+                    reloadedPeriod: null
+                }
+            }));
+
+            alert('❌ Regeneration Failed\n\n' + err.message);
+        }
+    };
+
+    const handleAutoLearn = async (period) => {
+        const { id: rotaId } = period;
+        const { startDate, endDate } = period;
+        // Confirmation dialog
+        const confirmed = window.confirm(
+            '🧠 Learn from this Schedule?\n\n' +
+            'This will:\n' +
+            '• Analyze all manual changes you made\n' +
+            '• Identify patterns in your corrections\n' +
+            '• Update employee preferences automatically (if confidence > 80%)\n' +
+            '• Help improve future solver results\n\n' +
+            'Continue?'
+        );
+
+        if (!confirmed) return;
+
+        setLearnLoading(true);
+
+        try {
+            const response = await fetch(`${API_ENDPOINTS.learningSchedule}?startDate=${startDate}&endDate=${endDate}`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({}),
+            });
+
+            if (!response.ok) throw new Error('Learning failed');
+
+            const data = await response.text();
+
+            alert(
+                '✅ Learning Complete!\n\n' +data+'\n\n' +
+                'Employee preferences have been updated to improve future schedules!'
+            );
+
+        } catch (err) {
+            console.error('Learning failed:', err);
+            alert('❌ Learning Failed\n\n' + err.message);
+        } finally {
+            setLearnLoading(false);
+        }
+    };
 
     return (
         <Box sx={{ p: 2 }}>
@@ -462,19 +588,21 @@ export default function PayCycleSchedule() {
                                                             variant="contained"
                                                             color="primary"
                                                             size="small"
+                                                            startIcon={<Home  />}
                                                             sx={{ px: 2, py: 0.5 }}
                                                             onClick={() => handleServiceStatsClick(currentPeriod)}
                                                         >
-                                                            Service Stats
+                                                            Service
                                                         </Button>
                                                         <Button
                                                             variant="contained"
                                                             color="primary"
                                                             size="small"
+                                                            startIcon={<People />}
                                                             sx={{ px: 2, py: 0.5 }}
                                                             onClick={() => handleEmpStatsClick(currentPeriod)}
                                                         >
-                                                            Employee Stats
+                                                            Employee
                                                         </Button>
                                                         <Button
                                                             variant="contained"
@@ -489,6 +617,7 @@ export default function PayCycleSchedule() {
                                                             variant="contained"
                                                             color="primary"
                                                             size="small"
+                                                            startIcon={<FileDownload />}
                                                             sx={{ px: 2, py: 0.5 }}
                                                             onClick={() => handleExportStatsClick(currentPeriod.rotaId)}
                                                             disabled={loading}
@@ -496,16 +625,27 @@ export default function PayCycleSchedule() {
                                                             {loading ? (
                                                                 <CircularProgress size={16} sx={{ mr: 1 }} />
                                                             ) : null}
-                                                            {loading ? "Downloading..." : "Export Stats"}
+                                                            {loading ? "Downloading..." : "Export"}
                                                         </Button>
                                                         <Button
                                                             variant="contained"
-                                                            color="primary"
+                                                            color="warning"
                                                             size="small"
+                                                            startIcon={<RegenerateIcon />}
                                                             sx={{ px: 2, py: 0.5 }}
-                                                            onClick={() => handleCardSubmit(period)}
+                                                            onClick={() => handleRegenerate(period)}
                                                         >
                                                             Re-Generate
+                                                        </Button>
+                                                        <Button
+                                                            variant="contained"
+                                                            color="info"
+                                                            size="small" 
+                                                            startIcon={<LearnIcon />}
+                                                            sx={{ px: 2, py: 0.5 }}
+                                                            onClick={() => handleAutoLearn(period)}
+                                                        >
+                                                            Learn
                                                         </Button>
                                                     </Box>
                                                 ) : (
