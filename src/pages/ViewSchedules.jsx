@@ -66,7 +66,8 @@ function buildAssignmentMap(assignments) {
     const shiftType = shift.shiftTemplate.shiftType;
     const date = shift.shiftStart;
     const shiftStartTime = shift.shiftTemplate.startTime;
-    const key = `${location}|${shiftType}|${date}|${shiftStartTime}`;
+    const shiftId = shift.id;
+    const key = `${location}|${shiftType}|${date}|${shiftStartTime}|${shiftId}`;
 
     if (!map[key]) {
       map[key] = [];
@@ -83,6 +84,11 @@ function buildAssignmentMap(assignments) {
     new Set(assignments.map((a) => a.shift.shiftStart))
   );
 
+  // Clear existing dates before rebuilding
+  Object.keys(datesByWeekday).forEach(day => {
+    datesByWeekday[day] = [];
+  });
+
   uniqueDateStrings.forEach((dateStr) => {
     const weekday = format(new Date(dateStr), "EEE");
     if (datesByWeekday[weekday]) {
@@ -90,6 +96,11 @@ function buildAssignmentMap(assignments) {
         datesByWeekday[weekday].push(dateStr);
       }
     }
+  });
+
+  // ✅ Sort dates within each weekday chronologically
+  Object.keys(datesByWeekday).forEach(day => {
+    datesByWeekday[day].sort((a, b) => new Date(a) - new Date(b));
   });
 
   return map;
@@ -168,16 +179,27 @@ const VirtualRow = memo(({
               return shiftDateStr === dateStr;
             });
 
-            return matching.map((assignment) => {
+            // ✅ Dedupe by shift.id to avoid showing same shift multiple times
+            const uniqueShifts = new Map();
+            matching.forEach((assignment) => {
+              const shiftId = assignment.shift.id;
+              if (!uniqueShifts.has(shiftId)) {
+                uniqueShifts.set(shiftId, assignment);
+              }
+            });
+
+            return Array.from(uniqueShifts.values()).map((assignment) => {
               const shiftDateStr = format(new Date(assignment.shift.shiftStart), "yyyy-MM-dd");
               const shiftStartTime = assignment.shift.shiftTemplate.startTime;
-              const cellKey = `${location}|${shiftType}|${shiftDateStr}|${shiftStartTime}`;
+              const shiftId = assignment.shift.id;
+              const cellKey = `${location}|${shiftType}|${shiftDateStr}|${shiftStartTime}|${shiftId}`;
               const droppableId = `cell|${cellKey}`;
               const changeType = changeHighlights[cellKey];
+              const cellEmployees = assignmentMap[cellKey] ?? [];
 
               return (
                 <Box 
-                  key={assignment.id} 
+                  key={cellKey} 
                   sx={{ 
                     mb: 1,
                     borderLeft: changeType ? '4px solid' : 'none',
@@ -203,7 +225,7 @@ const VirtualRow = memo(({
                   </Typography>
                   <DroppableCell
                     id={droppableId}
-                    assigned={assignmentMap[cellKey] ?? []}
+                    assigned={cellEmployees}
                     highlighted={highlighted[cellKey] ?? []}
                     onRemove={handleRemove}
                     isDragging={!!activeDragId}
@@ -269,7 +291,15 @@ export default function ViewSchedules() {
 
   // Helper: Extract shift ID from cell key
   const getShiftIdFromCellKey = (cellKey) => {
-    const [location, shiftType, date, startTime] = cellKey.split('|');
+    const parts = cellKey.split('|');
+    
+    // ✅ New format: location|shiftType|date|startTime|shiftId (5 parts)
+    if (parts.length === 5) {
+      return parts[4] ? Number(parts[4]) : null;
+    }
+    
+    // Old format: location|shiftType|date|startTime (4 parts) - fallback
+    const [location, shiftType, date, startTime] = parts;
     
     if (!rotaData?.shiftAssignmentList) {
       console.warn('No rotaData available for cell key:', cellKey);
@@ -556,7 +586,7 @@ export default function ViewSchedules() {
   });
 
   const handleRemove = (emp, cellKey) => {
-    const [location, shiftType, date, shiftTime] = cellKey.split("|");
+    const [location, shiftType, date, shiftTime, shiftId] = cellKey.split("|");
 
     setAssignmentMap((prev) => {
       const current = prev[cellKey] ?? [];
@@ -620,8 +650,8 @@ export default function ViewSchedules() {
     const droppedEmp = summarizedEmpList.find((e) => e.id === empId);
     if (!droppedEmp) return;
 
-    const [, location, shiftType, date, shiftTime] = over.id.split("|");
-    const cellKey = `${location}|${shiftType}|${date}|${shiftTime}`;
+    const [, location, shiftType, date, shiftTime, shiftId] = over.id.split("|");
+    const cellKey = `${location}|${shiftType}|${date}|${shiftTime}|${shiftId}`;
 
     setAssignmentMap((prev) => {
       const current = prev[cellKey] ?? [];

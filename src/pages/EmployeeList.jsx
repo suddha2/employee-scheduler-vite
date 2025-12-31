@@ -37,14 +37,14 @@ import { API_ENDPOINTS } from '../api/endpoint';
 
 export default function EmployeeList() {
     // State management
-    const [employees, setEmployees] = useState([]);
+    const [allEmployees, setAllEmployees] = useState([]); // ✅ Store all employees
+    const [filteredEmployees, setFilteredEmployees] = useState([]); // ✅ Filtered results
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     
     // Pagination state
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
-    const [totalElements, setTotalElements] = useState(0);
     
     // Filter state
     const [searchTerm, setSearchTerm] = useState('');
@@ -53,38 +53,63 @@ export default function EmployeeList() {
     const [filterGender, setFilterGender] = useState('');
     const [showFilters, setShowFilters] = useState(false);
     
-    // Available filter options (fetch from backend or hardcode)
+    // Available filter options
     const [regions, setRegions] = useState([]);
     const contractTypes = ['PERMANENT', 'ZERO_HOURS', 'FIXED_TERM', 'PART_TIME'];
     const genders = ['MALE', 'FEMALE', 'OTHER'];
     
     const navigate = useNavigate();
 
-    // Fetch employees with pagination and filters
+    // ✅ Fetch all employees once
     const fetchEmployees = async () => {
         setLoading(true);
         setError(null);
         
         try {
-            const params = {
-                page,
-                size: rowsPerPage,
-                search: searchTerm || undefined,
-                region: filterRegion || undefined,
-                contractType: filterContractType || undefined,
-                gender: filterGender || undefined
-            };
-
-            const response = await axiosInstance.get(API_ENDPOINTS.employees, { params });
+            const response = await axiosInstance.get(API_ENDPOINTS.employees);
+            const data = response.data.content || response.data;
             
-            setEmployees(response.data.content || response.data);
-            setTotalElements(response.data.totalElements || response.data.length);
+            setAllEmployees(data);
+            setFilteredEmployees(data); // Initially show all
+            
         } catch (err) {
             console.error('Failed to fetch employees:', err);
             setError('Failed to load employees. Please try again.');
         } finally {
             setLoading(false);
         }
+    };
+
+    // ✅ Apply filters to employees
+    const applyFilters = () => {
+        let filtered = [...allEmployees];
+        
+        // Search filter (firstName or lastName)
+        if (searchTerm) {
+            const search = searchTerm.toLowerCase();
+            filtered = filtered.filter(emp => 
+                emp.firstName?.toLowerCase().includes(search) ||
+                emp.lastName?.toLowerCase().includes(search)
+            );
+        }
+        
+        // Region filter
+        if (filterRegion) {
+            filtered = filtered.filter(emp => emp.preferredRegion === filterRegion);
+        }
+        
+        // Contract type filter
+        if (filterContractType) {
+            filtered = filtered.filter(emp => emp.contractType === filterContractType);
+        }
+        
+        // Gender filter
+        if (filterGender) {
+            filtered = filtered.filter(emp => emp.gender === filterGender);
+        }
+        
+        setFilteredEmployees(filtered);
+        setPage(0); // Reset to first page when filters change
     };
 
     // Fetch regions for filter dropdown
@@ -97,13 +122,18 @@ export default function EmployeeList() {
         }
     };
 
+    // ✅ Fetch employees once on mount
     useEffect(() => {
         fetchRegions();
+        fetchEmployees();
     }, []);
 
+    // ✅ Apply filters when filter values change
     useEffect(() => {
-        fetchEmployees();
-    }, [page, rowsPerPage, searchTerm, filterRegion, filterContractType, filterGender]);
+        if (allEmployees.length > 0) {
+            applyFilters();
+        }
+    }, [searchTerm, filterRegion, filterContractType, filterGender]);
 
     // Event handlers
     const handleChangePage = (event, newPage) => {
@@ -117,7 +147,6 @@ export default function EmployeeList() {
 
     const handleSearchChange = (event) => {
         setSearchTerm(event.target.value);
-        setPage(0); // Reset to first page on search
     };
 
     const handleClearFilters = () => {
@@ -162,6 +191,12 @@ export default function EmployeeList() {
         return colors[contractType] || 'default';
     };
 
+    // ✅ Get paginated employees from filtered results
+    const displayedEmployees = filteredEmployees.slice(
+        page * rowsPerPage,
+        page * rowsPerPage + rowsPerPage
+    );
+
     return (
         <Box sx={{ p: 3, mt: 8 }}>
             <Paper sx={{ p: 3 }}>
@@ -181,7 +216,7 @@ export default function EmployeeList() {
                 {/* Search and Filters */}
                 <Box sx={{ mb: 3 }}>
                     <Grid container spacing={2} alignItems="center">
-                        {/* Search */}
+                        {/* Search Bar */}
                         <Grid item xs={12} md={6}>
                             <TextField
                                 fullWidth
@@ -196,7 +231,10 @@ export default function EmployeeList() {
                                     ),
                                     endAdornment: searchTerm && (
                                         <InputAdornment position="end">
-                                            <IconButton size="small" onClick={() => setSearchTerm('')}>
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => setSearchTerm('')}
+                                            >
                                                 <ClearIcon />
                                             </IconButton>
                                         </InputAdornment>
@@ -205,8 +243,8 @@ export default function EmployeeList() {
                             />
                         </Grid>
 
-                        {/* Filter Toggle */}
-                        <Grid item xs={12} md={6} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                        {/* Filter Buttons */}
+                        <Grid item xs={12} md={6} sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                             <Button
                                 variant="outlined"
                                 startIcon={<FilterIcon />}
@@ -280,6 +318,18 @@ export default function EmployeeList() {
                     </Grid>
                 </Box>
 
+                {/* Results Count */}
+                {!loading && (
+                    <Box sx={{ mb: 2 }}>
+                        <Typography variant="body2" color="text.secondary">
+                            Showing {displayedEmployees.length} of {filteredEmployees.length} employees
+                            {filteredEmployees.length < allEmployees.length && 
+                                ` (filtered from ${allEmployees.length} total)`
+                            }
+                        </Typography>
+                    </Box>
+                )}
+
                 {/* Error Alert */}
                 {error && (
                     <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -310,16 +360,19 @@ export default function EmployeeList() {
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {employees.length === 0 ? (
+                                    {displayedEmployees.length === 0 ? (
                                         <TableRow>
                                             <TableCell colSpan={8} align="center">
                                                 <Typography variant="body1" color="textSecondary" sx={{ py: 4 }}>
-                                                    No employees found. Try adjusting your filters or create a new employee.
+                                                    {allEmployees.length === 0 
+                                                        ? 'No employees found. Create a new employee to get started.'
+                                                        : 'No employees match your filters. Try adjusting your search or filters.'
+                                                    }
                                                 </Typography>
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        employees.map((employee) => (
+                                        displayedEmployees.map((employee) => (
                                             <TableRow key={employee.id} hover>
                                                 <TableCell>{employee.id}</TableCell>
                                                 <TableCell>
@@ -374,7 +427,7 @@ export default function EmployeeList() {
                         {/* Pagination */}
                         <TablePagination
                             component="div"
-                            count={totalElements}
+                            count={filteredEmployees.length}
                             page={page}
                             onPageChange={handleChangePage}
                             rowsPerPage={rowsPerPage}

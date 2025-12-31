@@ -50,7 +50,7 @@ const ShiftTemplateForm = () => {
     
     const shiftTypes = ['LONG_DAY', 'DAY', 'SLEEP_IN', 'WAKING_NIGHT', 'FLOATING'];
     const daysOfWeek = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
-    const genders = ['MALE', 'FEMALE'];
+    const genders = ['ANY','MALE', 'FEMALE'];
     const skillOptions = [ 'BUCCAL', 'DRIVING'];
 
     // UI state
