@@ -520,8 +520,10 @@ export default function EmployeeForm() {
                 preferredService: preferredServiceWithWeights,  // Services WITH weights
                 restrictedService: formData.restrictedService,  // Services array
                 // REMOVED: No more preferredLocations field
-                minHrs: formData.minHrs ? parseFloat(formData.minHrs) : null,
-                maxHrs: formData.maxHrs ? parseFloat(formData.maxHrs) : null,
+                // minHrs: formData.minHrs ? parseFloat(formData.minHrs) : null,
+                // maxHrs: formData.maxHrs ? parseFloat(formData.maxHrs) : null,
+                minHrs: formData.minHrs === '' ? null : parseFloat(formData.minHrs),
+                maxHrs: formData.maxHrs === '' ? null : parseFloat(formData.maxHrs),
                 restDays: formData.restDays ? parseInt(formData.restDays) : null,
                 daysOn: formData.daysOn ? parseInt(formData.daysOn) : null,
                 daysOff: formData.daysOff ? parseInt(formData.daysOff) : null,
