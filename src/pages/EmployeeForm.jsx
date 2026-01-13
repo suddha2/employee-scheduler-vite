@@ -214,7 +214,7 @@ export default function EmployeeForm() {
             // Clear all if preferredService is empty
             setServiceWeights([]);
         }
-    }, [formData.preferredService, serviceWeights]);
+    }, [formData.preferredService]);
 
     // Fetch employee data if edit mode
     useEffect(() => {
