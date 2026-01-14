@@ -16,7 +16,8 @@ import {
     Autocomplete,
     Alert,
     CircularProgress,
-    Divider
+    Divider,
+    Backdrop
 } from '@mui/material';
 import {
     Save as SaveIcon,
@@ -77,10 +78,10 @@ export default function EmployeeForm() {
     const [availableServices, setAvailableServices] = useState([]);  // Services for selected region
     const genders = ['MALE', 'FEMALE'];
     const contractTypes = ['PERMANENT', 'ZERO_HOURS'];
-    const rateCodes = ['L1', 'L2', 'L3','ZERO_HOURS'];
+    const rateCodes = ['L1', 'L2', 'L3', 'ZERO_HOURS'];
     const daysOfWeek = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
     const shiftTypes = ['LONG_DAY', 'DAY', 'SLEEP_IN', 'WAKING_NIGHT', 'FLOATING'];
-    const skillsList = ['BUCALL','DRIVING'];
+    const skillsList = ['BUCALL', 'DRIVING'];
 
     // Fetch regions and locations on mount
     useEffect(() => {
@@ -193,7 +194,7 @@ export default function EmployeeForm() {
             const newServices = formData.preferredService.filter(
                 service => !serviceWeights.some(sw => sw.location === service)
             );
-            
+
             if (newServices.length > 0) {
                 const newWeights = newServices.map(service => ({
                     location: service,
@@ -206,7 +207,7 @@ export default function EmployeeForm() {
             const updatedWeights = serviceWeights.filter(
                 sw => formData.preferredService.includes(sw.location)
             );
-            
+
             if (updatedWeights.length !== serviceWeights.length) {
                 setServiceWeights(updatedWeights);
             }
@@ -228,19 +229,19 @@ export default function EmployeeForm() {
         try {
             const response = await axiosInstance.get(`${API_ENDPOINTS.employees}/${id}`);
             const employee = response.data;
-            
+
             console.log('=== EDIT MODE DEBUG ===');
             console.log('preferredService:', employee.preferredService);
             console.log('preferredLocations:', employee.preferredLocations);
-            
+
             // Determine source of service data with weights
             // Check which field actually has the weights (format: "Name:Weight")
             let servicesWithWeights = [];
-            
+
             // Check preferredService FIRST (your backend currently has weights here)
             if (employee.preferredService && employee.preferredService.length > 0) {
                 const firstService = employee.preferredService[0];
-                
+
                 if (typeof firstService === 'string' && firstService.includes(':')) {
                     // preferredService has weights
                     servicesWithWeights = employee.preferredService;
@@ -265,12 +266,12 @@ export default function EmployeeForm() {
                 servicesWithWeights = employee.preferredLocations;
                 console.log('✓ Using preferredLocations (fallback)');
             }
-            
+
             // Handle string or array
             if (typeof servicesWithWeights === 'string') {
                 servicesWithWeights = servicesWithWeights.split(',').map(s => s.trim());
             }
-            
+
             // Parse services with weights
             const parsedWeights = servicesWithWeights.map(service => {
                 if (typeof service === 'string' && service.includes(':')) {
@@ -282,7 +283,7 @@ export default function EmployeeForm() {
                 // Service without weight
                 return { location: String(service).trim(), weight: '100' };
             });
-            
+
             console.log('Parsed weights:', parsedWeights);
             setServiceWeights(parsedWeights);
 
@@ -295,10 +296,10 @@ export default function EmployeeForm() {
                 lastName: employee.lastName || '',
                 gender: employee.gender || '',
                 contractType: employee.contractType || '',
-                minHrs: employee.minHrs ?? '', 
-                maxHrs: employee.maxHrs ??'',
+                minHrs: employee.minHrs ?? '',
+                maxHrs: employee.maxHrs ?? '',
                 rateCode: employee.rateCode || '',
-                restDays: employee.restDays || '',
+                restDays: employee.restDays ?? '',
                 preferredRegion: employee.preferredRegion || '',
                 preferredService: serviceNames,  // Service names ONLY (no weights!)
                 restrictedService: employee.restrictedService || [],
@@ -307,13 +308,13 @@ export default function EmployeeForm() {
                 preferredShifts: employee.preferredShifts || [],
                 restrictedShifts: employee.restrictedShifts || [],
                 skills: employee.skills || [],
-                daysOn: employee.daysOn || '',
-                daysOff: employee.daysOff || '',
-                weekOn: employee.weekOn || '',
-                weekOff: employee.weekOff || '',
+                daysOn: employee.daysOn ?? '',
+                daysOff: employee.daysOff ?? '',
+                weekOn: employee.weekOn ?? '',
+                weekOff: employee.weekOff ?? '',
                 invertPattern: employee.invertPattern || false
             });
-            
+
             console.log('=== END DEBUG ===');
         } catch (err) {
             console.error('Failed to fetch employee:', err);
@@ -405,9 +406,9 @@ export default function EmployeeForm() {
 
     // Handle service weight change
     const handleWeightChange = (service, newWeight) => {
-        setServiceWeights(prev => 
-            prev.map(sw => 
-                sw.location === service 
+        setServiceWeights(prev =>
+            prev.map(sw =>
+                sw.location === service
                     ? { ...sw, weight: newWeight }
                     : sw
             )
@@ -428,7 +429,7 @@ export default function EmployeeForm() {
     // Handle Preferred Shifts change with LONG_DAY and SLEEP_IN pairing
     const handlePreferredShiftsChange = (e, value) => {
         let updatedShifts = [...value];
-        
+
         // Check if LONG_DAY was added
         if (value.includes('LONG_DAY') && !formData.preferredShifts.includes('LONG_DAY')) {
             // Add SLEEP_IN if not already there
@@ -436,7 +437,7 @@ export default function EmployeeForm() {
                 updatedShifts.push('SLEEP_IN');
             }
         }
-        
+
         // Check if SLEEP_IN was added
         if (value.includes('SLEEP_IN') && !formData.preferredShifts.includes('SLEEP_IN')) {
             // Add LONG_DAY if not already there
@@ -444,26 +445,26 @@ export default function EmployeeForm() {
                 updatedShifts.push('LONG_DAY');
             }
         }
-        
+
         // Check if LONG_DAY was removed
         if (!value.includes('LONG_DAY') && formData.preferredShifts.includes('LONG_DAY')) {
             // Remove SLEEP_IN as well
             updatedShifts = updatedShifts.filter(shift => shift !== 'SLEEP_IN');
         }
-        
+
         // Check if SLEEP_IN was removed
         if (!value.includes('SLEEP_IN') && formData.preferredShifts.includes('SLEEP_IN')) {
             // Remove LONG_DAY as well
             updatedShifts = updatedShifts.filter(shift => shift !== 'LONG_DAY');
         }
-        
+
         setFormData({ ...formData, preferredShifts: updatedShifts });
     };
 
     // Handle Restricted Shifts change with LONG_DAY and SLEEP_IN pairing
     const handleRestrictedShiftsChange = (e, value) => {
         let updatedShifts = [...value];
-        
+
         // Check if LONG_DAY was added
         if (value.includes('LONG_DAY') && !formData.restrictedShifts.includes('LONG_DAY')) {
             // Add SLEEP_IN if not already there
@@ -471,7 +472,7 @@ export default function EmployeeForm() {
                 updatedShifts.push('SLEEP_IN');
             }
         }
-        
+
         // Check if SLEEP_IN was added
         if (value.includes('SLEEP_IN') && !formData.restrictedShifts.includes('SLEEP_IN')) {
             // Add LONG_DAY if not already there
@@ -479,19 +480,19 @@ export default function EmployeeForm() {
                 updatedShifts.push('LONG_DAY');
             }
         }
-        
+
         // Check if LONG_DAY was removed
         if (!value.includes('LONG_DAY') && formData.restrictedShifts.includes('LONG_DAY')) {
             // Remove SLEEP_IN as well
             updatedShifts = updatedShifts.filter(shift => shift !== 'SLEEP_IN');
         }
-        
+
         // Check if SLEEP_IN was removed
         if (!value.includes('SLEEP_IN') && formData.restrictedShifts.includes('SLEEP_IN')) {
             // Remove LONG_DAY as well
             updatedShifts = updatedShifts.filter(shift => shift !== 'LONG_DAY');
         }
-        
+
         setFormData({ ...formData, restrictedShifts: updatedShifts });
     };
 
@@ -519,33 +520,48 @@ export default function EmployeeForm() {
                 ...formData,
                 preferredService: preferredServiceWithWeights,  // Services WITH weights
                 restrictedService: formData.restrictedService,  // Services array
-                // REMOVED: No more preferredLocations field
-                // minHrs: formData.minHrs ? parseFloat(formData.minHrs) : null,
-                // maxHrs: formData.maxHrs ? parseFloat(formData.maxHrs) : null,
+                // ✅ ADD THESE MAPPINGS:
+                preferredShift: formData.preferredShifts || [],
+                restrictedShift: formData.restrictedShifts || [],
+                preferredDay: formData.preferredDays || [],
+                restrictedDay: formData.restrictedDays || [],
+
+                // ✅ REMOVE PLURAL VERSIONS:
+                // preferredShifts: undefined,
+                // restrictedShifts: undefined,
+                // preferredDays: undefined,
+                // restrictedDays: undefined,
+
                 minHrs: formData.minHrs === '' ? null : parseFloat(formData.minHrs),
                 maxHrs: formData.maxHrs === '' ? null : parseFloat(formData.maxHrs),
-                restDays: formData.restDays ? parseInt(formData.restDays) : null,
-                daysOn: formData.daysOn ? parseInt(formData.daysOn) : null,
-                daysOff: formData.daysOff ? parseInt(formData.daysOff) : null,
-                weekOn: formData.weekOn ? parseInt(formData.weekOn) : null,
-                weekOff: formData.weekOff ? parseInt(formData.weekOff) : null,
-            };
+                restDays: formData.restDays === '' ? null : parseInt(formData.restDays),
+                daysOn: formData.daysOn === '' ? null : parseInt(formData.daysOn),
+                daysOff: formData.daysOff === '' ? null : parseInt(formData.daysOff),
+                weekOn: formData.weekOn === '' ? null : parseInt(formData.weekOn),
+                weekOff: formData.weekOff === '' ? null : parseInt(formData.weekOff),
 
+            };
+            console.log('Sending payload:', {
+                preferredShift: payload.preferredShift,
+                restrictedShift: payload.restrictedShift,
+                preferredDay: payload.preferredDay,
+                restrictedDay: payload.restrictedDay
+            });
             if (isEditMode) {
                 await axiosInstance.put(`${API_ENDPOINTS.employees}/${id}`, payload);
                 setSuccess(true);
-                setTimeout(() => navigate('/employees'), 2000);
+                setTimeout(() => navigate('/employees'), 3000);
             } else {
                 await axiosInstance.post(API_ENDPOINTS.employees, payload);
                 setSuccess(true);
-                setTimeout(() => navigate('/employees'), 2000);
+                setTimeout(() => navigate('/employees'), 3000);
             }
         } catch (err) {
             console.error('Failed to save employee:', err);
             setError(err.response?.data?.message || 'Failed to save employee. Please try again.');
-        } finally {
             setSaving(false);
         }
+
     };
 
     if (loading) {
@@ -557,438 +573,492 @@ export default function EmployeeForm() {
     }
 
     return (
-        <Box sx={{ p: 3 }}>
-            <Paper sx={{ p: 4, maxWidth: 1200, mx: 'auto' }}>
-                {/* Header */}
-                <Typography variant="h4" gutterBottom>
-                    {isEditMode ? 'Edit Employee' : 'Create New Employee'}
-                </Typography>
-
-                {/* Success/Error Messages */}
-                {success && (
-                    <Alert severity="success" sx={{ mb: 3 }}>
-                        Employee {isEditMode ? 'updated' : 'created'} successfully! Redirecting...
-                    </Alert>
-                )}
-                {error && (
-                    <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-                        {error}
-                    </Alert>
-                )}
-
-                <form onSubmit={handleSubmit}>
-                    {/* Basic Information */}
-                    <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
-                        Basic Information
+        <>
+            <Backdrop
+                sx={{
+                    zIndex: (theme) => theme.zIndex.drawer + 1,
+                    backdropFilter: 'blur(8px)',
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)'
+                }}
+                open={saving}
+            >
+                <Paper
+                    elevation={24}
+                    sx={{
+                        p: 5,
+                        borderRadius: 3,
+                        textAlign: 'center',
+                        minWidth: 400,
+                        backgroundColor: success ? '#f1f8f4' : 'white'
+                    }}
+                >
+                    {success ? (
+                        <>
+                            <Box sx={{
+                                width: 80,
+                                height: 80,
+                                borderRadius: '50%',
+                                backgroundColor: '#4caf50',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 24px'
+                            }}>
+                                <Typography variant="h2" sx={{ color: 'white' }}>✓</Typography>
+                            </Box>
+                            <Typography variant="h5" gutterBottom sx={{ color: '#2e7d32', fontWeight: 600 }}>
+                                Success!
+                            </Typography>
+                            <Typography variant="body1" color="text.secondary">
+                                Employee {isEditMode ? 'updated' : 'created'} successfully
+                            </Typography>
+                        </>
+                    ) : (
+                        <>
+                            <CircularProgress size={60} thickness={4} sx={{ mb: 3 }} />
+                            <Typography variant="h6" gutterBottom sx={{ fontWeight: 500 }}>
+                                {isEditMode ? 'Updating Employee' : 'Creating Employee'}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                Please wait...
+                            </Typography>
+                        </>
+                    )}
+                </Paper>
+            </Backdrop>
+            <Box sx={{ p: 3 }}>
+                <Paper sx={{ p: 4, maxWidth: 1200, mx: 'auto' }}>
+                    {/* Header */}
+                    <Typography variant="h4" gutterBottom>
+                        {isEditMode ? 'Edit Employee' : 'Create New Employee'}
                     </Typography>
-                    <Divider sx={{ mb: 2 }} />
-                    <Grid container spacing={3}>
-                        <Grid item xs={12} md={6}>
-                            <TextField
-                                fullWidth
-                                required
-                                label="First Name"
-                                value={formData.firstName}
-                                onChange={handleChange('firstName')}
-                                error={!!errors.firstName}
-                                helperText={errors.firstName}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                            <TextField
-                                fullWidth
-                                required
-                                label="Last Name"
-                                value={formData.lastName}
-                                onChange={handleChange('lastName')}
-                                error={!!errors.lastName}
-                                helperText={errors.lastName}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                            <FormControl fullWidth required error={!!errors.gender}>
-                                <InputLabel>Gender</InputLabel>
-                                <Select
-                                    value={formData.gender}
-                                    onChange={handleChange('gender')}
-                                    label="Gender"
-                                >
-                                    {genders.map(gender => (
-                                        <MenuItem key={gender} value={gender}>{gender}</MenuItem>
-                                    ))}
-                                </Select>
-                                {errors.gender && <FormHelperText>{errors.gender}</FormHelperText>}
-                            </FormControl>
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                            <FormControl fullWidth required error={!!errors.contractType}>
-                                <InputLabel>Contract Type</InputLabel>
-                                <Select
-                                    value={formData.contractType}
-                                    onChange={handleChange('contractType')}
-                                    label="Contract Type"
-                                >
-                                    {contractTypes.map(type => (
-                                        <MenuItem key={type} value={type}>{type.replace('_', ' ')}</MenuItem>
-                                    ))}
-                                </Select>
-                                {errors.contractType && <FormHelperText>{errors.contractType}</FormHelperText>}
-                            </FormControl>
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                            <FormControl fullWidth>
-                                <InputLabel>Rate Code</InputLabel>
-                                <Select
-                                    value={formData.rateCode}
-                                    onChange={handleChange('rateCode')}
-                                    label="Rate Code"
-                                >
-                                    <MenuItem value="">None</MenuItem>
-                                    {rateCodes.map(rate => (
-                                        <MenuItem key={rate} value={rate}>{rate}</MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        </Grid>
-                    </Grid>
 
-                    {/* Hours and Rest Days */}
-                    <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
-                        Working Hours
-                    </Typography>
-                    <Divider sx={{ mb: 2 }} />
-                    <Grid container spacing={3}>
-                        <Grid item xs={12} md={4}>
-                            <TextField
-                                fullWidth
-                                type="number"
-                                label="Min Hours per Week"
-                                value={formData.minHrs}
-                                onChange={handleChange('minHrs')}
-                                error={!!errors.minHrs}
-                                helperText={errors.minHrs}
-                                inputProps={{ step: '0.01', min: '0' }}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                            <TextField
-                                fullWidth
-                                type="number"
-                                label="Max Hours per Week"
-                                value={formData.maxHrs}
-                                onChange={handleChange('maxHrs')}
-                                error={!!errors.maxHrs}
-                                helperText={errors.maxHrs}
-                                inputProps={{ step: '0.01', min: '0' }}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                            <TextField
-                                fullWidth
-                                type="number"
-                                label="Rest Days per Cycle"
-                                value={formData.restDays}
-                                onChange={handleChange('restDays')}
-                                error={!!errors.restDays}
-                                helperText={errors.restDays}
-                                inputProps={{ min: '0' }}
-                            />
-                        </Grid>
-                    </Grid>
+                    {/* Success/Error Messages */}
+                    {success && (
+                        <Alert severity="success" sx={{ mb: 3 }}>
+                            Employee {isEditMode ? 'updated' : 'created'} successfully! Redirecting...
+                        </Alert>
+                    )}
+                    {error && (
+                        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+                            {error}
+                        </Alert>
+                    )}
 
-                    {/* Region and Services */}
-                    <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
-                        Region & Services
-                    </Typography>
-                    <Divider sx={{ mb: 2 }} />
-                    <Grid container spacing={3}>
-                        <Grid item xs={12} md={4}>
-                            <FormControl fullWidth>
-                                <InputLabel>Preferred Region *</InputLabel>
-                                <Select
-                                    value={formData.preferredRegion}
-                                    onChange={handleChange('preferredRegion')}
-                                    label="Preferred Region *"
-                                >
-                                    <MenuItem value="">None</MenuItem>
-                                    {regions.map(region => (
-                                        <MenuItem key={region} value={region}>{region}</MenuItem>
-                                    ))}
-                                </Select>
-                                <FormHelperText>Select region first to load services</FormHelperText>
-                            </FormControl>
-                        </Grid>
-                        
-                        <Grid item xs={12} md={4}>
-                            <FormControl fullWidth disabled={!formData.preferredRegion || loadingServices}>
-                                <Autocomplete
-                                    multiple
-                                    options={getAvailablePreferredServices()}
-                                    value={formData.preferredService}
-                                    onChange={(e, value) => setFormData({ ...formData, preferredService: value })}
-                                    disabled={!formData.preferredRegion || loadingServices}
-                                    getOptionLabel={(option) => {
-                                        // Strip weight if present (safety measure)
-                                        return typeof option === 'string' && option.includes(':') 
-                                            ? option.split(':')[0].trim() 
-                                            : option;
-                                    }}
-                                    renderInput={(params) => (
-                                        <TextField
-                                            {...params}
-                                            label="Preferred Services"
-                                            placeholder={
-                                                !formData.preferredRegion 
-                                                    ? "Select region first" 
-                                                    : loadingServices 
-                                                    ? "Loading services..." 
-                                                    : "Select services"
-                                            }
-                                        />
-                                    )}
-                                />
-                                {loadingServices && <FormHelperText>Loading services...</FormHelperText>}
-                            </FormControl>
-                        </Grid>
-
-                        <Grid item xs={12} md={4}>
-                            <FormControl fullWidth disabled={!formData.preferredRegion || loadingServices}>
-                                <Autocomplete
-                                    multiple
-                                    options={getAvailableRestrictedServices()}
-                                    value={formData.restrictedService}
-                                    onChange={(e, value) => setFormData({ ...formData, restrictedService: value })}
-                                    disabled={!formData.preferredRegion || loadingServices}
-                                    renderInput={(params) => (
-                                        <TextField
-                                            {...params}
-                                            label="Restricted Services"
-                                            placeholder={
-                                                !formData.preferredRegion 
-                                                    ? "Select region first" 
-                                                    : loadingServices 
-                                                    ? "Loading services..." 
-                                                    : "Select services"
-                                            }
-                                        />
-                                    )}
-                                />
-                            </FormControl>
-                        </Grid>
-                    </Grid>
-
-                    {/* Service Weights */}
-                    <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
-                        Service Weights
-                    </Typography>
-                    <Divider sx={{ mb: 2 }} />
-                    <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                        <Typography variant="subtitle2" gutterBottom color="text.secondary">
-                            Services selected in "Preferred Services" above will appear here automatically. Set weight for each service (0-100, where 100 = dedicated).
+                    <form onSubmit={handleSubmit}>
+                        {/* Basic Information */}
+                        <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
+                            Basic Information
                         </Typography>
-
-                        {/* Display services with editable weights */}
-                        {serviceWeights.length === 0 ? (
-                            <Alert severity="info" sx={{ mt: 2 }}>
-                                No services selected yet. Select services in "Preferred Services" field above.
-                            </Alert>
-                        ) : (
-                            <Grid container spacing={2} sx={{ mt: 2 }}>
-                                {serviceWeights.map((sw) => (
-                                    <Grid item xs={12} md={6} key={sw.location}>
-                                        <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                                            <Typography sx={{ flexGrow: 1, fontWeight: 'medium' }}>
-                                                {sw.location}
-                                            </Typography>
-                                            <TextField
-                                                type="number"
-                                                label="Weight"
-                                                value={sw.weight}
-                                                onChange={(e) => handleWeightChange(sw.location, e.target.value)}
-                                                inputProps={{ min: '0', max: '100', style: { width: '80px' } }}
-                                                size="small"
-                                                helperText={sw.weight === '100' ? 'Dedicated' : ''}
-                                            />
-                                            <IconButton 
-                                                onClick={() => handleRemoveService(sw.location)}
-                                                color="error"
-                                                size="small"
-                                                title="Remove service"
-                                            >
-                                                <DeleteIcon />
-                                            </IconButton>
-                                        </Paper>
-                                    </Grid>
-                                ))}
+                        <Divider sx={{ mb: 2 }} />
+                        <Grid container spacing={3}>
+                            <Grid item xs={12} md={6}>
+                                <TextField
+                                    fullWidth
+                                    required
+                                    label="First Name"
+                                    value={formData.firstName}
+                                    onChange={handleChange('firstName')}
+                                    error={!!errors.firstName}
+                                    helperText={errors.firstName}
+                                />
                             </Grid>
-                        )}
-                        
-                        {errors.serviceWeights && (
-                            <FormHelperText error sx={{ mt: 2 }}>{errors.serviceWeights}</FormHelperText>
-                        )}
-                    </Box>
+                            <Grid item xs={12} md={6}>
+                                <TextField
+                                    fullWidth
+                                    required
+                                    label="Last Name"
+                                    value={formData.lastName}
+                                    onChange={handleChange('lastName')}
+                                    error={!!errors.lastName}
+                                    helperText={errors.lastName}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={4}>
+                                <FormControl fullWidth required error={!!errors.gender}>
+                                    <InputLabel>Gender</InputLabel>
+                                    <Select
+                                        value={formData.gender}
+                                        onChange={handleChange('gender')}
+                                        label="Gender"
+                                    >
+                                        {genders.map(gender => (
+                                            <MenuItem key={gender} value={gender}>{gender}</MenuItem>
+                                        ))}
+                                    </Select>
+                                    {errors.gender && <FormHelperText>{errors.gender}</FormHelperText>}
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} md={4}>
+                                <FormControl fullWidth required error={!!errors.contractType}>
+                                    <InputLabel>Contract Type</InputLabel>
+                                    <Select
+                                        value={formData.contractType}
+                                        onChange={handleChange('contractType')}
+                                        label="Contract Type"
+                                    >
+                                        {contractTypes.map(type => (
+                                            <MenuItem key={type} value={type}>{type.replace('_', ' ')}</MenuItem>
+                                        ))}
+                                    </Select>
+                                    {errors.contractType && <FormHelperText>{errors.contractType}</FormHelperText>}
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} md={4}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Rate Code</InputLabel>
+                                    <Select
+                                        value={formData.rateCode}
+                                        onChange={handleChange('rateCode')}
+                                        label="Rate Code"
+                                    >
+                                        <MenuItem value="">None</MenuItem>
+                                        {rateCodes.map(rate => (
+                                            <MenuItem key={rate} value={rate}>{rate}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                        </Grid>
 
-                    {/* Days and Shifts Preferences */}
-                    <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
-                        Day and Shift Preferences
-                    </Typography>
-                    <Divider sx={{ mb: 2 }} />
-                    <Grid container spacing={3}>
-                        <Grid item xs={12} md={6}>
-                            <Autocomplete
-                                multiple
-                                options={getAvailablePreferredDays()}
-                                value={formData.preferredDays}
-                                onChange={(e, value) => setFormData({ ...formData, preferredDays: value })}
-                                renderInput={(params) => (
-                                    <TextField {...params} label="Preferred Days" />
-                                )}
-                            />
+                        {/* Hours and Rest Days */}
+                        <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
+                            Working Hours
+                        </Typography>
+                        <Divider sx={{ mb: 2 }} />
+                        <Grid container spacing={3}>
+                            <Grid item xs={12} md={4}>
+                                <TextField
+                                    fullWidth
+                                    type="number"
+                                    label="Min Hours per Week"
+                                    value={formData.minHrs}
+                                    onChange={handleChange('minHrs')}
+                                    error={!!errors.minHrs}
+                                    helperText={errors.minHrs}
+                                    inputProps={{ step: '0.01', min: '0' }}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={4}>
+                                <TextField
+                                    fullWidth
+                                    type="number"
+                                    label="Max Hours per Week"
+                                    value={formData.maxHrs}
+                                    onChange={handleChange('maxHrs')}
+                                    error={!!errors.maxHrs}
+                                    helperText={errors.maxHrs}
+                                    inputProps={{ step: '0.01', min: '0' }}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={4}>
+                                <TextField
+                                    fullWidth
+                                    type="number"
+                                    label="Rest Days per Cycle"
+                                    value={formData.restDays}
+                                    onChange={handleChange('restDays')}
+                                    error={!!errors.restDays}
+                                    helperText={errors.restDays}
+                                    inputProps={{ min: '0' }}
+                                />
+                            </Grid>
                         </Grid>
-                        <Grid item xs={12} md={6}>
-                            <Autocomplete
-                                multiple
-                                options={getAvailableRestrictedDays()}
-                                value={formData.restrictedDays}
-                                onChange={(e, value) => setFormData({ ...formData, restrictedDays: value })}
-                                renderInput={(params) => (
-                                    <TextField {...params} label="Restricted Days" />
-                                )}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                            <Autocomplete
-                                multiple
-                                options={getAvailablePreferredShifts()}
-                                value={formData.preferredShifts}
-                                onChange={handlePreferredShiftsChange}
-                                renderInput={(params) => (
-                                    <TextField 
-                                        {...params} 
-                                        label="Preferred Shifts"
-                                        helperText="LONG_DAY and SLEEP_IN are paired - selecting one adds the other"
+
+                        {/* Region and Services */}
+                        <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
+                            Region & Services
+                        </Typography>
+                        <Divider sx={{ mb: 2 }} />
+                        <Grid container spacing={3}>
+                            <Grid item xs={12} md={4}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Preferred Region *</InputLabel>
+                                    <Select
+                                        value={formData.preferredRegion}
+                                        onChange={handleChange('preferredRegion')}
+                                        label="Preferred Region *"
+                                    >
+                                        <MenuItem value="">None</MenuItem>
+                                        {regions.map(region => (
+                                            <MenuItem key={region} value={region}>{region}</MenuItem>
+                                        ))}
+                                    </Select>
+                                    <FormHelperText>Select region first to load services</FormHelperText>
+                                </FormControl>
+                            </Grid>
+
+                            <Grid item xs={12} md={4}>
+                                <FormControl fullWidth disabled={!formData.preferredRegion || loadingServices}>
+                                    <Autocomplete
+                                        multiple
+                                        options={getAvailablePreferredServices()}
+                                        value={formData.preferredService}
+                                        onChange={(e, value) => setFormData({ ...formData, preferredService: value })}
+                                        disabled={!formData.preferredRegion || loadingServices}
+                                        getOptionLabel={(option) => {
+                                            // Strip weight if present (safety measure)
+                                            return typeof option === 'string' && option.includes(':')
+                                                ? option.split(':')[0].trim()
+                                                : option;
+                                        }}
+                                        renderInput={(params) => (
+                                            <TextField
+                                                {...params}
+                                                label="Preferred Services"
+                                                placeholder={
+                                                    !formData.preferredRegion
+                                                        ? "Select region first"
+                                                        : loadingServices
+                                                            ? "Loading services..."
+                                                            : "Select services"
+                                                }
+                                            />
+                                        )}
                                     />
-                                )}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                            <Autocomplete
-                                multiple
-                                options={getAvailableRestrictedShifts()}
-                                value={formData.restrictedShifts}
-                                onChange={handleRestrictedShiftsChange}
-                                renderInput={(params) => (
-                                    <TextField 
-                                        {...params} 
-                                        label="Restricted Shifts"
-                                        helperText="LONG_DAY and SLEEP_IN are paired - selecting one adds the other"
+                                    {loadingServices && <FormHelperText>Loading services...</FormHelperText>}
+                                </FormControl>
+                            </Grid>
+
+                            <Grid item xs={12} md={4}>
+                                <FormControl fullWidth disabled={!formData.preferredRegion || loadingServices}>
+                                    <Autocomplete
+                                        multiple
+                                        options={getAvailableRestrictedServices()}
+                                        value={formData.restrictedService}
+                                        onChange={(e, value) => setFormData({ ...formData, restrictedService: value })}
+                                        disabled={!formData.preferredRegion || loadingServices}
+                                        renderInput={(params) => (
+                                            <TextField
+                                                {...params}
+                                                label="Restricted Services"
+                                                placeholder={
+                                                    !formData.preferredRegion
+                                                        ? "Select region first"
+                                                        : loadingServices
+                                                            ? "Loading services..."
+                                                            : "Select services"
+                                                }
+                                            />
+                                        )}
                                     />
-                                )}
-                            />
+                                </FormControl>
+                            </Grid>
                         </Grid>
-                    </Grid>
 
-                    {/* Skills (Free Text) */}
-                    <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
-                        Skills
-                    </Typography>
-                    <Divider sx={{ mb: 2 }} />
-                    <Grid container spacing={2}>
-                        <Grid item xs={12}>
-                            <Autocomplete
-                                multiple
-                                freeSolo
-                                options={skillsList}
-                                value={formData.skills}
-                                onChange={(e, value) => setFormData({ ...formData, skills: value })}
-                                renderInput={(params) => (
-                                    <TextField
-                                        {...params}
-                                        label="Skills"
-                                        placeholder="Type and press Enter to add skills"
-                                    />
-                                )}
-                            />
-                        </Grid>
-                    </Grid>
+                        {/* Service Weights */}
+                        <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
+                            Service Weights
+                        </Typography>
+                        <Divider sx={{ mb: 2 }} />
+                        <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                            <Typography variant="subtitle2" gutterBottom color="text.secondary">
+                                Services selected in "Preferred Services" above will appear here automatically. Set weight for each service (0-100, where 100 = dedicated).
+                            </Typography>
 
-                    {/* Work Pattern */}
-                    <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
-                        Work Pattern (Optional)
-                    </Typography>
-                    <Divider sx={{ mb: 2 }} />
-                    <Grid container spacing={3}>
-                        <Grid item xs={12} md={3}>
-                            <TextField
-                                fullWidth
-                                type="number"
-                                label="Days On"
-                                value={formData.daysOn}
-                                onChange={handleChange('daysOn')}
-                                error={!!errors.daysOn}
-                                helperText={errors.daysOn}
-                                inputProps={{ min: '0' }}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={3}>
-                            <TextField
-                                fullWidth
-                                type="number"
-                                label="Days Off"
-                                value={formData.daysOff}
-                                onChange={handleChange('daysOff')}
-                                error={!!errors.daysOff}
-                                helperText={errors.daysOff}
-                                inputProps={{ min: '0' }}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={3}>
-                            <TextField
-                                fullWidth
-                                type="number"
-                                label="Weeks On"
-                                value={formData.weekOn}
-                                onChange={handleChange('weekOn')}
-                                error={!!errors.weekOn}
-                                helperText={errors.weekOn}
-                                inputProps={{ min: '0' }}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={3}>
-                            <TextField
-                                fullWidth
-                                type="number"
-                                label="Weeks Off"
-                                value={formData.weekOff}
-                                onChange={handleChange('weekOff')}
-                                error={!!errors.weekOff}
-                                helperText={errors.weekOff}
-                                inputProps={{ min: '0' }}
-                            />
-                        </Grid>
-                    </Grid>
+                            {/* Display services with editable weights */}
+                            {serviceWeights.length === 0 ? (
+                                <Alert severity="info" sx={{ mt: 2 }}>
+                                    No services selected yet. Select services in "Preferred Services" field above.
+                                </Alert>
+                            ) : (
+                                <Grid container spacing={2} sx={{ mt: 2 }}>
+                                    {serviceWeights.map((sw) => (
+                                        <Grid item xs={12} md={6} key={sw.location}>
+                                            <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                <Typography sx={{ flexGrow: 1, fontWeight: 'medium' }}>
+                                                    {sw.location}
+                                                </Typography>
+                                                <TextField
+                                                    type="number"
+                                                    label="Weight"
+                                                    value={sw.weight}
+                                                    onChange={(e) => handleWeightChange(sw.location, e.target.value)}
+                                                    inputProps={{ min: '0', max: '100', style: { width: '80px' } }}
+                                                    size="small"
+                                                    helperText={sw.weight === '100' ? 'Dedicated' : ''}
+                                                />
+                                                <IconButton
+                                                    onClick={() => handleRemoveService(sw.location)}
+                                                    color="error"
+                                                    size="small"
+                                                    title="Remove service"
+                                                >
+                                                    <DeleteIcon />
+                                                </IconButton>
+                                            </Paper>
+                                        </Grid>
+                                    ))}
+                                </Grid>
+                            )}
 
-                    {/* Action Buttons */}
-                    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 4 }}>
-                        <Button
-                            variant="outlined"
-                            startIcon={<CancelIcon />}
-                            onClick={() => navigate('/employees')}
-                            disabled={saving}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
-                            disabled={saving}
-                        >
-                            {saving ? 'Saving...' : (isEditMode ? 'Update Employee' : 'Create Employee')}
-                        </Button>
-                    </Box>
-                </form>
-            </Paper>
-        </Box>
+                            {errors.serviceWeights && (
+                                <FormHelperText error sx={{ mt: 2 }}>{errors.serviceWeights}</FormHelperText>
+                            )}
+                        </Box>
+
+                        {/* Days and Shifts Preferences */}
+                        <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
+                            Day and Shift Preferences
+                        </Typography>
+                        <Divider sx={{ mb: 2 }} />
+                        <Grid container spacing={3}>
+                            <Grid item xs={12} md={6}>
+                                <Autocomplete
+                                    multiple
+                                    options={getAvailablePreferredDays()}
+                                    value={formData.preferredDays}
+                                    onChange={(e, value) => setFormData({ ...formData, preferredDays: value })}
+                                    renderInput={(params) => (
+                                        <TextField {...params} label="Preferred Days" />
+                                    )}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <Autocomplete
+                                    multiple
+                                    options={getAvailableRestrictedDays()}
+                                    value={formData.restrictedDays}
+                                    onChange={(e, value) => setFormData({ ...formData, restrictedDays: value })}
+                                    renderInput={(params) => (
+                                        <TextField {...params} label="Restricted Days" />
+                                    )}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <Autocomplete
+                                    multiple
+                                    options={getAvailablePreferredShifts()}
+                                    value={formData.preferredShifts}
+                                    onChange={handlePreferredShiftsChange}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            label="Preferred Shifts"
+                                            helperText="LONG_DAY and SLEEP_IN are paired - selecting one adds the other"
+                                        />
+                                    )}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <Autocomplete
+                                    multiple
+                                    options={getAvailableRestrictedShifts()}
+                                    value={formData.restrictedShifts}
+                                    onChange={handleRestrictedShiftsChange}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            label="Restricted Shifts"
+                                            helperText="LONG_DAY and SLEEP_IN are paired - selecting one adds the other"
+                                        />
+                                    )}
+                                />
+                            </Grid>
+                        </Grid>
+
+                        {/* Skills (Free Text) */}
+                        <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
+                            Skills
+                        </Typography>
+                        <Divider sx={{ mb: 2 }} />
+                        <Grid container spacing={2}>
+                            <Grid item xs={12}>
+                                <Autocomplete
+                                    multiple
+                                    freeSolo
+                                    options={skillsList}
+                                    value={formData.skills}
+                                    onChange={(e, value) => setFormData({ ...formData, skills: value })}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            label="Skills"
+                                            placeholder="Type and press Enter to add skills"
+                                        />
+                                    )}
+                                />
+                            </Grid>
+                        </Grid>
+
+                        {/* Work Pattern */}
+                        <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
+                            Work Pattern (Optional)
+                        </Typography>
+                        <Divider sx={{ mb: 2 }} />
+                        <Grid container spacing={3}>
+                            <Grid item xs={12} md={3}>
+                                <TextField
+                                    fullWidth
+                                    type="number"
+                                    label="Days On"
+                                    value={formData.daysOn}
+                                    onChange={handleChange('daysOn')}
+                                    error={!!errors.daysOn}
+                                    helperText={errors.daysOn}
+                                    inputProps={{ min: '0' }}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={3}>
+                                <TextField
+                                    fullWidth
+                                    type="number"
+                                    label="Days Off"
+                                    value={formData.daysOff}
+                                    onChange={handleChange('daysOff')}
+                                    error={!!errors.daysOff}
+                                    helperText={errors.daysOff}
+                                    inputProps={{ min: '0' }}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={3}>
+                                <TextField
+                                    fullWidth
+                                    type="number"
+                                    label="Weeks On"
+                                    value={formData.weekOn}
+                                    onChange={handleChange('weekOn')}
+                                    error={!!errors.weekOn}
+                                    helperText={errors.weekOn}
+                                    inputProps={{ min: '0' }}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={3}>
+                                <TextField
+                                    fullWidth
+                                    type="number"
+                                    label="Weeks Off"
+                                    value={formData.weekOff}
+                                    onChange={handleChange('weekOff')}
+                                    error={!!errors.weekOff}
+                                    helperText={errors.weekOff}
+                                    inputProps={{ min: '0' }}
+                                />
+                            </Grid>
+                        </Grid>
+
+                        {/* Action Buttons */}
+                        <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 4 }}>
+                            <Button
+                                variant="outlined"
+                                startIcon={<CancelIcon />}
+                                onClick={() => navigate('/employees')}
+                                disabled={saving}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                variant="contained"
+                                startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
+                                disabled={saving}
+                            >
+                                {saving ? 'Saving...' : (isEditMode ? 'Update Employee' : 'Create Employee')}
+                            </Button>
+                        </Box>
+                    </form>
+                </Paper>
+            </Box>
+        </>
     );
 }
