@@ -25,6 +25,7 @@ import { DroppableCell } from "../components/droppableCell";
 import VersionHistorySidebar from '../components/Versionhistorysidebar';
 import SaveScheduleDialog from '../components/SaveScheduleDialog';
 import DiscardChangesDialog from '../components/DiscardChangesDialog';
+import ConflictDialog from '../components/ConflictDialog';
 
 
 const weekdayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -287,7 +288,8 @@ export default function ViewSchedules() {
   const [draggedEmployee, setDraggedEmployee] = useState(null);
 
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
-
+  const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
+  const [conflictData, setConflictData] = useState(null);
 
   // Versioning state
   const [versionSidebarOpen, setVersionSidebarOpen] = useState(false);
@@ -652,6 +654,47 @@ export default function ViewSchedules() {
     setDraggedEmployee(emp);
   }
 
+  const checkForConflicts = (employeeId, targetDate, targetCellKey) => {
+    const conflicts = [];
+
+    // Check all cells in assignmentMap for same employee on same day
+    Object.entries(assignmentMap).forEach(([cellKey, employees]) => {
+      // Skip the target cell itself
+      if (cellKey === targetCellKey) return;
+
+      // Parse cell key: location|shiftType|date|startTime|shiftId
+      const parts = cellKey.split('|');
+      if (parts.length !== 5) return;
+
+      const [location, shiftType, date, startTime, shiftId] = parts;
+
+      // Check if same date
+      if (date !== targetDate) return;
+
+      // Check if employee is assigned
+      const isAssigned = employees.some(emp => emp.id === employeeId);
+      if (!isAssigned) return;
+
+      // Find shift details from rotaData
+      const assignment = rotaData.shiftAssignmentList.find(a =>
+        a.shift.id === parseInt(shiftId)
+      );
+
+      if (assignment) {
+        conflicts.push({
+          location,
+          shiftType,
+          date,
+          startTime: assignment.shift.shiftTemplate.startTime,
+          endTime: assignment.shift.shiftTemplate.endTime,
+          shiftId
+        });
+      }
+    });
+
+    return conflicts;
+  };
+
   function handleDragEnd({ active, over }) {
     setActiveDragId(null);
     setDraggedEmployee(null);
@@ -666,6 +709,33 @@ export default function ViewSchedules() {
     const [, location, shiftType, date, shiftTime, shiftId] = over.id.split("|");
     const cellKey = `${location}|${shiftType}|${date}|${shiftTime}|${shiftId}`;
 
+    // ✅ CHECK FOR CONFLICTS BEFORE ASSIGNMENT
+    const conflicts = checkForConflicts(empId, date, cellKey);
+
+    if (conflicts.length > 0) {
+      // Show conflict dialog
+      const targetAssignment = rotaData.shiftAssignmentList.find(a =>
+        a.shift.id === parseInt(shiftId)
+      );
+
+      setConflictData({
+        employee: droppedEmp,
+        targetShift: {
+          location,
+          shiftType,
+          date,
+          startTime: targetAssignment?.shift.shiftTemplate.startTime || shiftTime,
+          endTime: targetAssignment?.shift.shiftTemplate.endTime || '',
+        },
+        conflictingShifts: conflicts
+      });
+      setConflictDialogOpen(true);
+
+      // ❌ STOP HERE - Don't assign
+      return;
+    }
+
+    // ✅ NO CONFLICTS - Proceed with assignment
     setAssignmentMap((prev) => {
       const current = prev[cellKey] ?? [];
       const alreadyAssigned = current.some((e) => e.id === droppedEmp.id);
@@ -969,7 +1039,17 @@ export default function ViewSchedules() {
         assignmentMap={assignmentMap}
         onSaveComplete={handleSaveComplete}
       />
-
+      {/* ✅ Add Conflict Dialog */}
+      <ConflictDialog
+        open={conflictDialogOpen}
+        onClose={() => {
+          setConflictDialogOpen(false);
+          setConflictData(null);
+        }}
+        employee={conflictData?.employee}
+        targetShift={conflictData?.targetShift}
+        conflictingShifts={conflictData?.conflictingShifts || []}
+      />
       <Snackbar
         open={snackbar.opened}
         autoHideDuration={4000}
