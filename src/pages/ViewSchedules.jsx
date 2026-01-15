@@ -24,6 +24,8 @@ import { DroppableCell } from "../components/droppableCell";
 // Import versioning components
 import VersionHistorySidebar from '../components/Versionhistorysidebar';
 import SaveScheduleDialog from '../components/SaveScheduleDialog';
+import DiscardChangesDialog from '../components/DiscardChangesDialog';
+
 
 const weekdayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const datesByWeekday = {};
@@ -34,18 +36,18 @@ weekdayOrder.forEach((day) => {
 // Helper: Calculate shift duration
 const calculateDuration = (startTime, endTime) => {
   if (!startTime || !endTime) return 0;
-  
+
   const [startHour, startMin] = startTime.split(':').map(Number);
   const [endHour, endMin] = endTime.split(':').map(Number);
-  
+
   const startMinutes = startHour * 60 + startMin;
   let endMinutes = endHour * 60 + endMin;
-  
+
   // Handle overnight shifts
   if (endMinutes < startMinutes) {
     endMinutes += 24 * 60;
   }
-  
+
   return (endMinutes - startMinutes) / 60;
 };
 
@@ -136,14 +138,14 @@ function setEmpSummary(emplist, assignments) {
 }
 
 // Enhanced VirtualRow with change highlighting
-const VirtualRow = memo(({ 
-  row, 
-  columnWidths, 
-  weekdayOrder, 
-  datesByWeekday, 
-  assignmentMap, 
-  highlighted, 
-  handleRemove, 
+const VirtualRow = memo(({
+  row,
+  columnWidths,
+  weekdayOrder,
+  datesByWeekday,
+  assignmentMap,
+  highlighted,
+  handleRemove,
   activeDragId,
   virtualRow,
   measureElement,
@@ -198,22 +200,24 @@ const VirtualRow = memo(({
               const cellEmployees = assignmentMap[cellKey] ?? [];
 
               return (
-                <Box 
-                  key={cellKey} 
-                  sx={{ 
+                <Box
+                  key={cellKey}
+                  sx={{
                     mb: 1,
-                    borderLeft: changeType ? '4px solid' : 'none',
-                    borderLeftColor: 
+                    position: 'relative',
+                    // ✅ Subtle left border for changes
+                    borderLeft: changeType ? '3px solid' : 'none',
+                    borderLeftColor:
                       changeType === 'ASSIGNED' ? 'success.main' :
-                      changeType === 'UNASSIGNED' ? 'error.main' :
-                      changeType === 'REASSIGNED' ? 'info.main' : 'transparent',
-                    pl: changeType ? 1 : 0,
-                    backgroundColor: changeType ? 
-                      (changeType === 'ASSIGNED' ? 'success.light' :
-                       changeType === 'UNASSIGNED' ? 'error.light' :
-                       'info.light') : 'transparent',
-                    borderRadius: changeType ? 1 : 0,
-                    opacity: changeType === 'UNASSIGNED' ? 0.6 : 1
+                        changeType === 'UNASSIGNED' ? 'warning.main' :  // ✅ Changed from error to warning
+                          changeType === 'REASSIGNED' ? 'info.main' : 'transparent',
+                    pl: changeType ? 0.5 : 0,
+                    // ✅ NO background color change - keeps it clean
+                    backgroundColor: 'transparent',
+                    borderRadius: 1,
+                    // ✅ NO opacity reduction - keeps it visible
+                    opacity: 1,
+                    transition: 'all 0.3s ease-in-out',  // ✅ Smooth transition
                   }}
                 >
                   <Typography variant="caption" fontWeight="bold" display="block">
@@ -230,15 +234,24 @@ const VirtualRow = memo(({
                     onRemove={handleRemove}
                     isDragging={!!activeDragId}
                   />
+
+                  {/* ✅ Small, unobtrusive change badge */}
                   {changeType && (
-                    <Chip 
-                      label={changeType}
+                    <Chip
+                      label={changeType === 'ASSIGNED' ? 'Added' : changeType === 'UNASSIGNED' ? 'Removed' : 'Changed'}
                       size="small"
+                      variant="outlined"  // ✅ Outlined instead of filled
                       color={
                         changeType === 'ASSIGNED' ? 'success' :
-                        changeType === 'UNASSIGNED' ? 'error' : 'info'
+                          changeType === 'UNASSIGNED' ? 'default' :  // ✅ Default instead of error
+                            'info'
                       }
-                      sx={{ mt: 0.5, fontSize: '0.6rem' }}
+                      sx={{
+                        mt: 0.5,
+                        fontSize: '0.55rem',
+                        height: '18px',
+                        '& .MuiChip-label': { px: 0.5 }
+                      }}
                     />
                   )}
                 </Box>
@@ -273,6 +286,9 @@ export default function ViewSchedules() {
   const [activeDragId, setActiveDragId] = useState(null);
   const [draggedEmployee, setDraggedEmployee] = useState(null);
 
+  const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+
+
   // Versioning state
   const [versionSidebarOpen, setVersionSidebarOpen] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -292,26 +308,26 @@ export default function ViewSchedules() {
   // Helper: Extract shift ID from cell key
   const getShiftIdFromCellKey = (cellKey) => {
     const parts = cellKey.split('|');
-    
+
     // ✅ New format: location|shiftType|date|startTime|shiftId (5 parts)
     if (parts.length === 5) {
       return parts[4] ? Number(parts[4]) : null;
     }
-    
+
     // Old format: location|shiftType|date|startTime (4 parts) - fallback
     const [location, shiftType, date, startTime] = parts;
-    
+
     if (!rotaData?.shiftAssignmentList) {
       console.warn('No rotaData available for cell key:', cellKey);
       return null;
     }
-    
+
     const assignment = rotaData.shiftAssignmentList.find(a => {
       const shift = a.shift;
       const template = shift?.shiftTemplate;
-      
+
       if (!shift || !template) return false;
-      
+
       return (
         template.location === location &&
         template.shiftType === shiftType &&
@@ -319,11 +335,11 @@ export default function ViewSchedules() {
         template.startTime === startTime
       );
     });
-    
+
     if (!assignment) {
       console.warn('No assignment found for cell key:', cellKey);
     }
-    
+
     return assignment?.shift?.id || null;
   };
 
@@ -338,7 +354,7 @@ export default function ViewSchedules() {
     }
 
     const assignments = versionData.assignments.map(a => {
-      const shiftStartDate = a.shiftStart ? 
+      const shiftStartDate = a.shiftStart ?
         (typeof a.shiftStart === 'string' ? a.shiftStart.split('T')[0] : a.shiftStart) :
         null;
 
@@ -347,7 +363,7 @@ export default function ViewSchedules() {
         shift: {
           id: a.shiftId,
           shiftStart: shiftStartDate,
-          shiftEnd: a.shiftEnd ? 
+          shiftEnd: a.shiftEnd ?
             (typeof a.shiftEnd === 'string' ? a.shiftEnd.split('T')[0] : a.shiftEnd) :
             null,
           shiftTemplate: {
@@ -366,10 +382,10 @@ export default function ViewSchedules() {
       };
     });
 
-    console.log('Converted version data:', {
-      assignmentCount: assignments.length,
-      sample: assignments[0]
-    });
+    // console.log('Converted version data:', {
+    //   assignmentCount: assignments.length,
+    //   sample: assignments[0]
+    // });
 
     return {
       shiftAssignmentList: assignments,
@@ -382,7 +398,7 @@ export default function ViewSchedules() {
     setLoading(true);
     try {
       let response;
-      
+
       if (versionId) {
         console.log('Loading version:', versionId);
         response = await axiosInstance.get(
@@ -392,13 +408,13 @@ export default function ViewSchedules() {
             headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
           }
         );
-        
+
         setViewingHistoricalVersion(!response.data.version.isCurrent);
         setCurrentVersion(response.data.version);
-        
+
         const rotaDataFromVersion = convertVersionToRotaData(response.data);
         setRotaData(rotaDataFromVersion);
-        
+
       } else {
         console.log('Loading current schedule');
         response = await axiosInstance.get(
@@ -407,10 +423,10 @@ export default function ViewSchedules() {
             headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
           }
         );
-        
+
         setViewingHistoricalVersion(false);
         setRotaData(response.data);
-        
+
         try {
           const versionResponse = await axiosInstance.get(
             `${API_ENDPOINTS.scheduleVersions}/${id}/versions/current`,
@@ -456,21 +472,17 @@ export default function ViewSchedules() {
 
     const newMap = buildAssignmentMap(rotaData.shiftAssignmentList);
     setAssignmentMap(newMap);
-    
+
     // CRITICAL FIX: Only update originalAssignmentMap for CURRENT version
     // NOT for historical versions (historical versions should be read-only)
     const isCurrentVersion = currentVersion?.isCurrent !== false;
-    
-    if (Object.keys(originalAssignmentMap).length === 0 || 
-        (!viewingHistoricalVersion && isCurrentVersion)) {
+
+    if (Object.keys(originalAssignmentMap).length === 0 ||
+      (!viewingHistoricalVersion && isCurrentVersion)) {
       setOriginalAssignmentMap(JSON.parse(JSON.stringify(newMap)));
-      console.log('Updated originalAssignmentMap', {
-        isCurrentVersion,
-        viewingHistoricalVersion,
-        versionNumber: currentVersion?.versionNumber
-      });
+
     }
-    
+
     // Always clear pending changes when viewing historical version
     if (viewingHistoricalVersion) {
       setPendingChanges([]);
@@ -505,7 +517,7 @@ export default function ViewSchedules() {
         if (!originalIds.has(empId)) {
           const employee = current.find(e => e.id === empId);
           const shiftId = getShiftIdFromCellKey(cellKey);
-          
+
           if (shiftId) {
             changes.push({
               cellKey,
@@ -525,7 +537,7 @@ export default function ViewSchedules() {
         if (!currentIds.has(empId)) {
           const employee = original.find(e => e.id === empId);
           const shiftId = getShiftIdFromCellKey(cellKey);
-          
+
           if (shiftId) {
             changes.push({
               cellKey,
@@ -541,11 +553,11 @@ export default function ViewSchedules() {
         }
       });
 
-      if (original.length > 0 && current.length > 0 && 
-          original.length === 1 && current.length === 1 &&
-          original[0].id !== current[0].id) {
+      if (original.length > 0 && current.length > 0 &&
+        original.length === 1 && current.length === 1 &&
+        original[0].id !== current[0].id) {
         const shiftId = getShiftIdFromCellKey(cellKey);
-        
+
         if (shiftId) {
           changes.push({
             cellKey,
@@ -585,7 +597,8 @@ export default function ViewSchedules() {
     overscan: 5,
   });
 
-  const handleRemove = (emp, cellKey) => {
+  const handleRemove = (cellKey, emp) => {
+
     const [location, shiftType, date, shiftTime, shiftId] = cellKey.split("|");
 
     setAssignmentMap((prev) => {
@@ -703,14 +716,26 @@ export default function ViewSchedules() {
     setDraggedEmployee(null);
   }
 
+  // const handleDiscardChanges = () => {
+  //   if (window.confirm(`Discard ${pendingChanges.length} pending changes?`)) {
+  //     setAssignmentMap(JSON.parse(JSON.stringify(originalAssignmentMap)));
+  //     setPendingChanges([]);
+  //     setChangeHighlights({});
+  //     setHighlighted({});
+  //     setSnackbar({ message: 'Changes discarded', opened: true });
+  //   }
+  // };
+
   const handleDiscardChanges = () => {
-    if (window.confirm(`Discard ${pendingChanges.length} pending changes?`)) {
-      setAssignmentMap(JSON.parse(JSON.stringify(originalAssignmentMap)));
-      setPendingChanges([]);
-      setChangeHighlights({});
-      setHighlighted({});
-      setSnackbar({ message: 'Changes discarded', opened: true });
-    }
+    setDiscardDialogOpen(true);  // ✅ Open dialog instead of window.confirm
+  };
+
+  const handleConfirmDiscard = () => {
+    setAssignmentMap(JSON.parse(JSON.stringify(originalAssignmentMap)));
+    setPendingChanges([]);
+    setChangeHighlights({});
+    setHighlighted({});
+    setSnackbar({ message: 'Changes discarded', opened: true });
   };
 
   const handleVersionSelect = (version) => {
@@ -726,9 +751,9 @@ export default function ViewSchedules() {
     setOriginalAssignmentMap(JSON.parse(JSON.stringify(assignmentMap)));
     setPendingChanges([]);
     setChangeHighlights({});
-    setSnackbar({ 
-      message: `Version ${versionData.version.versionNumber} saved successfully`, 
-      opened: true 
+    setSnackbar({
+      message: `Version ${versionData.version.versionNumber} saved successfully`,
+      opened: true
     });
   };
 
@@ -739,9 +764,9 @@ export default function ViewSchedules() {
     }
 
     if (viewingHistoricalVersion) {
-      setSnackbar({ 
-        message: 'Cannot save changes to historical version. Please rollback first.', 
-        opened: true 
+      setSnackbar({
+        message: 'Cannot save changes to historical version. Please rollback first.',
+        opened: true
       });
       return;
     }
@@ -780,9 +805,9 @@ export default function ViewSchedules() {
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             {currentVersion ? currentVersion.versionLabel : 'Schedule View'}
             {currentVersion && (
-              <Chip 
+              <Chip
                 label={`v${currentVersion.versionNumber}`}
-                size="small" 
+                size="small"
                 sx={{ ml: 1 }}
                 color={currentVersion.isCurrent ? 'success' : 'default'}
               />
@@ -799,7 +824,7 @@ export default function ViewSchedules() {
           )}
 
           {pendingChanges.length > 0 && (
-            <Chip 
+            <Chip
               label={`${pendingChanges.length} pending changes`}
               color="warning"
               sx={{ mr: 2 }}
@@ -814,7 +839,7 @@ export default function ViewSchedules() {
 
           <Tooltip title="Discard all changes">
             <span>
-              <IconButton 
+              <IconButton
                 onClick={handleDiscardChanges}
                 disabled={pendingChanges.length === 0 || viewingHistoricalVersion}
                 color="error"
@@ -951,13 +976,19 @@ export default function ViewSchedules() {
         onClose={() => setSnackbar({ ...snackbar, opened: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert 
+        <Alert
           severity={snackbar.message?.includes('fail') ? 'error' : 'success'}
           onClose={() => setSnackbar({ ...snackbar, opened: false })}
         >
           {snackbar.message}
         </Alert>
       </Snackbar>
+      <DiscardChangesDialog
+        open={discardDialogOpen}
+        onClose={() => setDiscardDialogOpen(false)}
+        onConfirm={handleConfirmDiscard}
+        pendingChanges={pendingChanges}
+      />
     </DndContext>
   );
 }

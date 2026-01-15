@@ -60,7 +60,7 @@ export default function ScheduleForm({ locations, onSubmitSuccess, setSnackbar,s
             //await fetchRequests(); // ← this updates the list from backend
 
         } catch (error) {
-            console.log("^^^^^^^^^^^^^^^^^^^^^^^^^",error);
+            // console.log("^^^^^^^^^^^^^^^^^^^^^^^^^",error);
             setSnackbar({ open: true, message: 'Submission failed', severity: 'error' });
         }
     };

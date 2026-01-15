@@ -17,8 +17,10 @@ export const DroppableCell = memo(({
     disabled: !isDragging // Disabled when not dragging = no collision detection overhead
   });
   
-  const [, location, shiftType, date, shiftTime] = id.split("|");
-  const cellKey = `${location}|${shiftType}|${date}|${shiftTime}`;
+  const [, location, shiftType, date, shiftTime,shiftId] = id.split("|");
+  const cellKey = `${location}|${shiftType}|${date}|${shiftTime}|${shiftId}`;
+
+
 
   const assignedIds = assigned.map((e) => e.id);
   const extraHighlighted = highlighted.filter((e) => !assignedIds.includes(e.id));
