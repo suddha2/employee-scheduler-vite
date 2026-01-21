@@ -31,7 +31,7 @@ const ShiftTemplateForm = () => {
         location: '',
         region: '',
         shiftType: '',
-        dayOfWeek: '',
+        daysOfWeek: [],
         startTime: '',
         endTime: '',
         breakStart: '',
@@ -47,11 +47,11 @@ const ShiftTemplateForm = () => {
     // Dropdown options
     const [regions, setRegions] = useState([]);
     const [locations, setLocations] = useState([]);
-    
-    const shiftTypes = ['LONG_DAY', 'DAY', 'SLEEP_IN', 'WAKING_NIGHT', 'FLOATING'];
+
+    const shiftTypes = ['LONG_DAY', 'DAY', 'SLEEP_IN', 'WAKING_NIGHT', 'FLOATING', 'CARE_CALL'];
     const daysOfWeek = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
-    const genders = ['ANY','MALE', 'FEMALE'];
-    const skillOptions = [ 'BUCCAL', 'DRIVING'];
+    const genders = ['ANY', 'MALE', 'FEMALE'];
+    const skillOptions = ['BUCCAL', 'DRIVING'];
 
     // UI state
     const [loading, setLoading] = useState(false);
@@ -100,12 +100,12 @@ const ShiftTemplateForm = () => {
         try {
             const response = await axiosInstance.get(`${API_ENDPOINTS.shiftTemplates}/${id}`);
             const template = response.data;
-            
+
             setFormData({
                 location: template.location || '',
                 region: template.region || '',
                 shiftType: template.shiftType || '',
-                dayOfWeek: template.dayOfWeek || '',
+                daysOfWeek: template.dayOfWeek ? [template.dayOfWeek] : [],
                 startTime: template.startTime || '',
                 endTime: template.endTime || '',
                 breakStart: template.breakStart || '',
@@ -137,8 +137,8 @@ const ShiftTemplateForm = () => {
         if (!formData.shiftType) {
             newErrors.shiftType = 'Shift type is required';
         }
-        if (!formData.dayOfWeek) {
-            newErrors.dayOfWeek = 'Day of week is required';
+        if (!formData.daysOfWeek || formData.daysOfWeek.length === 0) {
+            newErrors.dayOfWeek = 'At least one day is required';
         }
         if (!formData.startTime) {
             newErrors.startTime = 'Start time is required';
@@ -187,15 +187,19 @@ const ShiftTemplateForm = () => {
                 totalHours: formData.totalHours ? parseFloat(formData.totalHours) : null
             };
 
+
             if (isEditMode) {
-                await axiosInstance.put(`${API_ENDPOINTS.shiftTemplates}/${id}`, payload);
-                setSuccess(true);
-                setTimeout(() => navigate('/shift-templates'), 2000);
+                // Edit mode - single template update with first day
+                await axiosInstance.put(`${API_ENDPOINTS.shiftTemplates}/${id}`, {
+                    ...payload,
+                    dayOfWeek: formData.daysOfWeek[0] // Backend expects single day
+                });
             } else {
+                // Create mode - send daysOfWeek array to backend
                 await axiosInstance.post(API_ENDPOINTS.shiftTemplates, payload);
-                setSuccess(true);
-                setTimeout(() => navigate('/shift-templates'), 2000);
             }
+            setSuccess(true);
+            setTimeout(() => navigate('/shift-templates'), 2000);
         } catch (err) {
             console.error('Failed to save shift template:', err);
             setError(err.response?.data?.message || 'Failed to save shift template. Please try again.');
@@ -254,24 +258,33 @@ const ShiftTemplateForm = () => {
                         </Grid>
 
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth error={Boolean(errors.location)}>
-                                <InputLabel>Service Location</InputLabel>
-                                <Select
-                                    value={formData.location}
-                                    onChange={handleChange('location')}
-                                    label="Service Location"
-                                    disabled={!formData.region}
-                                >
-                                    {locations.map((location) => (
-                                        <MenuItem key={location} value={location}>
-                                            {location}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                                {errors.location && (
-                                    <Typography color="error" variant="caption">{errors.location}</Typography>
+                            <Autocomplete
+                                freeSolo
+                                options={locations}
+                                value={formData.location}
+                                inputValue={formData.location}
+                                onChange={(e, newValue) => {
+                                    setFormData({ ...formData, location: newValue || '' });
+                                    if (errors.location) {
+                                        setErrors({ ...errors, location: undefined });
+                                    }
+                                }}
+                                onInputChange={(e, newInputValue) => {
+                                    setFormData({ ...formData, location: newInputValue });
+                                    if (errors.location) {
+                                        setErrors({ ...errors, location: undefined });
+                                    }
+                                }}
+                                disabled={!formData.region}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="Service Location"
+                                        error={Boolean(errors.location)}
+                                        helperText={errors.location || 'Select existing or type new location'}
+                                    />
                                 )}
-                            </FormControl>
+                            />
                         </Grid>
 
                         <Grid item xs={12} md={6}>
@@ -295,23 +308,25 @@ const ShiftTemplateForm = () => {
                         </Grid>
 
                         <Grid item xs={12} md={6}>
-                            <FormControl fullWidth error={Boolean(errors.dayOfWeek)}>
-                                <InputLabel>Day of Week</InputLabel>
-                                <Select
-                                    value={formData.dayOfWeek}
-                                    onChange={handleChange('dayOfWeek')}
-                                    label="Day of Week"
-                                >
-                                    {daysOfWeek.map((day) => (
-                                        <MenuItem key={day} value={day}>
-                                            {day}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                                {errors.dayOfWeek && (
-                                    <Typography color="error" variant="caption">{errors.dayOfWeek}</Typography>
+                            <Autocomplete
+                                multiple
+                                options={daysOfWeek}
+                                value={formData.daysOfWeek}
+                                onChange={(e, value) => {
+                                    setFormData({ ...formData, daysOfWeek: value });
+                                    if (errors.daysOfWeek) {
+                                        setErrors({ ...errors, daysOfWeek: undefined });
+                                    }
+                                }}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="Days of Week"
+                                        error={Boolean(errors.daysOfWeek)}
+                                        helperText={errors.daysOfWeek}
+                                    />
                                 )}
-                            </FormControl>
+                            />
                         </Grid>
                     </Grid>
 

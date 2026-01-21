@@ -90,7 +90,7 @@ export default function SubmitSchedule() {
     setRequests((prev) => [...prev, newRequest]);
   };
   const handleView = (req) => {
-    console.log("submitSchedule->handleview->", req);
+    // console.log("submitSchedule->handleview->", req);
     navigate(`/schedules?id=${req.rotaId}`);
   }
   return (

@@ -29,8 +29,11 @@ import {
     Edit as EditIcon,
     Search as SearchIcon,
     Clear as ClearIcon,
-    FilterList as FilterIcon
+    FilterList as FilterIcon,
+    Visibility as VisibilityIcon,
+    VisibilityOff as VisibilityOffIcon
 } from '@mui/icons-material';
+
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../components/axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
@@ -41,37 +44,37 @@ export default function EmployeeList() {
     const [filteredEmployees, setFilteredEmployees] = useState([]); // ✅ Filtered results
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    
+
     // Pagination state
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
-    
+
     // Filter state
     const [searchTerm, setSearchTerm] = useState('');
     const [filterRegion, setFilterRegion] = useState('');
     const [filterContractType, setFilterContractType] = useState('');
     const [filterGender, setFilterGender] = useState('');
     const [showFilters, setShowFilters] = useState(false);
-    
+
     // Available filter options
     const [regions, setRegions] = useState([]);
     const contractTypes = ['PERMANENT', 'ZERO_HOURS', 'FIXED_TERM', 'PART_TIME'];
     const genders = ['MALE', 'FEMALE', 'OTHER'];
-    
+
     const navigate = useNavigate();
 
     // ✅ Fetch all employees once
     const fetchEmployees = async () => {
         setLoading(true);
         setError(null);
-        
+
         try {
             const response = await axiosInstance.get(API_ENDPOINTS.employees);
             const data = response.data.content || response.data;
-            
+
             setAllEmployees(data);
             setFilteredEmployees(data); // Initially show all
-            
+
         } catch (err) {
             console.error('Failed to fetch employees:', err);
             setError('Failed to load employees. Please try again.');
@@ -83,31 +86,31 @@ export default function EmployeeList() {
     // ✅ Apply filters to employees
     const applyFilters = () => {
         let filtered = [...allEmployees];
-        
+
         // Search filter (firstName or lastName)
         if (searchTerm) {
             const search = searchTerm.toLowerCase();
-            filtered = filtered.filter(emp => 
+            filtered = filtered.filter(emp =>
                 emp.firstName?.toLowerCase().includes(search) ||
                 emp.lastName?.toLowerCase().includes(search)
             );
         }
-        
+
         // Region filter
         if (filterRegion) {
             filtered = filtered.filter(emp => emp.preferredRegion === filterRegion);
         }
-        
+
         // Contract type filter
         if (filterContractType) {
             filtered = filtered.filter(emp => emp.contractType === filterContractType);
         }
-        
+
         // Gender filter
         if (filterGender) {
             filtered = filtered.filter(emp => emp.gender === filterGender);
         }
-        
+
         setFilteredEmployees(filtered);
         setPage(0); // Reset to first page when filters change
     };
@@ -160,7 +163,17 @@ export default function EmployeeList() {
     const handleEdit = (id) => {
         navigate(`/employees/edit/${id}`);
     };
-
+    const handleToggleActive = async (id) => {
+        try {
+            await axiosInstance.patch(
+                `${API_ENDPOINTS.employees}/${id}/toggle-active`
+            );
+            fetchEmployees();
+        } catch (err) {
+            console.error('Failed to toggle active status:', err);
+            setError('Failed to update template. Please try again.');
+        }
+    };
     const handleCreate = () => {
         navigate('/employees/create');
     };
@@ -170,7 +183,7 @@ export default function EmployeeList() {
         if (!preferredService || preferredService.length === 0) {
             return 'None';
         }
-        
+
         return preferredService.map(service => {
             // Check if has weight format "Location:60"
             if (service.includes(':')) {
@@ -323,7 +336,7 @@ export default function EmployeeList() {
                     <Box sx={{ mb: 2 }}>
                         <Typography variant="body2" color="text.secondary">
                             Showing {displayedEmployees.length} of {filteredEmployees.length} employees
-                            {filteredEmployees.length < allEmployees.length && 
+                            {filteredEmployees.length < allEmployees.length &&
                                 ` (filtered from ${allEmployees.length} total)`
                             }
                         </Typography>
@@ -364,7 +377,7 @@ export default function EmployeeList() {
                                         <TableRow>
                                             <TableCell colSpan={8} align="center">
                                                 <Typography variant="body1" color="textSecondary" sx={{ py: 4 }}>
-                                                    {allEmployees.length === 0 
+                                                    {allEmployees.length === 0
                                                         ? 'No employees found. Create a new employee to get started.'
                                                         : 'No employees match your filters. Try adjusting your search or filters.'
                                                     }
@@ -408,14 +421,24 @@ export default function EmployeeList() {
                                                     </Tooltip>
                                                 </TableCell>
                                                 <TableCell align="center">
-                                                    <Tooltip title="Edit Employee">
-                                                        <IconButton
-                                                            color="primary"
-                                                            onClick={() => handleEdit(employee.id)}
-                                                        >
-                                                            <EditIcon />
-                                                        </IconButton>
-                                                    </Tooltip>
+
+                                                    <IconButton
+                                                        color="primary"
+                                                        onClick={() => handleEdit(employee.id)}
+                                                        title="Edit"
+                                                    >
+                                                        <EditIcon />
+                                                    </IconButton>
+
+                                                    <IconButton
+                                                        color={employee.active ? 'warning' : 'success'}
+                                                        onClick={() => handleToggleActive(employee.id)}
+                                                        size="small"
+                                                        title={employee.active ? 'Deactivate' : 'Activate'}
+                                                    >
+                                                        {employee.active ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                                    </IconButton>
+
                                                 </TableCell>
                                             </TableRow>
                                         ))
