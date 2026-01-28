@@ -77,17 +77,19 @@ function buildAssignmentMap(assignments) {
       seen[key] = new Set();
     }
 
+    // ✅ FIX: Only add employee if it exists
     if (employee && !seen[key].has(employee.id)) {
       map[key].push(employee);
       seen[key].add(employee.id);
     }
+    // ← Cell still exists in map even if employee is null
   });
 
   const uniqueDateStrings = Array.from(
     new Set(assignments.map((a) => a.shift.shiftStart))
   );
 
-  // Clear existing dates before rebuilding
+  // Clear and rebuild dates
   Object.keys(datesByWeekday).forEach(day => {
     datesByWeekday[day] = [];
   });
@@ -101,7 +103,6 @@ function buildAssignmentMap(assignments) {
     }
   });
 
-  // ✅ Sort dates within each weekday chronologically
   Object.keys(datesByWeekday).forEach(day => {
     datesByWeekday[day].sort((a, b) => new Date(a) - new Date(b));
   });
@@ -355,6 +356,7 @@ export default function ViewSchedules() {
       };
     }
 
+    // ✅ FIX: Include ALL shifts, even unassigned ones
     const assignments = versionData.assignments.map(a => {
       const shiftStartDate = a.shiftStart ?
         (typeof a.shiftStart === 'string' ? a.shiftStart.split('T')[0] : a.shiftStart) :
@@ -376,18 +378,14 @@ export default function ViewSchedules() {
           },
           durationInHours: calculateDuration(a.startTime, a.endTime),
         },
+        // ✅ FIX: Employee can be null (unassigned shift)
         employee: a.employeeId ? {
           id: a.employeeId,
           firstName: a.employeeFirstName || 'Unknown',
           lastName: a.employeeLastName || '',
-        } : null,
+        } : null,  // ← null instead of undefined
       };
     });
-
-    // console.log('Converted version data:', {
-    //   assignmentCount: assignments.length,
-    //   sample: assignments[0]
-    // });
 
     return {
       shiftAssignmentList: assignments,
@@ -821,6 +819,7 @@ export default function ViewSchedules() {
     setOriginalAssignmentMap(JSON.parse(JSON.stringify(assignmentMap)));
     setPendingChanges([]);
     setChangeHighlights({});
+    loadSchedule();
     setSnackbar({
       message: `Version ${versionData.version.versionNumber} saved successfully`,
       opened: true
