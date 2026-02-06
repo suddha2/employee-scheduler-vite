@@ -15,10 +15,14 @@ import {
   Alert,
   CircularProgress,
   Divider,
+  FormControlLabel,
+  Checkbox,
+  Paper,
 } from '@mui/material';
 import {
   Save as SaveIcon,
   Warning as WarningIcon,
+  PushPin as PinIcon,
 } from '@mui/icons-material';
 import axiosInstance from './axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
@@ -33,6 +37,7 @@ export default function SaveScheduleDialog({
 }) {
   const [versionLabel, setVersionLabel] = useState('');
   const [comment, setComment] = useState('');
+  const [pinAllChanges, setPinAllChanges] = useState(false);  // ✅ NEW STATE
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -40,6 +45,7 @@ export default function SaveScheduleDialog({
     if (!saving) {
       setVersionLabel('');
       setComment('');
+      setPinAllChanges(false);  // ✅ RESET
       setError(null);
       onClose();
     }
@@ -70,6 +76,7 @@ export default function SaveScheduleDialog({
         scheduleId,
         versionLabel,
         comment,
+        pinAllChanges,  // ✅ LOG PIN STATUS
         changesCount: formattedChanges.length,
         changes: formattedChanges,
       });
@@ -80,6 +87,7 @@ export default function SaveScheduleDialog({
           versionLabel: versionLabel.trim(),
           comment: comment.trim() || null,
           changes: formattedChanges,
+          pinAllChanges: pinAllChanges,  // ✅ SEND TO BACKEND
         },
         {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
@@ -96,11 +104,19 @@ export default function SaveScheduleDialog({
       // Reset form and close
       setVersionLabel('');
       setComment('');
+      setPinAllChanges(false);  // ✅ RESET
       onClose();
     } catch (err) {
       console.error('Failed to save version:', err);
-      const errorMsg = err.response?.data?.message || 'Failed to save version';
-      setError(errorMsg);
+
+      // ✅ HANDLE CONFLICT ERROR (409)
+      if (err.response?.status === 409) {
+        const conflicts = err.response?.data?.conflicts || [];
+        setError(`Pin validation failed: ${conflicts.length} conflict(s) detected. Please fix conflicting shift assignments before saving.`);
+      } else {
+        const errorMsg = err.response?.data?.message || 'Failed to save version';
+        setError(errorMsg);
+      }
     } finally {
       setSaving(false);
     }
@@ -111,8 +127,11 @@ export default function SaveScheduleDialog({
   const unassignedCount = pendingChanges.filter(c => c.changeType === 'UNASSIGNED').length;
   const reassignedCount = pendingChanges.filter(c => c.changeType === 'REASSIGNED').length;
 
+  // ✅ Count changes that will be pinned (exclude unassigned)
+  //const pinnableChanges = pendingChanges.filter(c => c.changeType !== 'UNASSIGNED').length;
+
   // Generate default label if empty
-  const suggestedLabel = versionLabel || 
+  const suggestedLabel = versionLabel ||
     `Manual Edit - ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
 
   return (
@@ -188,9 +207,52 @@ export default function SaveScheduleDialog({
           onChange={(e) => setComment(e.target.value)}
           placeholder="Describe what changed and why..."
           helperText="Add details about this version"
-          sx={{ mb: 3 }}
+          sx={{ mb: 2 }}
           disabled={saving}
         />
+
+        {/* ✅ PIN CHECKBOX - NEW SECTION */}
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 2,
+            mb: 3,
+            backgroundColor: pinAllChanges ? 'action.hover' : 'background.paper',
+            transition: 'background-color 0.3s'
+          }}
+        >
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={pinAllChanges}
+                onChange={(e) => setPinAllChanges(e.target.checked)}
+                disabled={saving}
+                icon={<PinIcon />}
+                checkedIcon={<PinIcon />}
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body1" fontWeight="medium">
+                  Pin all current assignments
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Pins ALL assignments in this schedule (not just your changes).
+                  Solver will preserve these in future periods.
+                </Typography>
+              </Box>
+            }
+          />
+
+          {pinAllChanges && (
+            <Alert severity="info" sx={{ mt: 2 }} icon={<PinIcon />}>
+              <Typography variant="body2">
+                All current assignments in this schedule will be pinned.
+                When generating future schedules, the solver will preserve these assignments.
+              </Typography>
+            </Alert>
+          )}
+        </Paper>
 
         <Divider sx={{ my: 2 }} />
 
@@ -226,10 +288,20 @@ export default function SaveScheduleDialog({
                   return 'Unknown change';
                 };
 
+                // ✅ Show pin indicator
+                //const willBePinned = pinAllChanges && change.changeType !== 'UNASSIGNED';
+
                 return (
                   <ListItem key={index} divider={index < pendingChanges.length - 1}>
                     <ListItemText
-                      primary={getChangeDescription()}
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {getChangeDescription()}
+                          {/* {willBePinned && (
+                            <PinIcon fontSize="small" color="action" />
+                          )} */}
+                        </Box>
+                      }
                       secondary={
                         <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
                           <Chip
@@ -237,7 +309,7 @@ export default function SaveScheduleDialog({
                             size="small"
                             color={
                               change.changeType === 'ASSIGNED' ? 'success' :
-                              change.changeType === 'UNASSIGNED' ? 'error' : 'info'
+                                change.changeType === 'UNASSIGNED' ? 'error' : 'info'
                             }
                             sx={{ height: 18, fontSize: '0.7rem' }}
                           />

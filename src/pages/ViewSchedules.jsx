@@ -579,15 +579,24 @@ export default function ViewSchedules() {
   }, [assignmentMap, originalAssignmentMap, viewingHistoricalVersion]);
 
   const rowData = useMemo(() => {
-    return Object.entries(groupedAssignments).map(([key, assignments]) => {
-      const [location, shiftType] = key.split("|");
-      return {
-        key,
-        location,
-        shiftType,
-        assignments
-      };
-    });
+    return Object.entries(groupedAssignments)
+      .map(([key, assignments]) => {
+        const [location, shiftType] = key.split("|");
+        return {
+          key,
+          location,
+          shiftType,
+          assignments
+        };
+      })
+      .sort((a, b) => {
+        // Primary sort: by location (alphabetically)
+        const locCompare = a.location.localeCompare(b.location);
+        if (locCompare !== 0) return locCompare;
+
+        // Secondary sort: by shift type (if same location)
+        return a.shiftType.localeCompare(b.shiftType);
+      });
   }, [groupedAssignments]);
 
   const rowVirtualizer = useVirtualizer({
@@ -655,42 +664,63 @@ export default function ViewSchedules() {
   const checkForConflicts = (employeeId, targetDate, targetCellKey) => {
     const conflicts = [];
 
-    // Check all cells in assignmentMap for same employee on same day
-    Object.entries(assignmentMap).forEach(([cellKey, employees]) => {
-      // Skip the target cell itself
-      if (cellKey === targetCellKey) return;
+    // Parse target shift details
+    const targetParts = targetCellKey.split('|');
+    if (targetParts.length !== 5) return conflicts;
 
-      // Parse cell key: location|shiftType|date|startTime|shiftId
+    const [targetLocation, targetShiftType, , , targetShiftId] = targetParts;
+
+    // Get all shifts for this employee on the same day (including target)
+    const shiftsOnDay = [];
+
+    // Add existing assignments
+    Object.entries(assignmentMap).forEach(([cellKey, employees]) => {
+      if (cellKey === targetCellKey) return; // Skip target itself
+
       const parts = cellKey.split('|');
       if (parts.length !== 5) return;
 
       const [location, shiftType, date, startTime, shiftId] = parts;
 
-      // Check if same date
-      if (date !== targetDate) return;
+      if (date !== targetDate) return; // Different day
 
-      // Check if employee is assigned
       const isAssigned = employees.some(emp => emp.id === employeeId);
-      if (!isAssigned) return;
+      if (!isAssigned) return; // Employee not assigned
 
-      // Find shift details from rotaData
-      const assignment = rotaData.shiftAssignmentList.find(a =>
-        a.shift.id === parseInt(shiftId)
-      );
-
-      if (assignment) {
-        conflicts.push({
-          location,
-          shiftType,
-          date,
-          startTime: assignment.shift.shiftTemplate.startTime,
-          endTime: assignment.shift.shiftTemplate.endTime,
-          shiftId
-        });
-      }
+      shiftsOnDay.push({ location, shiftType, date, startTime, shiftId });
     });
 
-    return conflicts;
+    // Add the target shift we're trying to assign
+    shiftsOnDay.push({
+      location: targetLocation,
+      shiftType: targetShiftType,
+      date: targetDate,
+      startTime: targetParts[3],
+      shiftId: targetShiftId
+    });
+
+    // ✅ NOW CHECK: Are these shift types allowed on the same day?
+    if (!isAllowedDayShiftTypes(shiftsOnDay)) {
+      // Return conflicts ONLY if the combination is invalid
+      return shiftsOnDay
+        .filter(s => s.shiftId !== targetShiftId) // Don't include target in conflict list
+        .map(shift => {
+          const assignment = rotaData.shiftAssignmentList.find(a =>
+            a.shift.id === parseInt(shift.shiftId)
+          );
+
+          return {
+            location: shift.location,
+            shiftType: shift.shiftType,
+            date: shift.date,
+            startTime: assignment?.shift.shiftTemplate.startTime || shift.startTime,
+            endTime: assignment?.shift.shiftTemplate.endTime || '',
+            shiftId: shift.shiftId
+          };
+        });
+    }
+
+    return []; // No conflicts - combination is valid
   };
 
   function handleDragEnd({ active, over }) {
@@ -849,6 +879,55 @@ export default function ViewSchedules() {
     } else {
       loadSchedule();
     }
+  };
+  /**
+ * Check if shift types are allowed on same day
+ * Same business rules as backend validation
+ */
+  const isAllowedDayShiftTypes = (shifts) => {
+    if (!shifts || shifts.length === 0) return true;
+    if (shifts.length === 1) return true;
+
+    const types = shifts.map(s => s.shiftType);
+    const locations = shifts.map(s => s.location);
+
+    // All FLOATING at different locations
+    const allFloating = types.every(t => t === 'FLOATING');
+    if (allFloating) {
+      const uniqueLocs = new Set(locations);
+      return uniqueLocs.size === locations.length;
+    }
+
+    // No mixing FLOATING with non-FLOATING
+    const hasFloating = types.some(t => t === 'FLOATING');
+    const hasNonFloating = types.some(t =>
+      t === 'DAY' || t === 'LONG_DAY' || t === 'WAKING_NIGHT' || t === 'SLEEP_IN'
+    );
+
+    if (hasFloating && hasNonFloating) {
+      return false;
+    }
+
+    // ✅ CRITICAL: LONG_DAY + SLEEP_IN at SAME location is ALLOWED
+    if (shifts.length === 2) {
+      const hasLongDay = types.includes('LONG_DAY');
+      const hasSleepIn = types.includes('SLEEP_IN');
+
+      if (hasLongDay && hasSleepIn) {
+        // Check if both at same location
+        const longDayLoc = shifts.find(s => s.shiftType === 'LONG_DAY')?.location;
+        const sleepInLoc = shifts.find(s => s.shiftType === 'SLEEP_IN')?.location;
+
+        return longDayLoc === sleepInLoc; // ✅ Valid if same location
+      }
+    }
+
+    // Any other 2+ non-floating is invalid
+    if (shifts.length >= 2 && !allFloating) {
+      return false;
+    }
+
+    return true;
   };
 
   if (loading) {
