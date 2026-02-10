@@ -26,7 +26,8 @@ import VersionHistorySidebar from '../components/Versionhistorysidebar';
 import SaveScheduleDialog from '../components/SaveScheduleDialog';
 import DiscardChangesDialog from '../components/DiscardChangesDialog';
 import ConflictDialog from '../components/ConflictDialog';
-
+// Add to imports at top
+import BulkAssignmentModal from '../components/BulkAssignmentModal';
 
 const weekdayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const datesByWeekday = {};
@@ -300,6 +301,14 @@ export default function ViewSchedules() {
   const [pendingChanges, setPendingChanges] = useState([]);
   const [changeHighlights, setChangeHighlights] = useState({});
   const [viewingHistoricalVersion, setViewingHistoricalVersion] = useState(false);
+
+  const [bulkAssignmentModal, setBulkAssignmentModal] = useState({
+    open: false,
+    employee: null,
+    targetCellKey: null,
+    location: null,
+    shiftType: null,
+  })
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -723,6 +732,91 @@ export default function ViewSchedules() {
     return []; // No conflicts - combination is valid
   };
 
+  // function handleDragEnd({ active, over }) {
+  //   setActiveDragId(null);
+  //   setDraggedEmployee(null);
+
+  //   if (!over) return;
+
+  //   const [, empIdStr] = active.id.split("|");
+  //   const empId = Number(empIdStr);
+  //   const droppedEmp = summarizedEmpList.find((e) => e.id === empId);
+  //   if (!droppedEmp) return;
+
+  //   const [, location, shiftType, date, shiftTime, shiftId] = over.id.split("|");
+  //   const cellKey = `${location}|${shiftType}|${date}|${shiftTime}|${shiftId}`;
+
+  //   // ✅ CHECK FOR CONFLICTS BEFORE ASSIGNMENT
+  //   const conflicts = checkForConflicts(empId, date, cellKey);
+
+  //   if (conflicts.length > 0) {
+  //     // Show conflict dialog
+  //     const targetAssignment = rotaData.shiftAssignmentList.find(a =>
+  //       a.shift.id === parseInt(shiftId)
+  //     );
+
+  //     setConflictData({
+  //       employee: droppedEmp,
+  //       targetShift: {
+  //         location,
+  //         shiftType,
+  //         date,
+  //         startTime: targetAssignment?.shift.shiftTemplate.startTime || shiftTime,
+  //         endTime: targetAssignment?.shift.shiftTemplate.endTime || '',
+  //       },
+  //       conflictingShifts: conflicts
+  //     });
+  //     setConflictDialogOpen(true);
+
+  //     // ❌ STOP HERE - Don't assign
+  //     return;
+  //   }
+
+  //   // ✅ NO CONFLICTS - Proceed with assignment
+  //   setAssignmentMap((prev) => {
+  //     const current = prev[cellKey] ?? [];
+  //     const alreadyAssigned = current.some((e) => e.id === droppedEmp.id);
+  //     if (alreadyAssigned) return prev;
+
+  //     return { ...prev, [cellKey]: [...current, droppedEmp] };
+  //   });
+
+  //   setSummarizedEmpList((prevList) => {
+  //     return prevList.map((e) => {
+  //       if (e.id === empId) {
+  //         const summary = e.shiftTypeSummary?.[shiftType] || { count: 0, hours: 0 };
+
+  //         const matchingAssignment = rotaData.shiftAssignmentList.find((a) =>
+  //           a.shift.shiftTemplate.shiftType === shiftType &&
+  //           a.shift.shiftTemplate.startTime === shiftTime &&
+  //           a.shift.shiftTemplate.location === location &&
+  //           a.shift.shiftStart === date
+  //         );
+
+  //         const duration = matchingAssignment?.shift?.durationInHours || 0;
+
+  //         return {
+  //           ...e,
+  //           shiftTypeSummary: {
+  //             ...e.shiftTypeSummary,
+  //             [shiftType]: {
+  //               count: summary.count + 1,
+  //               hours: summary.hours + duration
+  //             }
+  //           }
+  //         };
+  //       }
+  //       return e;
+  //     });
+  //   });
+
+  //   setHighlighted((prev) => {
+  //     const current = prev[cellKey] ?? [];
+  //     const alreadyAssigned = current.some((e) => e.id === droppedEmp.id);
+  //     if (alreadyAssigned) return prev;
+  //     return { ...prev, [cellKey]: [...current, droppedEmp] };
+  //   });
+  // }
   function handleDragEnd({ active, over }) {
     setActiveDragId(null);
     setDraggedEmployee(null);
@@ -737,7 +831,7 @@ export default function ViewSchedules() {
     const [, location, shiftType, date, shiftTime, shiftId] = over.id.split("|");
     const cellKey = `${location}|${shiftType}|${date}|${shiftTime}|${shiftId}`;
 
-    // ✅ CHECK FOR CONFLICTS BEFORE ASSIGNMENT
+    // ✅ CHECK FOR CONFLICTS BEFORE OPENING MODAL
     const conflicts = checkForConflicts(empId, date, cellKey);
 
     if (conflicts.length > 0) {
@@ -758,74 +852,136 @@ export default function ViewSchedules() {
         conflictingShifts: conflicts
       });
       setConflictDialogOpen(true);
-
-      // ❌ STOP HERE - Don't assign
       return;
     }
 
-    // ✅ NO CONFLICTS - Proceed with assignment
-    setAssignmentMap((prev) => {
-      const current = prev[cellKey] ?? [];
-      const alreadyAssigned = current.some((e) => e.id === droppedEmp.id);
-      if (alreadyAssigned) return prev;
-
-      return { ...prev, [cellKey]: [...current, droppedEmp] };
-    });
-
-    setSummarizedEmpList((prevList) => {
-      return prevList.map((e) => {
-        if (e.id === empId) {
-          const summary = e.shiftTypeSummary?.[shiftType] || { count: 0, hours: 0 };
-
-          const matchingAssignment = rotaData.shiftAssignmentList.find((a) =>
-            a.shift.shiftTemplate.shiftType === shiftType &&
-            a.shift.shiftTemplate.startTime === shiftTime &&
-            a.shift.shiftTemplate.location === location &&
-            a.shift.shiftStart === date
-          );
-
-          const duration = matchingAssignment?.shift?.durationInHours || 0;
-
-          return {
-            ...e,
-            shiftTypeSummary: {
-              ...e.shiftTypeSummary,
-              [shiftType]: {
-                count: summary.count + 1,
-                hours: summary.hours + duration
-              }
-            }
-          };
-        }
-        return e;
-      });
-    });
-
-    setHighlighted((prev) => {
-      const current = prev[cellKey] ?? [];
-      const alreadyAssigned = current.some((e) => e.id === droppedEmp.id);
-      if (alreadyAssigned) return prev;
-      return { ...prev, [cellKey]: [...current, droppedEmp] };
+    // ✅ NO CONFLICTS - Open bulk assignment modal
+    setBulkAssignmentModal({
+      open: true,
+      employee: droppedEmp,
+      targetCellKey: cellKey,
+      location,
+      shiftType,
     });
   }
+
+  const handleBulkAssignment = (selectedCellKeys, overrideInfo) => {
+    const employee = bulkAssignmentModal.employee;
+
+    selectedCellKeys.forEach((cellKey, index) => {
+      const [location, shiftType, date, shiftTime, shiftId] = cellKey.split('|');
+      const override = overrideInfo[index];
+
+      // ✅ OVERRIDE: Remove existing employees if needed
+      if (override.shouldOverride) {
+        setAssignmentMap((prev) => {
+          // Remove all other employees, keep only the new one
+          return { ...prev, [cellKey]: [employee] };
+        });
+
+        // Update summaries for removed employees
+        const currentAssignments = assignmentMap[cellKey] || [];
+        currentAssignments.forEach(removedEmp => {
+          if (removedEmp.id === employee.id) return; // Skip if same employee
+
+          setSummarizedEmpList((prevList) => {
+            return prevList.map((e) => {
+              if (e.id === removedEmp.id) {
+                const summary = e.shiftTypeSummary?.[shiftType] || { count: 0, hours: 0 };
+                const matchingAssignment = rotaData.shiftAssignmentList.find((a) =>
+                  a.shift.shiftTemplate.shiftType === shiftType &&
+                  a.shift.shiftTemplate.startTime === shiftTime &&
+                  a.shift.shiftTemplate.location === location &&
+                  a.shift.shiftStart === date
+                );
+                const duration = matchingAssignment?.shift?.durationInHours || 0;
+
+                const updatedSummary = { ...e.shiftTypeSummary };
+                const newCount = Math.max(0, summary.count - 1);
+                const newHours = Math.max(0, summary.hours - duration);
+
+                if (newCount === 0 && newHours === 0) {
+                  delete updatedSummary[shiftType];
+                } else {
+                  updatedSummary[shiftType] = { count: newCount, hours: newHours };
+                }
+
+                return { ...e, shiftTypeSummary: updatedSummary };
+              }
+              return e;
+            });
+          });
+        });
+      } else {
+        // ✅ NORMAL: Add employee to existing assignments
+        setAssignmentMap((prev) => {
+          const current = prev[cellKey] ?? [];
+          const alreadyAssigned = current.some((e) => e.id === employee.id);
+          if (alreadyAssigned) return prev;
+
+          return { ...prev, [cellKey]: [...current, employee] };
+        });
+      }
+
+      // Update employee summary for NEW assignment
+      setSummarizedEmpList((prevList) => {
+        return prevList.map((e) => {
+          if (e.id === employee.id) {
+            const summary = e.shiftTypeSummary?.[shiftType] || { count: 0, hours: 0 };
+
+            const matchingAssignment = rotaData.shiftAssignmentList.find((a) =>
+              a.shift.shiftTemplate.shiftType === shiftType &&
+              a.shift.shiftTemplate.startTime === shiftTime &&
+              a.shift.shiftTemplate.location === location &&
+              a.shift.shiftStart === date
+            );
+
+            const duration = matchingAssignment?.shift?.durationInHours || 0;
+
+            return {
+              ...e,
+              shiftTypeSummary: {
+                ...e.shiftTypeSummary,
+                [shiftType]: {
+                  count: summary.count + 1,
+                  hours: summary.hours + duration
+                }
+              }
+            };
+          }
+          return e;
+        });
+      });
+
+      // Update highlighted
+      if (override.shouldOverride) {
+        setHighlighted((prev) => {
+          return { ...prev, [cellKey]: [employee] };
+        });
+      } else {
+        setHighlighted((prev) => {
+          const current = prev[cellKey] ?? [];
+          const alreadyAssigned = current.some((e) => e.id === employee.id);
+          if (alreadyAssigned) return prev;
+          return { ...prev, [cellKey]: [...current, employee] };
+        });
+      }
+    });
+
+    // Close modal
+    setBulkAssignmentModal({ open: false, employee: null, targetCellKey: null, location: null, shiftType: null });
+  };
+
 
   function handleDragCancel() {
     setActiveDragId(null);
     setDraggedEmployee(null);
   }
 
-  // const handleDiscardChanges = () => {
-  //   if (window.confirm(`Discard ${pendingChanges.length} pending changes?`)) {
-  //     setAssignmentMap(JSON.parse(JSON.stringify(originalAssignmentMap)));
-  //     setPendingChanges([]);
-  //     setChangeHighlights({});
-  //     setHighlighted({});
-  //     setSnackbar({ message: 'Changes discarded', opened: true });
-  //   }
-  // };
+
 
   const handleDiscardChanges = () => {
-    setDiscardDialogOpen(true);  // ✅ Open dialog instead of window.confirm
+    setDiscardDialogOpen(true);
   };
 
   const handleConfirmDiscard = () => {
@@ -1146,6 +1302,25 @@ export default function ViewSchedules() {
         onClose={() => setDiscardDialogOpen(false)}
         onConfirm={handleConfirmDiscard}
         pendingChanges={pendingChanges}
+      />
+      {/* Add before </DndContext> closing tag, around line 850 */}
+      <BulkAssignmentModal
+        open={bulkAssignmentModal.open}
+        onClose={() => setBulkAssignmentModal({
+          open: false,
+          employee: null,
+          targetCellKey: null,
+          location: null,
+          shiftType: null
+        })}
+        employee={bulkAssignmentModal.employee}
+        targetCellKey={bulkAssignmentModal.targetCellKey}
+        location={bulkAssignmentModal.location}
+        shiftType={bulkAssignmentModal.shiftType}
+        datesByWeekday={datesByWeekday}
+        assignmentMap={assignmentMap}
+        rotaData={rotaData}
+        onConfirm={handleBulkAssignment}
       />
     </DndContext>
   );
