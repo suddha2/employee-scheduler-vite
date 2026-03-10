@@ -13,6 +13,7 @@ import EmployeeForm from './pages/EmployeeForm';
 import SubmitSchedule from './pages/SubmitSchedule';
 import ViewSchedules from './pages/ViewSchedules';
 import PayCycleSchedule from './pages/PayCycleScheduleView';
+import ArchivedPayCycleView from './pages/ArchivedPayCycleView';
 import ServiceStatsView from './pages/ServiceStatsView';
 import EmpStatsView from './pages/EmpStatsView';
 import ShiftTemplatesList from './pages/ShiftTemplatesList';
@@ -92,6 +93,16 @@ export default function App() {
                   <ProtectedRoute>
                     <Layout>
                       <PayCycleSchedule />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/paycycleSchedule/archived"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <ArchivedPayCycleView />
                     </Layout>
                   </ProtectedRoute>
                 }

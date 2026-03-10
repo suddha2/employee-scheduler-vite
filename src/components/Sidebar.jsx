@@ -23,7 +23,8 @@ import {
     ExpandLess,
     ExpandMore,
     ChevronLeft as ChevronLeftIcon,
-    Menu as MenuIcon
+    Menu as MenuIcon,
+    Archive as ArchiveIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -61,6 +62,12 @@ export default function Sidebar({ open, onClose, onToggle }) {
             title: 'Pay Cycle Schedule',
             icon: <CalendarIcon />,
             path: '/paycycleSchedule'
+        },
+        {
+            title: 'Archived Periods',
+            icon: <ArchiveIcon />,
+            path: '/paycycleSchedule/archived',
+            subItem: true
         },
         // {
         //     title: 'View Schedules',
@@ -126,7 +133,26 @@ export default function Sidebar({ open, onClose, onToggle }) {
                 <List>
                     {menuItems.map((item, index) => (
                         <div key={item.title}>
-                            {item.isExpandable ? (
+                            {item.subItem ? (
+                                <ListItemButton
+                                    onClick={() => handleNavigate(item.path)}
+                                    sx={{
+                                        pl: 4,
+                                        bgcolor: isActive(item.path) ? 'action.selected' : 'transparent',
+                                        '&:hover': {
+                                            bgcolor: isActive(item.path) ? 'action.selected' : 'action.hover'
+                                        }
+                                    }}
+                                >
+                                    <ListItemIcon sx={{ color: isActive(item.path) ? 'primary.main' : 'text.secondary', minWidth: 36 }}>
+                                        {item.icon}
+                                    </ListItemIcon>
+                                    <ListItemText
+                                        primary={item.title}
+                                        primaryTypographyProps={{ variant: 'body2', color: isActive(item.path) ? 'primary' : 'text.secondary' }}
+                                    />
+                                </ListItemButton>
+                        ) : item.isExpandable ? (
                                 <>
                                     <ListItemButton onClick={handleStatsClick}>
                                         <ListItemIcon
