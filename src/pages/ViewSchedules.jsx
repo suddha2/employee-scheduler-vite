@@ -11,6 +11,8 @@ import {
   Refresh as RefreshIcon,
   Info as InfoIcon,
   ArrowBack as ArrowBackIcon,
+  Visibility,
+  VisibilityOff,
 } from "@mui/icons-material";
 import { format } from "date-fns";
 import { DndContext, DragOverlay, pointerWithin } from "@dnd-kit/core";
@@ -152,7 +154,8 @@ const VirtualRow = memo(({
   activeDragId,
   virtualRow,
   measureElement,
-  changeHighlights
+  changeHighlights,
+  clearedCells  // ✅ NEW PROP
 }) => {
   const { location, shiftType, assignments } = row;
 
@@ -232,7 +235,7 @@ const VirtualRow = memo(({
                   </Typography>
                   <DroppableCell
                     id={droppableId}
-                    assigned={cellEmployees}
+                    assigned={clearedCells.has(cellKey) ? [] : cellEmployees}
                     highlighted={highlighted[cellKey] ?? []}
                     onRemove={handleRemove}
                     isDragging={!!activeDragId}
@@ -309,6 +312,9 @@ export default function ViewSchedules() {
     location: null,
     shiftType: null,
   })
+
+  // ✅ NEW: State for clearing assignments (front-end only)
+  const [clearedCells, setClearedCells] = useState(new Set());
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -992,6 +998,23 @@ export default function ViewSchedules() {
     setSnackbar({ message: 'Changes discarded', opened: true });
   };
 
+  // ✅ NEW: Clear all assignments (front-end only)
+  const handleClearAllAssignments = () => {
+    // Get all cell keys from assignmentMap
+    const allCellKeys = Object.keys(assignmentMap);
+    
+    // Mark all cells as cleared
+    setClearedCells(new Set(allCellKeys));
+    
+    setSnackbar({ message: 'All assignments hidden (front-end only)', opened: true });
+  };
+
+  // ✅ NEW: Restore all assignments
+  const handleRestoreAllAssignments = () => {
+    setClearedCells(new Set());
+    setSnackbar({ message: 'All assignments restored', opened: true });
+  };
+
   const handleVersionSelect = (version) => {
     if (version) {
       loadSchedule(version.versionId, true);
@@ -1153,6 +1176,18 @@ export default function ViewSchedules() {
             </span>
           </Tooltip>
 
+          <Tooltip title={clearedCells.size > 0 ? "Restore all assignments" : "Hide all assignments (front-end only)"}>
+            <span>
+              <IconButton
+                onClick={clearedCells.size > 0 ? handleRestoreAllAssignments : handleClearAllAssignments}
+                disabled={viewingHistoricalVersion}
+                color={clearedCells.size > 0 ? "primary" : "default"}
+              >
+                {clearedCells.size > 0 ? <Visibility /> : <VisibilityOff />}
+              </IconButton>
+            </span>
+          </Tooltip>
+
           <Tooltip title="Version history">
             <IconButton onClick={() => setVersionSidebarOpen(true)}>
               <HistoryIcon />
@@ -1231,6 +1266,7 @@ export default function ViewSchedules() {
                   virtualRow={virtualRow}
                   measureElement={rowVirtualizer.measureElement}
                   changeHighlights={changeHighlights}
+                  clearedCells={clearedCells}
                 />
               );
             })}

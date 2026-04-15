@@ -68,7 +68,7 @@ export const DroppableCell = memo(({
                 whiteSpace: "nowrap",
                 backgroundColor: highlighted.some((e) => e.id === emp.id)
                   ? "#a5d6a7"
-                  : "#1E90FF",
+                  : "#1976D2",
               }}
             />
           ))

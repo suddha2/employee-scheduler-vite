@@ -16,8 +16,20 @@ import {
     Divider,
     FormControlLabel,
     Switch,
-    CircularProgress
+    CircularProgress,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    List,
+    ListItem,
+    ListItemText,
+    Chip
 } from '@mui/material';
+import {
+    Warning as WarningIcon,
+    CheckCircle as CheckCircleIcon
+} from '@mui/icons-material';
 import axiosInstance from '../components/axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
 
@@ -60,6 +72,13 @@ const ShiftTemplateForm = () => {
     const [success, setSuccess] = useState(false);
     const [errors, setErrors] = useState({});
 
+    // ✅ NEW: Bulk edit state
+    const [bulkEditMode, setBulkEditMode] = useState(false);
+    const [affectedTemplates, setAffectedTemplates] = useState([]);
+    const [loadingAffected, setLoadingAffected] = useState(false);
+    const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+    const [originalFormData, setOriginalFormData] = useState(null);
+
     // Fetch regions on mount
     useEffect(() => {
         fetchRegions();
@@ -74,6 +93,13 @@ const ShiftTemplateForm = () => {
             fetchLocations(formData.region);
         }
     }, [formData.region]);
+
+    // ✅ NEW: Fetch affected templates when bulk mode enabled
+    useEffect(() => {
+        if (bulkEditMode && formData.location && formData.shiftType) {
+            fetchAffectedTemplates();
+        }
+    }, [bulkEditMode]);
 
     const fetchRegions = async () => {
         try {
@@ -101,7 +127,7 @@ const ShiftTemplateForm = () => {
             const response = await axiosInstance.get(`${API_ENDPOINTS.shiftTemplates}/${id}`);
             const template = response.data;
 
-            setFormData({
+            const loadedData = {
                 location: template.location || '',
                 region: template.region || '',
                 shiftType: template.shiftType || '',
@@ -116,13 +142,129 @@ const ShiftTemplateForm = () => {
                 empCount: template.empCount || 1,
                 priority: template.priority || 1,
                 active: template.active !== undefined ? template.active : true
-            });
+            };
+
+            setFormData(loadedData);
+            setOriginalFormData(loadedData); // ✅ Store original for comparison
         } catch (err) {
             console.error('Failed to fetch shift template:', err);
             setError('Failed to load shift template data.');
         } finally {
             setLoading(false);
         }
+    };
+
+    // ✅ NEW: Fetch templates that will be affected by bulk edit
+    const fetchAffectedTemplates = async () => {
+        setLoadingAffected(true);
+        try {
+            const response = await axiosInstance.get(
+                `${API_ENDPOINTS.shiftTemplates}/match`,
+                {
+                    params: {
+                        location: formData.location,
+                        shiftType: formData.shiftType,
+                        region: formData.region
+                    }
+                }
+            );
+            setAffectedTemplates(response.data || []);
+        } catch (err) {
+            console.error('Failed to fetch matching templates:', err);
+            setAffectedTemplates([]);
+        } finally {
+            setLoadingAffected(false);
+        }
+    };
+
+    // ✅ NEW: Handle bulk mode toggle
+    const handleBulkModeToggle = (event) => {
+        const enabled = event.target.checked;
+        setBulkEditMode(enabled);
+        
+        if (!enabled) {
+            setAffectedTemplates([]);
+        }
+    };
+
+    // ✅ NEW: Get list of changed fields
+    const getChangedFields = () => {
+        if (!originalFormData) return [];
+        
+        const changes = [];
+        
+        if (formData.startTime !== originalFormData.startTime) {
+            changes.push({
+                field: 'Start Time',
+                from: originalFormData.startTime,
+                to: formData.startTime
+            });
+        }
+        if (formData.endTime !== originalFormData.endTime) {
+            changes.push({
+                field: 'End Time',
+                from: originalFormData.endTime,
+                to: formData.endTime
+            });
+        }
+        if (formData.breakStart !== originalFormData.breakStart) {
+            changes.push({
+                field: 'Break Start',
+                from: originalFormData.breakStart || 'None',
+                to: formData.breakStart || 'None'
+            });
+        }
+        if (formData.breakEnd !== originalFormData.breakEnd) {
+            changes.push({
+                field: 'Break End',
+                from: originalFormData.breakEnd || 'None',
+                to: formData.breakEnd || 'None'
+            });
+        }
+        if (formData.totalHours !== originalFormData.totalHours) {
+            changes.push({
+                field: 'Total Hours',
+                from: originalFormData.totalHours || 'Auto',
+                to: formData.totalHours || 'Auto'
+            });
+        }
+        if (formData.empCount !== originalFormData.empCount) {
+            changes.push({
+                field: 'Employee Count',
+                from: originalFormData.empCount,
+                to: formData.empCount
+            });
+        }
+        if (formData.priority !== originalFormData.priority) {
+            changes.push({
+                field: 'Priority',
+                from: originalFormData.priority,
+                to: formData.priority
+            });
+        }
+        if (formData.requiredGender !== originalFormData.requiredGender) {
+            changes.push({
+                field: 'Required Gender',
+                from: originalFormData.requiredGender || 'ANY',
+                to: formData.requiredGender || 'ANY'
+            });
+        }
+        if (JSON.stringify(formData.requiredSkills) !== JSON.stringify(originalFormData.requiredSkills)) {
+            changes.push({
+                field: 'Required Skills',
+                from: originalFormData.requiredSkills.join(', ') || 'None',
+                to: formData.requiredSkills.join(', ') || 'None'
+            });
+        }
+        if (formData.active !== originalFormData.active) {
+            changes.push({
+                field: 'Active Status',
+                from: originalFormData.active ? 'Active' : 'Inactive',
+                to: formData.active ? 'Active' : 'Inactive'
+            });
+        }
+        
+        return changes;
     };
 
     const validate = () => {
@@ -137,7 +279,7 @@ const ShiftTemplateForm = () => {
         if (!formData.shiftType) {
             newErrors.shiftType = 'Shift type is required';
         }
-        if (!formData.daysOfWeek || formData.daysOfWeek.length === 0) {
+        if (!bulkEditMode && (!formData.daysOfWeek || formData.daysOfWeek.length === 0)) {
             newErrors.dayOfWeek = 'At least one day is required';
         }
         if (!formData.startTime) {
@@ -175,6 +317,18 @@ const ShiftTemplateForm = () => {
             return;
         }
 
+        // ✅ NEW: If bulk edit mode and multiple templates, show confirmation
+        if (isEditMode && bulkEditMode && affectedTemplates.length > 1) {
+            setConfirmDialogOpen(true);
+            return;
+        }
+
+        // Normal single update
+        await performSave();
+    };
+
+    // ✅ NEW: Perform the actual save operation
+    const performSave = async () => {
         setSaving(true);
         setError(null);
         setSuccess(false);
@@ -187,25 +341,56 @@ const ShiftTemplateForm = () => {
                 totalHours: formData.totalHours ? parseFloat(formData.totalHours) : null
             };
 
-
-            if (isEditMode) {
-                // Edit mode - single template update with first day
+            if (isEditMode && bulkEditMode && affectedTemplates.length > 1) {
+                // ✅ Bulk update endpoint
+                await axiosInstance.put(
+                    `${API_ENDPOINTS.shiftTemplates}/bulk-update`,
+                    {
+                        location: formData.location,
+                        shiftType: formData.shiftType,
+                        region: formData.region,
+                        updates: {
+                            startTime: formData.startTime,
+                            endTime: formData.endTime,
+                            breakStart: formData.breakStart || null,
+                            breakEnd: formData.breakEnd || null,
+                            totalHours: payload.totalHours,
+                            requiredGender: formData.requiredGender || null,
+                            requiredSkills: formData.requiredSkills,
+                            empCount: payload.empCount,
+                            priority: payload.priority,
+                            active: formData.active
+                        }
+                    }
+                );
+                setSuccess(true);
+                setTimeout(() => navigate('/shift-templates'), 2000);
+            } else if (isEditMode) {
+                // Single template update
                 await axiosInstance.put(`${API_ENDPOINTS.shiftTemplates}/${id}`, {
                     ...payload,
-                    dayOfWeek: formData.daysOfWeek[0] // Backend expects single day
+                    dayOfWeek: formData.daysOfWeek[0]
                 });
+                setSuccess(true);
+                setTimeout(() => navigate('/shift-templates'), 2000);
             } else {
                 // Create mode - send daysOfWeek array to backend
                 await axiosInstance.post(API_ENDPOINTS.shiftTemplates, payload);
+                setSuccess(true);
+                setTimeout(() => navigate('/shift-templates'), 2000);
             }
-            setSuccess(true);
-            setTimeout(() => navigate('/shift-templates'), 2000);
         } catch (err) {
             console.error('Failed to save shift template:', err);
             setError(err.response?.data?.message || 'Failed to save shift template. Please try again.');
         } finally {
             setSaving(false);
+            setConfirmDialogOpen(false);
         }
+    };
+
+    // ✅ NEW: Handle bulk update confirmation
+    const handleConfirmBulkUpdate = () => {
+        performSave();
     };
 
     if (loading) {
@@ -215,6 +400,8 @@ const ShiftTemplateForm = () => {
             </Box>
         );
     }
+
+    const changedFields = getChangedFields();
 
     return (
         <Box sx={{ p: 3 }}>
@@ -226,8 +413,76 @@ const ShiftTemplateForm = () => {
 
                 {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
                 {success && <Alert severity="success" sx={{ mb: 2 }}>
-                    Shift template {isEditMode ? 'updated' : 'created'} successfully!
+                    Shift template {isEditMode && bulkEditMode ? `updated (${affectedTemplates.length} templates)` : isEditMode ? 'updated' : 'created'} successfully!
                 </Alert>}
+
+                {/* ✅ NEW: Bulk Edit Mode Toggle */}
+                {isEditMode && (
+                    <Paper 
+                        elevation={0} 
+                        sx={{ 
+                            mb: 3, 
+                            p: 2, 
+                            bgcolor: bulkEditMode ? 'warning.light' : 'info.light',
+                            border: 1,
+                            borderColor: bulkEditMode ? 'warning.main' : 'info.main'
+                        }}
+                    >
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={bulkEditMode}
+                                    onChange={handleBulkModeToggle}
+                                    color={bulkEditMode ? 'warning' : 'primary'}
+                                />
+                            }
+                            label={
+                                <Box>
+                                    <Typography variant="body1" fontWeight="medium">
+                                        {bulkEditMode ? '⚠️ Bulk Edit Mode Active' : 'Enable Bulk Edit Mode'}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {bulkEditMode 
+                                            ? 'Changes will apply to ALL shift templates with same location and shift type'
+                                            : 'Apply changes to all days with same location and shift type'
+                                        }
+                                    </Typography>
+                                </Box>
+                            }
+                        />
+                        
+                        {bulkEditMode && (
+                            <Box sx={{ mt: 2 }}>
+                                {loadingAffected ? (
+                                    <Box display="flex" alignItems="center" gap={1}>
+                                        <CircularProgress size={20} />
+                                        <Typography variant="body2">Loading affected templates...</Typography>
+                                    </Box>
+                                ) : affectedTemplates.length > 0 ? (
+                                    <Alert severity="warning" icon={<WarningIcon />}>
+                                        <Typography variant="body2" fontWeight="medium">
+                                            <strong>{affectedTemplates.length} shift template{affectedTemplates.length !== 1 ? 's' : ''}</strong> will be updated:
+                                        </Typography>
+                                        <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                            {affectedTemplates.map((template, idx) => (
+                                                <Chip
+                                                    key={idx}
+                                                    label={template.dayOfWeek}
+                                                    size="small"
+                                                    variant="outlined"
+                                                />
+                                            ))}
+                                        </Box>
+                                    </Alert>
+                                ) : (
+                                    <Alert severity="info">
+                                        No matching templates found
+                                    </Alert>
+                                )}
+                            </Box>
+                        )}
+                    </Paper>
+                )}
 
                 <form onSubmit={handleSubmit}>
                     {/* Basic Information */}
@@ -244,6 +499,7 @@ const ShiftTemplateForm = () => {
                                     value={formData.region}
                                     onChange={handleChange('region')}
                                     label="Region"
+                                    disabled={bulkEditMode}
                                 >
                                     {regions.map((region) => (
                                         <MenuItem key={region} value={region}>
@@ -253,6 +509,11 @@ const ShiftTemplateForm = () => {
                                 </Select>
                                 {errors.region && (
                                     <Typography color="error" variant="caption">{errors.region}</Typography>
+                                )}
+                                {bulkEditMode && (
+                                    <Typography variant="caption" color="warning.main">
+                                        Read-only in bulk edit mode
+                                    </Typography>
                                 )}
                             </FormControl>
                         </Grid>
@@ -275,13 +536,17 @@ const ShiftTemplateForm = () => {
                                         setErrors({ ...errors, location: undefined });
                                     }
                                 }}
-                                disabled={!formData.region}
+                                disabled={!formData.region || bulkEditMode}
                                 renderInput={(params) => (
                                     <TextField
                                         {...params}
                                         label="Service Location"
                                         error={Boolean(errors.location)}
-                                        helperText={errors.location || 'Select existing or type new location'}
+                                        helperText={
+                                            bulkEditMode 
+                                                ? 'Read-only in bulk edit mode'
+                                                : errors.location || 'Select existing or type new location'
+                                        }
                                     />
                                 )}
                             />
@@ -294,6 +559,7 @@ const ShiftTemplateForm = () => {
                                     value={formData.shiftType}
                                     onChange={handleChange('shiftType')}
                                     label="Shift Type"
+                                    disabled={bulkEditMode}
                                 >
                                     {shiftTypes.map((type) => (
                                         <MenuItem key={type} value={type}>
@@ -303,6 +569,11 @@ const ShiftTemplateForm = () => {
                                 </Select>
                                 {errors.shiftType && (
                                     <Typography color="error" variant="caption">{errors.shiftType}</Typography>
+                                )}
+                                {bulkEditMode && (
+                                    <Typography variant="caption" color="warning.main">
+                                        Read-only in bulk edit mode
+                                    </Typography>
                                 )}
                             </FormControl>
                         </Grid>
@@ -318,12 +589,17 @@ const ShiftTemplateForm = () => {
                                         setErrors({ ...errors, daysOfWeek: undefined });
                                     }
                                 }}
+                                disabled={bulkEditMode}
                                 renderInput={(params) => (
                                     <TextField
                                         {...params}
                                         label="Days of Week"
                                         error={Boolean(errors.daysOfWeek)}
-                                        helperText={errors.daysOfWeek}
+                                        helperText={
+                                            bulkEditMode 
+                                                ? `Applies to all days (${affectedTemplates.length} templates)`
+                                                : errors.daysOfWeek
+                                        }
                                     />
                                 )}
                             />
@@ -477,11 +753,16 @@ const ShiftTemplateForm = () => {
                         <Button
                             type="submit"
                             variant="contained"
-                            color="primary"
+                            color={bulkEditMode ? "warning" : "primary"}
                             disabled={saving}
                             startIcon={saving && <CircularProgress size={20} />}
                         >
-                            {saving ? 'Saving...' : (isEditMode ? 'Update' : 'Create')}
+                            {saving 
+                                ? 'Saving...' 
+                                : bulkEditMode && affectedTemplates.length > 1
+                                    ? `Update All (${affectedTemplates.length})`
+                                    : isEditMode ? 'Update' : 'Create'
+                            }
                         </Button>
                         <Button
                             variant="outlined"
@@ -493,6 +774,93 @@ const ShiftTemplateForm = () => {
                     </Box>
                 </form>
             </Paper>
+
+            {/* ✅ NEW: Bulk Update Confirmation Dialog */}
+            <Dialog
+                open={confirmDialogOpen}
+                onClose={() => !saving && setConfirmDialogOpen(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>
+                    <Box display="flex" alignItems="center" gap={1}>
+                        <WarningIcon color="warning" />
+                        <Typography variant="h6">
+                            Confirm Bulk Update
+                        </Typography>
+                    </Box>
+                </DialogTitle>
+                
+                <DialogContent>
+                    <Alert severity="warning" sx={{ mb: 2 }}>
+                        You are about to update <strong>{affectedTemplates.length} shift templates</strong>
+                    </Alert>
+
+                    <Typography variant="subtitle1" fontWeight="medium" gutterBottom>
+                        Affected Templates:
+                    </Typography>
+                    <Paper variant="outlined" sx={{ p: 2, mb: 2, maxHeight: 200, overflow: 'auto' }}>
+                        <List dense>
+                            {affectedTemplates.map((template, idx) => (
+                                <ListItem key={idx} sx={{ py: 0.5 }}>
+                                    <ListItemText
+                                        primary={`${formData.location} - ${formData.shiftType} (${template.dayOfWeek})`}
+                                        secondary={`${template.startTime} - ${template.endTime}`}
+                                    />
+                                </ListItem>
+                            ))}
+                        </List>
+                    </Paper>
+
+                    {changedFields.length > 0 && (
+                        <>
+                            <Typography variant="subtitle1" fontWeight="medium" gutterBottom>
+                                Changes to Apply:
+                            </Typography>
+                            <Paper variant="outlined" sx={{ p: 2 }}>
+                                <List dense>
+                                    {changedFields.map((change, idx) => (
+                                        <ListItem key={idx} sx={{ py: 0.5 }}>
+                                            <ListItemText
+                                                primary={change.field}
+                                                secondary={
+                                                    <Box component="span" display="flex" alignItems="center" gap={1}>
+                                                        <span style={{ textDecoration: 'line-through', color: 'gray' }}>
+                                                            {change.from}
+                                                        </span>
+                                                        <span>→</span>
+                                                        <span style={{ fontWeight: 'bold', color: 'green' }}>
+                                                            {change.to}
+                                                        </span>
+                                                    </Box>
+                                                }
+                                            />
+                                        </ListItem>
+                                    ))}
+                                </List>
+                            </Paper>
+                        </>
+                    )}
+                </DialogContent>
+
+                <DialogActions sx={{ p: 2 }}>
+                    <Button 
+                        onClick={() => setConfirmDialogOpen(false)} 
+                        disabled={saving}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="warning"
+                        onClick={handleConfirmBulkUpdate}
+                        disabled={saving}
+                        startIcon={saving ? <CircularProgress size={20} /> : <CheckCircleIcon />}
+                    >
+                        {saving ? 'Updating...' : `Confirm Update (${affectedTemplates.length} templates)`}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };
