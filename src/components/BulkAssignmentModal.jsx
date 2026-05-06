@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
     Dialog,
     DialogTitle,
@@ -39,7 +39,15 @@ export default function BulkAssignmentModal({
 }) {
     const [assignmentMode, setAssignmentMode] = useState('single');
     const [selectedCells, setSelectedCells] = useState(new Set([targetCellKey]));
-    const [allowOverride, setAllowOverride] = useState(false); // ✅ NEW STATE
+    const [allowOverride, setAllowOverride] = useState(false);
+
+    useEffect(() => {
+        if (open && targetCellKey) {
+            setAssignmentMode('single');
+            setSelectedCells(new Set([targetCellKey]));
+            setAllowOverride(false);
+        }
+    }, [open, targetCellKey]);
 
     // Build available cells for this location + shiftType
     const availableCells = useMemo(() => {
@@ -166,7 +174,7 @@ export default function BulkAssignmentModal({
         });
 
         onConfirm(cellsToAssign, overrideInfo);
-        onClose();
+        handleClose();
     };
 
     const handleClose = () => {

@@ -13,6 +13,7 @@ import {
   ArrowBack as ArrowBackIcon,
   Visibility,
   VisibilityOff,
+  DeleteSweep as ClearAllIcon,
 } from "@mui/icons-material";
 import { format } from "date-fns";
 import { DndContext, DragOverlay, pointerWithin } from "@dnd-kit/core";
@@ -1015,6 +1016,17 @@ export default function ViewSchedules() {
     setSnackbar({ message: 'All assignments restored', opened: true });
   };
 
+  const handleClearAllActual = () => {
+    setAssignmentMap((prev) => {
+      const cleared = {};
+      Object.keys(prev).forEach((key) => { cleared[key] = []; });
+      return cleared;
+    });
+    setHighlighted({});
+    setSummarizedEmpList((prev) => prev.map((e) => ({ ...e, shiftTypeSummary: {} })));
+    setSnackbar({ message: 'All assignments cleared', opened: true });
+  };
+
   const handleVersionSelect = (version) => {
     if (version) {
       loadSchedule(version.versionId, true);
@@ -1172,6 +1184,18 @@ export default function ViewSchedules() {
                 color="error"
               >
                 <UndoIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
+
+          <Tooltip title="Clear all assignments">
+            <span>
+              <IconButton
+                onClick={handleClearAllActual}
+                disabled={viewingHistoricalVersion || Object.values(assignmentMap).every(v => v.length === 0)}
+                color="error"
+              >
+                <ClearAllIcon />
               </IconButton>
             </span>
           </Tooltip>
