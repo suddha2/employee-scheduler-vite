@@ -1380,6 +1380,7 @@ export default function ViewSchedules() {
         datesByWeekday={datesByWeekday}
         assignmentMap={assignmentMap}
         rotaData={rotaData}
+        checkForConflicts={checkForConflicts}
         onConfirm={handleBulkAssignment}
       />
     </DndContext>

@@ -35,6 +35,7 @@ export default function BulkAssignmentModal({
     datesByWeekday,
     assignmentMap,
     rotaData,
+    checkForConflicts,
     onConfirm,
 }) {
     const [assignmentMode, setAssignmentMode] = useState('single');
@@ -74,8 +75,9 @@ export default function BulkAssignmentModal({
                 // Get names of other assigned employees
                 const otherEmployeeNames = assignedToOther.map(emp => `${emp.firstName} ${emp.lastName}`).join(', ');
 
-                // Check for conflicts (simplified - you can enhance this)
-                const hasConflict = false; // TODO: Add conflict check if needed
+                const hasConflict = !isAssignedToThisEmployee && employee && checkForConflicts
+                    ? checkForConflicts(employee.id, date, cellKey).length > 0
+                    : false;
 
                 return {
                     cellKey,
@@ -88,7 +90,7 @@ export default function BulkAssignmentModal({
                     hasConflict,
                 };
             });
-    }, [rotaData, location, shiftType, assignmentMap, employee]);
+    }, [rotaData, location, shiftType, assignmentMap, employee, checkForConflicts]);
 
     // Build heat map grid data
     const heatMapData = useMemo(() => {
