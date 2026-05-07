@@ -29,6 +29,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from '../components/axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
 import { useServiceWeights } from '../hooks/useServiceWeights';
+import { validateEmployee } from '../utils/employeeValidation';
+import { parseServiceWeights, serializeServiceWeights } from '../utils/serviceWeights';
+import ServiceWeightPicker from '../components/ServiceWeightPicker';
 
 export default function EmployeeForm() {
     const { id } = useParams();
@@ -191,46 +194,8 @@ export default function EmployeeForm() {
             const response = await axiosInstance.get(`${API_ENDPOINTS.employees}/${id}`);
             const employee = response.data;
 
-            // Pick whichever field carries the "Name:Weight" format; preferredService
-            // has historically been the source-of-truth, but fall back to preferredLocations.
-            let servicesWithWeights = [];
-
-            if (employee.preferredService && employee.preferredService.length > 0) {
-                const firstService = employee.preferredService[0];
-
-                if (typeof firstService === 'string' && firstService.includes(':')) {
-                    servicesWithWeights = employee.preferredService;
-                } else if (employee.preferredLocations && employee.preferredLocations.length > 0) {
-                    const firstLocation = employee.preferredLocations[0];
-                    if (typeof firstLocation === 'string' && firstLocation.includes(':')) {
-                        servicesWithWeights = employee.preferredLocations;
-                    } else {
-                        servicesWithWeights = employee.preferredService;
-                    }
-                } else {
-                    servicesWithWeights = employee.preferredService;
-                }
-            } else if (employee.preferredLocations && employee.preferredLocations.length > 0) {
-                servicesWithWeights = employee.preferredLocations;
-            }
-
-            if (typeof servicesWithWeights === 'string') {
-                servicesWithWeights = servicesWithWeights.split(',').map(s => s.trim());
-            }
-
-            const parsedWeights = servicesWithWeights.map(service => {
-                if (typeof service === 'string' && service.includes(':')) {
-                    const parts = service.split(':');
-                    const location = parts[0].trim();
-                    const weight = parts[1] ? parts[1].trim() : '100';
-                    return { location, weight };
-                }
-                return { location: String(service).trim(), weight: '100' };
-            });
-
+            const { parsedWeights, serviceNames } = parseServiceWeights(employee);
             setServiceWeights(parsedWeights);
-
-            const serviceNames = parsedWeights.map(sw => sw.location);
 
             setFormData({
                 firstName: employee.firstName || '',
@@ -255,8 +220,6 @@ export default function EmployeeForm() {
                 weekOff: employee.weekOff ?? '',
                 invertPattern: employee.invertPattern || false
             });
-
-            console.log('=== END DEBUG ===');
         } catch (err) {
             console.error('Failed to fetch employee:', err);
             setError('Failed to load employee data.');
@@ -267,68 +230,7 @@ export default function EmployeeForm() {
 
     // Validation
     const validate = () => {
-        const newErrors = {};
-
-        // Required fields
-        if (!formData.firstName?.trim()) newErrors.firstName = 'First name is required';
-        if (!formData.lastName?.trim()) newErrors.lastName = 'Last name is required';
-        if (!formData.gender) newErrors.gender = 'Gender is required';
-        if (!formData.contractType) newErrors.contractType = 'Contract type is required';
-
-        // Hours validation
-        const minHrs = parseFloat(formData.minHrs);
-        const maxHrs = parseFloat(formData.maxHrs);
-
-        if (formData.minHrs && isNaN(minHrs)) {
-            newErrors.minHrs = 'Min hours must be a number';
-        } else if (minHrs < 0) {
-            newErrors.minHrs = 'Min hours cannot be negative';
-        }
-
-        if (formData.maxHrs && isNaN(maxHrs)) {
-            newErrors.maxHrs = 'Max hours must be a number';
-        } else if (maxHrs < 0) {
-            newErrors.maxHrs = 'Max hours cannot be negative';
-        }
-
-        if (minHrs && maxHrs && minHrs > maxHrs) {
-            newErrors.maxHrs = 'Max hours must be greater than or equal to min hours';
-        }
-
-        // Rest days validation
-        if (formData.restDays && (isNaN(formData.restDays) || formData.restDays < 0)) {
-            newErrors.restDays = 'Rest days must be a positive number';
-        }
-
-        // Pattern validation
-        if (formData.daysOn && (isNaN(formData.daysOn) || formData.daysOn < 0)) {
-            newErrors.daysOn = 'Days on must be a positive number';
-        }
-        if (formData.daysOff && (isNaN(formData.daysOff) || formData.daysOff < 0)) {
-            newErrors.daysOff = 'Days off must be a positive number';
-        }
-        if (formData.weekOn && (isNaN(formData.weekOn) || formData.weekOn < 0)) {
-            newErrors.weekOn = 'Week on must be a positive number';
-        }
-        if (formData.weekOff && (isNaN(formData.weekOff) || formData.weekOff < 0)) {
-            newErrors.weekOff = 'Week off must be a positive number';
-        }
-
-        // Service weight validation
-        const invalidWeights = serviceWeights.filter(sw => {
-            const weight = parseInt(sw.weight);
-            return isNaN(weight) || weight < 0 || weight > 100;
-        });
-        if (invalidWeights.length > 0) {
-            newErrors.serviceWeights = 'All service weights must be between 0 and 100';
-        }
-
-        // Services validation
-        if (formData.preferredRegion && formData.preferredService.length === 0 && formData.restrictedService.length === 0) {
-            // Optional warning - you can remove this if not needed
-            // newErrors.services = 'Consider selecting at least one preferred or restricted service';
-        }
-
+        const newErrors = validateEmployee(formData, serviceWeights);
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -451,15 +353,9 @@ export default function EmployeeForm() {
         setSuccess(false);
 
         try {
-            // Convert service weights to "ServiceName:Weight" format
-            // Store in preferredService (no more preferredLocations field)
-            const preferredServiceWithWeights = serviceWeights.map(
-                sw => `${sw.location}:${sw.weight}`
-            );
-
             const payload = {
                 ...formData,
-                preferredService: preferredServiceWithWeights,  // Services WITH weights
+                preferredService: serializeServiceWeights(serviceWeights),
                 restrictedService: formData.restrictedService,  // Services array
                 // ✅ ADD THESE MAPPINGS:
                 preferredShift: formData.preferredShifts || [],
@@ -787,56 +683,13 @@ export default function EmployeeForm() {
                             </Grid>
                         </Grid>
 
-                        {/* Service Weights */}
-                        <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
-                            Service Weights
-                        </Typography>
-                        <Divider sx={{ mb: 2 }} />
-                        <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                            <Typography variant="subtitle2" gutterBottom color="text.secondary">
-                                Services selected in "Preferred Services" above will appear here automatically. Set weight for each service (0-100, where 100 = dedicated).
-                            </Typography>
+                        <ServiceWeightPicker
+                            serviceWeights={serviceWeights}
+                            error={errors.serviceWeights}
+                            onWeightChange={handleWeightChange}
+                            onRemoveService={handleRemoveService}
+                        />
 
-                            {/* Display services with editable weights */}
-                            {serviceWeights.length === 0 ? (
-                                <Alert severity="info" sx={{ mt: 2 }}>
-                                    No services selected yet. Select services in "Preferred Services" field above.
-                                </Alert>
-                            ) : (
-                                <Grid container spacing={2} sx={{ mt: 2 }}>
-                                    {serviceWeights.map((sw) => (
-                                        <Grid item xs={12} md={6} key={sw.location}>
-                                            <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                                                <Typography sx={{ flexGrow: 1, fontWeight: 'medium' }}>
-                                                    {sw.location}
-                                                </Typography>
-                                                <TextField
-                                                    type="number"
-                                                    label="Weight"
-                                                    value={sw.weight}
-                                                    onChange={(e) => handleWeightChange(sw.location, e.target.value)}
-                                                    inputProps={{ min: '0', max: '100', style: { width: '80px' } }}
-                                                    size="small"
-                                                    helperText={sw.weight === '100' ? 'Dedicated' : ''}
-                                                />
-                                                <IconButton
-                                                    onClick={() => handleRemoveService(sw.location)}
-                                                    color="error"
-                                                    size="small"
-                                                    title="Remove service"
-                                                >
-                                                    <DeleteIcon />
-                                                </IconButton>
-                                            </Paper>
-                                        </Grid>
-                                    ))}
-                                </Grid>
-                            )}
-
-                            {errors.serviceWeights && (
-                                <FormHelperText error sx={{ mt: 2 }}>{errors.serviceWeights}</FormHelperText>
-                            )}
-                        </Box>
 
                         {/* Days and Shifts Preferences */}
                         <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>

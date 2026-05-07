@@ -33,6 +33,7 @@ import {
 import axiosInstance from '../components/axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
 import { getChangedFields } from '../utils/shiftTemplateDiff';
+import { validateShiftTemplate } from '../utils/shiftTemplateValidation';
 
 const ShiftTemplateForm = () => {
     const { id } = useParams();
@@ -189,33 +190,7 @@ const ShiftTemplateForm = () => {
     };
 
     const validate = () => {
-        const newErrors = {};
-
-        if (!formData.location.trim()) {
-            newErrors.location = 'Location is required';
-        }
-        if (!formData.region.trim()) {
-            newErrors.region = 'Region is required';
-        }
-        if (!formData.shiftType) {
-            newErrors.shiftType = 'Shift type is required';
-        }
-        if (!bulkEditMode && (!formData.daysOfWeek || formData.daysOfWeek.length === 0)) {
-            newErrors.dayOfWeek = 'At least one day is required';
-        }
-        if (!formData.startTime) {
-            newErrors.startTime = 'Start time is required';
-        }
-        if (!formData.endTime) {
-            newErrors.endTime = 'End time is required';
-        }
-        if (!formData.empCount || formData.empCount < 1) {
-            newErrors.empCount = 'Employee count must be at least 1';
-        }
-        if (!formData.priority || formData.priority < 1) {
-            newErrors.priority = 'Priority must be at least 1';
-        }
-
+        const newErrors = validateShiftTemplate(formData, bulkEditMode);
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
