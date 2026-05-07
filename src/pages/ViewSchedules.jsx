@@ -22,9 +22,9 @@ import FloatingEmployeeList from "./FloatingEmployeeList";
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
-import { safeStorage } from '../utils/safeStorage';
 import { calculateDuration } from '../utils/shiftCalculations';
 import { setEmpSummary, buildAssignmentMap } from '../utils/scheduleData';
+import { fetchCurrentSchedule, fetchScheduleVersion, fetchCurrentVersionMeta } from '../api/schedules';
 import { DroppableCell } from "../components/droppableCell";
 import ScheduleRow from "../components/ScheduleRow";
 
@@ -177,55 +177,21 @@ export default function ViewSchedules() {
     };
   };
 
-  // Load schedule (with version support)
   const loadSchedule = async (versionId = null, highlightChanges = false) => {
     setLoading(true);
     try {
-      let response;
-
       if (versionId) {
-        console.log('Loading version:', versionId);
-        response = await axiosInstance.get(
-          `${API_ENDPOINTS.scheduleVersions}/${id}/versions/${versionId}`,
-          {
-            params: { highlightChanges },
-            headers: { Authorization: `Bearer ${safeStorage.get('token')}` }
-          }
-        );
-
-        setViewingHistoricalVersion(!response.data.version.isCurrent);
-        setCurrentVersion(response.data.version);
-
-        const rotaDataFromVersion = convertVersionToRotaData(response.data);
-        setRotaData(rotaDataFromVersion);
-
+        const data = await fetchScheduleVersion(id, versionId, highlightChanges);
+        setViewingHistoricalVersion(!data.version.isCurrent);
+        setCurrentVersion(data.version);
+        setRotaData(convertVersionToRotaData(data));
       } else {
-        console.log('Loading current schedule');
-        response = await axiosInstance.get(
-          `${API_ENDPOINTS.solvedSchedule}?id=${id}`,
-          {
-            headers: { Authorization: `Bearer ${safeStorage.get('token')}` }
-          }
-        );
-
+        const data = await fetchCurrentSchedule(id);
         setViewingHistoricalVersion(false);
-        setRotaData(response.data);
-
-        try {
-          const versionResponse = await axiosInstance.get(
-            `${API_ENDPOINTS.scheduleVersions}/${id}/versions/current`,
-            {
-              headers: { Authorization: `Bearer ${safeStorage.get('token')}` }
-            }
-          );
-          setCurrentVersion(versionResponse.data.version);
-        } catch (err) {
-          console.log('No version metadata available');
-          setCurrentVersion(null);
-        }
+        setRotaData(data);
+        setCurrentVersion(await fetchCurrentVersionMeta(id));
       }
     } catch (err) {
-      console.error('Failed to load schedule:', err);
       const errorMsg = err.response?.data?.message || 'Failed to load schedule';
       setSnackbar({ message: errorMsg, opened: true });
     } finally {
