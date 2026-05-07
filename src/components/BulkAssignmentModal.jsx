@@ -95,44 +95,57 @@ export default function BulkAssignmentModal({
         const weekdayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         const grid = {};
 
+        if (availableCells.length === 0) return { grid, weekdayOrder };
+
+        // Find the Monday of the week containing the earliest date
+        const sortedDates = [...new Set(availableCells.map(c => c.date))].sort();
+        const firstDate = new Date(sortedDates[0]);
+        const dayOfWeek = firstDate.getDay(); // 0=Sun, 1=Mon ... 6=Sat
+        const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        const firstMonday = new Date(firstDate);
+        firstMonday.setDate(firstDate.getDate() - daysFromMonday);
+        firstMonday.setHours(0, 0, 0, 0);
+
         availableCells.forEach(cell => {
             const date = new Date(cell.date);
+            date.setHours(0, 0, 0, 0);
             const weekday = format(date, 'EEE');
 
-            const allDates = weekdayOrder.flatMap(day => datesByWeekday[day] || []);
-            const sortedDates = [...new Set(allDates)].sort();
-            const dateIndex = sortedDates.indexOf(cell.date);
-            const actualWeekNum = Math.floor(dateIndex / 7) + 1;
+            const diffDays = Math.round((date - firstMonday) / (1000 * 60 * 60 * 24));
+            const weekNum = Math.floor(diffDays / 7) + 1;
 
-            if (!grid[actualWeekNum]) {
-                grid[actualWeekNum] = {};
+            if (!grid[weekNum]) {
+                grid[weekNum] = {};
             }
 
-            grid[actualWeekNum][weekday] = cell;
+            grid[weekNum][weekday] = cell;
         });
 
         return { grid, weekdayOrder };
-    }, [availableCells, datesByWeekday]);
+    }, [availableCells]);
 
-    // ✅ Calculate override statistics
+    // Calculate override statistics (only counts cells that will result in actual new assignments)
     const overrideStats = useMemo(() => {
         const selectedCellsArray = Array.from(selectedCells);
-        const cellsWithOtherAssignments = selectedCellsArray.filter(cellKey => {
+        const newAssignments = selectedCellsArray.filter(cellKey => {
+            const cell = availableCells.find(c => c.cellKey === cellKey);
+            return cell && !cell.isAssignedToThisEmployee;
+        });
+        const cellsWithOtherAssignments = newAssignments.filter(cellKey => {
             const cell = availableCells.find(c => c.cellKey === cellKey);
             return cell?.hasOtherAssignment;
         });
 
         return {
-            total: selectedCells.size,
+            total: newAssignments.length,
             willOverride: cellsWithOtherAssignments.length,
             cellsToOverride: cellsWithOtherAssignments,
         };
     }, [selectedCells, availableCells]);
 
     const handleToggleCell = (cellKey, cell) => {
-        if (cell.hasConflict) return; // Block conflicted cells
-
-        // If cell has other assignment and override is not allowed, block it
+        if (cell.hasConflict) return;
+        if (cell.isAssignedToThisEmployee) return;
         if (cell.hasOtherAssignment && !allowOverride) return;
 
         setSelectedCells(prev => {
@@ -149,7 +162,8 @@ export default function BulkAssignmentModal({
     const handleSelectAll = () => {
         const validCells = availableCells
             .filter(c => !c.hasConflict)
-            .filter(c => allowOverride || !c.hasOtherAssignment) // ✅ Respect override setting
+            .filter(c => !c.isAssignedToThisEmployee)
+            .filter(c => allowOverride || !c.hasOtherAssignment)
             .map(c => c.cellKey);
         setSelectedCells(new Set(validCells));
     };
@@ -346,7 +360,7 @@ export default function BulkAssignmentModal({
 
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                             <Typography variant="subtitle2">
-                                Select dates ({selectedCells.size} selected)
+                                Select dates ({overrideStats.total} new assignment{overrideStats.total !== 1 ? 's' : ''} selected)
                                 {overrideStats.willOverride > 0 && (
                                     <Chip
                                         icon={<OverrideIcon />}
@@ -454,14 +468,14 @@ export default function BulkAssignmentModal({
                 <Button
                     variant="contained"
                     onClick={handleConfirm}
-                    disabled={assignmentMode === 'multiple' && selectedCells.size === 0}
+                    disabled={assignmentMode === 'multiple' && overrideStats.total === 0}
                     color={overrideStats.willOverride > 0 ? 'warning' : 'primary'}
                 >
                     {assignmentMode === 'single'
                         ? 'Assign Once'
                         : overrideStats.willOverride > 0
-                            ? `Override & Assign to ${selectedCells.size} Shift${selectedCells.size !== 1 ? 's' : ''}`
-                            : `Assign to ${selectedCells.size} Shift${selectedCells.size !== 1 ? 's' : ''}`
+                            ? `Override & Assign to ${overrideStats.total} Shift${overrideStats.total !== 1 ? 's' : ''}`
+                            : `Assign to ${overrideStats.total} Shift${overrideStats.total !== 1 ? 's' : ''}`
                     }
                 </Button>
             </DialogActions>
