@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, memo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Table, TableHead, TableBody, TableRow, TableCell,
   TableContainer, Paper, Typography, Box, Tooltip, Button, CircularProgress,
@@ -22,7 +22,11 @@ import FloatingEmployeeList from "./FloatingEmployeeList";
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
+import { safeStorage } from '../utils/safeStorage';
+import { calculateDuration } from '../utils/shiftCalculations';
+import { setEmpSummary, buildAssignmentMap } from '../utils/scheduleData';
 import { DroppableCell } from "../components/droppableCell";
+import ScheduleRow from "../components/ScheduleRow";
 
 // Import versioning components
 import VersionHistorySidebar from '../components/Versionhistorysidebar';
@@ -33,28 +37,8 @@ import ConflictDialog from '../components/ConflictDialog';
 import BulkAssignmentModal from '../components/BulkAssignmentModal';
 
 const weekdayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const datesByWeekday = {};
-weekdayOrder.forEach((day) => {
-  datesByWeekday[day] = [];
-});
-
-// Helper: Calculate shift duration
-const calculateDuration = (startTime, endTime) => {
-  if (!startTime || !endTime) return 0;
-
-  const [startHour, startMin] = startTime.split(':').map(Number);
-  const [endHour, endMin] = endTime.split(':').map(Number);
-
-  const startMinutes = startHour * 60 + startMin;
-  let endMinutes = endHour * 60 + endMin;
-
-  // Handle overnight shifts
-  if (endMinutes < startMinutes) {
-    endMinutes += 24 * 60;
-  }
-
-  return (endMinutes - startMinutes) / 60;
-};
+const emptyDatesByWeekday = () =>
+  weekdayOrder.reduce((acc, day) => { acc[day] = []; return acc; }, {});
 
 function LoadingSpinner() {
   return (
@@ -64,229 +48,13 @@ function LoadingSpinner() {
   );
 }
 
-function buildAssignmentMap(assignments) {
-  const map = {};
-  const seen = {};
-
-  assignments.forEach(({ shift, employee }) => {
-    const location = shift.shiftTemplate.location;
-    const shiftType = shift.shiftTemplate.shiftType;
-    const date = shift.shiftStart;
-    const shiftStartTime = shift.shiftTemplate.startTime;
-    const shiftId = shift.id;
-    const key = `${location}|${shiftType}|${date}|${shiftStartTime}|${shiftId}`;
-
-    if (!map[key]) {
-      map[key] = [];
-      seen[key] = new Set();
-    }
-
-    // ✅ FIX: Only add employee if it exists
-    if (employee && !seen[key].has(employee.id)) {
-      map[key].push(employee);
-      seen[key].add(employee.id);
-    }
-    // ← Cell still exists in map even if employee is null
-  });
-
-  const uniqueDateStrings = Array.from(
-    new Set(assignments.map((a) => a.shift.shiftStart))
-  );
-
-  // Clear and rebuild dates
-  Object.keys(datesByWeekday).forEach(day => {
-    datesByWeekday[day] = [];
-  });
-
-  uniqueDateStrings.forEach((dateStr) => {
-    const weekday = format(new Date(dateStr), "EEE");
-    if (datesByWeekday[weekday]) {
-      if (!datesByWeekday[weekday].includes(dateStr)) {
-        datesByWeekday[weekday].push(dateStr);
-      }
-    }
-  });
-
-  Object.keys(datesByWeekday).forEach(day => {
-    datesByWeekday[day].sort((a, b) => new Date(a) - new Date(b));
-  });
-
-  return map;
-}
-
-function setEmpSummary(emplist, assignments) {
-  const shiftTypeMap = {};
-
-  assignments.forEach(({ shift, employee }) => {
-    if (!employee) return;
-
-    const empId = employee.id;
-    const shiftType = shift.shiftTemplate.shiftType;
-
-    if (!shiftTypeMap[empId]) {
-      shiftTypeMap[empId] = {};
-    }
-
-    if (!shiftTypeMap[empId][shiftType]) {
-      shiftTypeMap[empId][shiftType] = { count: 0, hours: 0 };
-    }
-
-    shiftTypeMap[empId][shiftType].count += 1;
-    shiftTypeMap[empId][shiftType].hours += shift.durationInHours;
-  });
-
-  const updatedEmplist = emplist.map(emp => ({
-    ...emp,
-    shiftTypeSummary: shiftTypeMap[emp.id] || {}
-  }));
-
-  return updatedEmplist;
-}
-
-// Enhanced VirtualRow with change highlighting
-const VirtualRow = memo(({
-  row,
-  columnWidths,
-  weekdayOrder,
-  datesByWeekday,
-  assignmentMap,
-  highlighted,
-  handleRemove,
-  activeDragId,
-  virtualRow,
-  measureElement,
-  changeHighlights,
-  clearedCells  // ✅ NEW PROP
-}) => {
-  const { location, shiftType, assignments } = row;
-
-  return (
-    <Box
-      ref={measureElement}
-      data-index={virtualRow.index}
-      sx={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        transform: `translateY(${virtualRow.start}px)`,
-        display: 'flex',
-        borderBottom: '1px solid #ddd',
-        backgroundColor: '#f3f0e1ff',
-      }}
-    >
-      <Box sx={{ width: columnWidths[0], fontWeight: 'bold', p: 1, borderRight: '1px solid #eee' }}>
-        {`${location} - ${shiftType.replaceAll("_", " ")}`}
-      </Box>
-
-      {weekdayOrder.map((day, i) => (
-        <Box key={day} sx={{ width: columnWidths[i + 1], p: 1, borderRight: '1px solid #eee' }}>
-          {datesByWeekday[day].map((date) => {
-            const dateStr = date;
-            const matching = assignments.filter((a) => {
-              const shiftDateStr = format(new Date(a.shift.shiftStart), "yyyy-MM-dd");
-              return shiftDateStr === dateStr;
-            });
-
-            // ✅ Dedupe by shift.id to avoid showing same shift multiple times
-            const uniqueShifts = new Map();
-            matching.forEach((assignment) => {
-              const shiftId = assignment.shift.id;
-              if (!uniqueShifts.has(shiftId)) {
-                uniqueShifts.set(shiftId, assignment);
-              }
-            });
-
-            return Array.from(uniqueShifts.values()).map((assignment) => {
-              const shiftDateStr = format(new Date(assignment.shift.shiftStart), "yyyy-MM-dd");
-              const shiftStartTime = assignment.shift.shiftTemplate.startTime;
-              const shiftId = assignment.shift.id;
-              const cellKey = `${location}|${shiftType}|${shiftDateStr}|${shiftStartTime}|${shiftId}`;
-              const droppableId = `cell|${cellKey}`;
-              const changeType = changeHighlights[cellKey];
-              const cellEmployees = assignmentMap[cellKey] ?? [];
-
-              return (
-                <Box
-                  key={cellKey}
-                  sx={{
-                    mb: 1,
-                    position: 'relative',
-                    // ✅ Subtle left border for changes
-                    borderLeft: changeType ? '3px solid' : 'none',
-                    borderLeftColor:
-                      changeType === 'ASSIGNED' ? 'success.main' :
-                        changeType === 'UNASSIGNED' ? 'warning.main' :  // ✅ Changed from error to warning
-                          changeType === 'REASSIGNED' ? 'info.main' : 'transparent',
-                    pl: changeType ? 0.5 : 0,
-                    // ✅ NO background color change - keeps it clean
-                    backgroundColor: 'transparent',
-                    borderRadius: 1,
-                    // ✅ NO opacity reduction - keeps it visible
-                    opacity: 1,
-                    transition: 'all 0.3s ease-in-out',  // ✅ Smooth transition
-                  }}
-                >
-                  <Typography variant="caption" fontWeight="bold" display="block">
-                    {format(new Date(assignment.shift.shiftStart), "MMM d")}
-                  </Typography>
-                  <Typography variant="caption" display="block" color="text.secondary">
-                    {assignment.shift.shiftTemplate.startTime.slice(0, 5)}-
-                    {assignment.shift.shiftTemplate.endTime.slice(0, 5)}
-                  </Typography>
-                  <DroppableCell
-                    id={droppableId}
-                    assigned={clearedCells.has(cellKey) ? [] : cellEmployees}
-                    highlighted={highlighted[cellKey] ?? []}
-                    onRemove={handleRemove}
-                    isDragging={!!activeDragId}
-                  />
-
-                  {/* ✅ Small, unobtrusive change badge */}
-                  {changeType && (
-                    <Chip
-                      label={changeType === 'ASSIGNED' ? 'Added' : changeType === 'UNASSIGNED' ? 'Removed' : 'Changed'}
-                      size="small"
-                      variant="outlined"  // ✅ Outlined instead of filled
-                      color={
-                        changeType === 'ASSIGNED' ? 'success' :
-                          changeType === 'UNASSIGNED' ? 'default' :  // ✅ Default instead of error
-                            'info'
-                      }
-                      sx={{
-                        mt: 0.5,
-                        fontSize: '0.55rem',
-                        height: '18px',
-                        '& .MuiChip-label': { px: 0.5 }
-                      }}
-                    />
-                  )}
-                </Box>
-              );
-            });
-          })}
-        </Box>
-      ))}
-    </Box>
-  );
-}, (prevProps, nextProps) => {
-  return (
-    prevProps.activeDragId === nextProps.activeDragId &&
-    prevProps.row.key === nextProps.row.key &&
-    prevProps.virtualRow.start === nextProps.virtualRow.start &&
-    prevProps.assignmentMap === nextProps.assignmentMap &&
-    prevProps.changeHighlights === nextProps.changeHighlights
-  );
-});
-
-VirtualRow.displayName = 'VirtualRow';
-
 export default function ViewSchedules() {
   // Existing state
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ message: '', opened: false });
   const [rotaData, setRotaData] = useState(null);
   const [assignmentMap, setAssignmentMap] = useState({});
+  const [datesByWeekday, setDatesByWeekday] = useState(emptyDatesByWeekday);
   const [groupedAssignments, setGroupedAssignments] = useState({});
   const [summarizedEmpList, setSummarizedEmpList] = useState([]);
   const [highlighted, setHighlighted] = useState({});
@@ -421,7 +189,7 @@ export default function ViewSchedules() {
           `${API_ENDPOINTS.scheduleVersions}/${id}/versions/${versionId}`,
           {
             params: { highlightChanges },
-            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+            headers: { Authorization: `Bearer ${safeStorage.get('token')}` }
           }
         );
 
@@ -436,7 +204,7 @@ export default function ViewSchedules() {
         response = await axiosInstance.get(
           `${API_ENDPOINTS.solvedSchedule}?id=${id}`,
           {
-            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+            headers: { Authorization: `Bearer ${safeStorage.get('token')}` }
           }
         );
 
@@ -447,7 +215,7 @@ export default function ViewSchedules() {
           const versionResponse = await axiosInstance.get(
             `${API_ENDPOINTS.scheduleVersions}/${id}/versions/current`,
             {
-              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+              headers: { Authorization: `Bearer ${safeStorage.get('token')}` }
             }
           );
           setCurrentVersion(versionResponse.data.version);
@@ -486,8 +254,12 @@ export default function ViewSchedules() {
 
     setGroupedAssignments(grouped);
 
-    const newMap = buildAssignmentMap(rotaData.shiftAssignmentList);
+    const { assignmentMap: newMap, datesByWeekday: newDates } = buildAssignmentMap(
+      rotaData.shiftAssignmentList,
+      weekdayOrder
+    );
     setAssignmentMap(newMap);
+    setDatesByWeekday(newDates);
 
     // CRITICAL FIX: Only update originalAssignmentMap for CURRENT version
     // NOT for historical versions (historical versions should be read-only)
@@ -1277,7 +1049,7 @@ export default function ViewSchedules() {
             {virtualItems.map((virtualRow) => {
               const row = rowData[virtualRow.index];
               return (
-                <VirtualRow
+                <ScheduleRow
                   key={virtualRow.key}
                   row={row}
                   columnWidths={columnWidths}
