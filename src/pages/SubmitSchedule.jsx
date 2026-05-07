@@ -16,6 +16,7 @@ import ScheduleForm from './ScheduleForm';
 import ScheduleList from './ScheduleList';
 import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
+import { safeStorage } from '../utils/safeStorage';
 
 
 
@@ -51,7 +52,7 @@ export default function SubmitSchedule() {
       try {
         const response = await axiosInstance.get(API_ENDPOINTS.locations, {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Bearer ${safeStorage.get('token')}`,
             'Content-Type': 'application/json',
           },
         });
@@ -69,7 +70,7 @@ export default function SubmitSchedule() {
     try {
       const response = await axiosInstance.get(API_ENDPOINTS.enqueueList, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${safeStorage.get('token')}`,
         },
       });
       setRequests(response.data);

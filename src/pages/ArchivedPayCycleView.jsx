@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { usePersistedState } from '../hooks/usePersistedState';
 import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
+import { safeStorage } from '../utils/safeStorage';
 
 export default function ArchivedPayCycleView() {
     const [location, setLocation, clearLocation] = usePersistedState('archived_paycycle_location', null);
@@ -40,7 +41,7 @@ export default function ArchivedPayCycleView() {
         axiosInstance
             .get(API_ENDPOINTS.locations, {
                 headers: {
-                    Authorization: `Bearer ${localStorage.getItem('token')}`,
+                    Authorization: `Bearer ${safeStorage.get('token')}`,
                     'Content-Type': 'application/json',
                 },
                 signal: abortController.signal

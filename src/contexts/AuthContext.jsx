@@ -1,17 +1,17 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { safeStorage } from '../utils/safeStorage';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-    const [token, setToken] = useState(localStorage.getItem('token'));
-    const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
+    const [token, setToken] = useState(safeStorage.get('token'));
+    const [isAuthenticated, setIsAuthenticated] = useState(!!safeStorage.get('token'));
     const navigate = useNavigate();
     const location = useLocation();
 
     useEffect(() => {
-        // Sync state with localStorage
-        const storedToken = localStorage.getItem('token');
+        const storedToken = safeStorage.get('token');
         if (storedToken && storedToken !== token) {
             setToken(storedToken);
             setIsAuthenticated(true);
@@ -19,7 +19,7 @@ export function AuthProvider({ children }) {
     }, [token]);
 
     const login = (newToken) => {
-        localStorage.setItem('token', newToken);
+        safeStorage.set('token', newToken);
         setToken(newToken);
         setIsAuthenticated(true);
 
@@ -39,7 +39,7 @@ export function AuthProvider({ children }) {
     };
 
     const logout = () => {
-        localStorage.removeItem('token');
+        safeStorage.remove('token');
         setToken(null);
         setIsAuthenticated(false);
         sessionStorage.clear(); // Clear any saved state
@@ -53,10 +53,10 @@ export function AuthProvider({ children }) {
             sessionStorage.setItem('sessionExpired', 'true');
         }
         
-        localStorage.removeItem('token');
+        safeStorage.remove('token');
         setToken(null);
         setIsAuthenticated(false);
-        
+
         // Navigate instead of window.location.href to preserve React state
         navigate('/login', { 
             state: { 

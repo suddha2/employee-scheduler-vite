@@ -26,6 +26,7 @@ import {
 } from '@mui/icons-material';
 import axiosInstance from './axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
+import { safeStorage } from '../utils/safeStorage';
 
 export default function SaveScheduleDialog({
   open,
@@ -90,7 +91,7 @@ export default function SaveScheduleDialog({
           pinAllChanges: pinAllChanges,  // ✅ SEND TO BACKEND
         },
         {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          headers: { Authorization: `Bearer ${safeStorage.get('token')}` }
         }
       );
 

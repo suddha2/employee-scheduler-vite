@@ -80,8 +80,8 @@ export default function EmployeeForm() {
     const contractTypes = ['PERMANENT', 'ZERO_HOURS'];
     const rateCodes = ['L1', 'L2', 'L3', 'ZERO_HOURS'];
     const daysOfWeek = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
-    const shiftTypes = ['LONG_DAY', 'DAY', 'SLEEP_IN', 'WAKING_NIGHT', 'FLOATING'];
-    const skillsList = ['BUCALL', 'DRIVING'];
+    const shiftTypes = ['LONG_DAY', 'DAY', 'SLEEP_IN', 'WAKING_NIGHT', 'FLOATING', 'CARE_CALL'];
+    const skillsList = ['BUCCAL', 'DRIVING'];
 
     // Fetch regions and locations on mount
     useEffect(() => {
@@ -230,49 +230,33 @@ export default function EmployeeForm() {
             const response = await axiosInstance.get(`${API_ENDPOINTS.employees}/${id}`);
             const employee = response.data;
 
-            console.log('=== EDIT MODE DEBUG ===');
-            console.log('preferredService:', employee.preferredService);
-            console.log('preferredLocations:', employee.preferredLocations);
-
-            // Determine source of service data with weights
-            // Check which field actually has the weights (format: "Name:Weight")
+            // Pick whichever field carries the "Name:Weight" format; preferredService
+            // has historically been the source-of-truth, but fall back to preferredLocations.
             let servicesWithWeights = [];
 
-            // Check preferredService FIRST (your backend currently has weights here)
             if (employee.preferredService && employee.preferredService.length > 0) {
                 const firstService = employee.preferredService[0];
 
                 if (typeof firstService === 'string' && firstService.includes(':')) {
-                    // preferredService has weights
                     servicesWithWeights = employee.preferredService;
-                    console.log('✓ Using preferredService (has weights)');
                 } else if (employee.preferredLocations && employee.preferredLocations.length > 0) {
-                    // preferredService doesn't have weights, check preferredLocations
                     const firstLocation = employee.preferredLocations[0];
                     if (typeof firstLocation === 'string' && firstLocation.includes(':')) {
                         servicesWithWeights = employee.preferredLocations;
-                        console.log('✓ Using preferredLocations (has weights)');
                     } else {
-                        // Neither has weights, use preferredService as-is
                         servicesWithWeights = employee.preferredService;
-                        console.log('⚠ No weights found, using preferredService');
                     }
                 } else {
-                    // Only preferredService available
                     servicesWithWeights = employee.preferredService;
-                    console.log('⚠ Only preferredService available (no weights)');
                 }
             } else if (employee.preferredLocations && employee.preferredLocations.length > 0) {
                 servicesWithWeights = employee.preferredLocations;
-                console.log('✓ Using preferredLocations (fallback)');
             }
 
-            // Handle string or array
             if (typeof servicesWithWeights === 'string') {
                 servicesWithWeights = servicesWithWeights.split(',').map(s => s.trim());
             }
 
-            // Parse services with weights
             const parsedWeights = servicesWithWeights.map(service => {
                 if (typeof service === 'string' && service.includes(':')) {
                     const parts = service.split(':');
@@ -280,16 +264,12 @@ export default function EmployeeForm() {
                     const weight = parts[1] ? parts[1].trim() : '100';
                     return { location, weight };
                 }
-                // Service without weight
                 return { location: String(service).trim(), weight: '100' };
             });
 
-            console.log('Parsed weights:', parsedWeights);
             setServiceWeights(parsedWeights);
 
-            // Extract service names WITHOUT weights for dropdown
             const serviceNames = parsedWeights.map(sw => sw.location);
-            console.log('Service names for dropdown:', serviceNames);
 
             setFormData({
                 firstName: employee.firstName || '',

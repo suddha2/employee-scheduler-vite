@@ -9,6 +9,7 @@ import { Autocomplete } from '@mui/material';
 import { differenceInDays } from 'date-fns';
 import dayjs from 'dayjs';
 import { API_ENDPOINTS } from '../api/endpoint';
+import { safeStorage } from '../utils/safeStorage';
 
 export default function ScheduleForm({ locations, onSubmitSuccess, setSnackbar,setRequests }) {
     const [startDate, setStartDate] = useState(null);
@@ -44,7 +45,7 @@ export default function ScheduleForm({ locations, onSubmitSuccess, setSnackbar,s
             const response = await fetch(API_ENDPOINTS.enqueueRequest, {
                 method: 'POST',
                 headers: {
-                    Authorization: `Bearer ${localStorage.getItem('token')}`,
+                    Authorization: `Bearer ${safeStorage.get('token')}`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(payload),

@@ -1,6 +1,7 @@
 // api/axiosInstance.js
 import axios from 'axios';
 import {API_BASE_URL} from '../api/endpoint'
+import { safeStorage } from '../utils/safeStorage';
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -17,7 +18,7 @@ export function setupAuthInterceptor(handleSessionExpiry) {
 }
 
 axiosInstance.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = safeStorage.get('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -32,8 +33,8 @@ axiosInstance.interceptors.response.use(
       if (sessionExpiryHandler) {
         sessionExpiryHandler();
       } else {
-        // Fallback to direct localStorage clear and redirect
-        localStorage.removeItem('token');
+        // Fallback to direct storage clear and redirect
+        safeStorage.remove('token');
         window.location.href = '/login';
       }
     } 

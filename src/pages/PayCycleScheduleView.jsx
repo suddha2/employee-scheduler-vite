@@ -22,6 +22,7 @@ import { usePersistedState } from '../hooks/usePersistedState';
 
 import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
+import { safeStorage } from '../utils/safeStorage';
 
 
 export default function PayCycleSchedule() {
@@ -114,7 +115,7 @@ export default function PayCycleSchedule() {
         axiosInstance
             .get(API_ENDPOINTS.locations, {
                 headers: {
-                    Authorization: `Bearer ${localStorage.getItem('token')}`,
+                    Authorization: `Bearer ${safeStorage.get('token')}`,
                     'Content-Type': 'application/json',
                 },
                 signal: abortController.signal
@@ -312,7 +313,7 @@ export default function PayCycleSchedule() {
             const response = await fetch(API_ENDPOINTS.enqueueRequest, {
                 method: 'POST',
                 headers: {
-                    Authorization: `Bearer ${localStorage.getItem('token')}`,
+                    Authorization: `Bearer ${safeStorage.get('token')}`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(payload),
@@ -323,7 +324,7 @@ export default function PayCycleSchedule() {
             // Re-fetch just this period
             const refreshed = await axiosInstance.get(`${API_ENDPOINTS.payCycleSchedule}?location=${location.label}`, {
                 headers: {
-                    Authorization: `Bearer ${localStorage.getItem('token')}`,
+                    Authorization: `Bearer ${safeStorage.get('token')}`,
                     'Content-Type': 'application/json',
                 },
             });
@@ -376,7 +377,7 @@ export default function PayCycleSchedule() {
             const response = await fetch(`${API_ENDPOINTS.regenerateSchedule}`, {
                 method: 'POST',
                 headers: {
-                    Authorization: `Bearer ${localStorage.getItem('token')}`,
+                    Authorization: `Bearer ${safeStorage.get('token')}`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(payload),
@@ -389,7 +390,7 @@ export default function PayCycleSchedule() {
                 `${API_ENDPOINTS.payCycleSchedule}?location=${location.label}`,
                 {
                     headers: {
-                        Authorization: `Bearer ${localStorage.getItem('token')}`,
+                        Authorization: `Bearer ${safeStorage.get('token')}`,
                         'Content-Type': 'application/json',
                     },
                 }
@@ -443,7 +444,7 @@ export default function PayCycleSchedule() {
             const response = await fetch(`${API_ENDPOINTS.learningSchedule}?startDate=${startDate}&endDate=${endDate}`, {
                 method: 'POST',
                 headers: {
-                    Authorization: `Bearer ${localStorage.getItem('token')}`,
+                    Authorization: `Bearer ${safeStorage.get('token')}`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({}),
@@ -657,7 +658,7 @@ export default function PayCycleSchedule() {
                                             </Alert>
                                         </Box>
 
-                                        {currentPeriod.hasSolveRequest && currentPeriod.solevReqStatus == "COMPLETED" && (
+                                        {currentPeriod.hasSolveRequest && currentPeriod.solevReqStatus === "COMPLETED" && (
                                             <>
                                                 <Typography variant="body2" sx={{ mt: 1 }}>
                                                     🧑 Employees: {currentPeriod.employeeCount}

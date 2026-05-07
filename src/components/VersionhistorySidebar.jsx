@@ -30,6 +30,7 @@ import {
 import { format } from 'date-fns';
 import axiosInstance from './axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
+import { safeStorage } from '../utils/safeStorage';
 
 export default function VersionHistorySidebar({
   scheduleId,
@@ -59,7 +60,7 @@ export default function VersionHistorySidebar({
       const response = await axiosInstance.get(
         `${API_ENDPOINTS.scheduleVersions}/${scheduleId}/versions`,
         {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          headers: { Authorization: `Bearer ${safeStorage.get('token')}` }
         }
       );
       setVersions(response.data.versions || []);
@@ -89,7 +90,7 @@ export default function VersionHistorySidebar({
           reason: rollbackReason || 'Manual rollback',
         },
         {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          headers: { Authorization: `Bearer ${safeStorage.get('token')}` }
         }
       );
 
