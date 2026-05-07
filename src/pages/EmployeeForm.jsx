@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Box,
     Paper,
@@ -28,6 +28,7 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from '../components/axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
+import { useServiceWeights } from '../hooks/useServiceWeights';
 
 export default function EmployeeForm() {
     const { id } = useParams();
@@ -59,10 +60,7 @@ export default function EmployeeForm() {
         invertPattern: false
     });
 
-    // Service weight state (stores services with weights)
-    // Note: Named "serviceWeights" historically but actually stores services
-    // Format: [{location: "ServiceName", weight: "100"}, ...]
-    const [serviceWeights, setServiceWeights] = useState([]);
+    // [{location, weight}]; kept in sync with formData.preferredService by useServiceWeights.
 
     // UI state
     const [loading, setLoading] = useState(false);
@@ -178,44 +176,7 @@ export default function EmployeeForm() {
         );
     };
 
-    // Track if component just mounted (to prevent sync on initial load)
-    const isInitialMount = useRef(true);
-
-    // Sync preferredService with serviceWeights (only after initial load)
-    useEffect(() => {
-        // Skip sync on initial mount (edit mode loads data separately)
-        if (isInitialMount.current) {
-            isInitialMount.current = false;
-            return;
-        }
-
-        if (formData.preferredService && formData.preferredService.length > 0) {
-            // Add new services that aren't already in serviceWeights
-            const newServices = formData.preferredService.filter(
-                service => !serviceWeights.some(sw => sw.location === service)
-            );
-
-            if (newServices.length > 0) {
-                const newWeights = newServices.map(service => ({
-                    location: service,
-                    weight: '100' // Default weight
-                }));
-                setServiceWeights(prev => [...prev, ...newWeights]);
-            }
-
-            // Remove services that are no longer in preferredService
-            const updatedWeights = serviceWeights.filter(
-                sw => formData.preferredService.includes(sw.location)
-            );
-
-            if (updatedWeights.length !== serviceWeights.length) {
-                setServiceWeights(updatedWeights);
-            }
-        } else {
-            // Clear all if preferredService is empty
-            setServiceWeights([]);
-        }
-    }, [formData.preferredService]);
+    const [serviceWeights, setServiceWeights] = useServiceWeights(formData.preferredService);
 
     // Fetch employee data if edit mode
     useEffect(() => {
