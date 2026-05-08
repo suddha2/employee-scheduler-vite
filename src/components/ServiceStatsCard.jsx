@@ -182,18 +182,16 @@ export default function ServiceStatsCard({ region, service, rotaId, onToast }) {
           <Table size="small" sx={{ tableLayout: 'fixed', '& td, & th': { px: 0.5 } }}>
             <TableHead>
               <TableRow>
-                <TableCell>Type</TableCell>
-                <TableCell align="right">Alloc</TableCell>
-                <TableCell align="right">Unalloc</TableCell>
-                <TableCell align="right">Total</TableCell>
+                <TableCell sx={{ width: '40%' }}>Type</TableCell>
+                <TableCell align="right" sx={{ width: '20%' }}>Alloc</TableCell>
+                <TableCell align="right" sx={{ width: '20%' }}>Unalloc</TableCell>
+                <TableCell align="right" sx={{ width: '20%' }}>Total</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {totalsByType.map((stat) => (
                 <TableRow key={stat.shiftType}>
-                  <TableCell sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {stat.shiftType}
-                  </TableCell>
+                  <TableCell>{stat.shiftType}</TableCell>
                   <TableCell align="right">{stat.allocationCount}</TableCell>
                   <TableCell align="right">{stat.shiftCount - stat.allocationCount}</TableCell>
                   <TableCell align="right">{stat.shiftCount}</TableCell>
@@ -225,11 +223,11 @@ export default function ServiceStatsCard({ region, service, rotaId, onToast }) {
                 <Table size="small" sx={{ tableLayout: 'fixed', '& td, & th': { px: 0.5 } }}>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Type</TableCell>
-                      <TableCell align="right">Alloc</TableCell>
-                      <TableCell align="right">Unalloc</TableCell>
-                      <TableCell align="right">Total</TableCell>
-                      <TableCell sx={{ width: '40%' }}>Coverage</TableCell>
+                      <TableCell sx={{ width: '34%' }}>Type</TableCell>
+                      <TableCell align="right" sx={{ width: '12%' }}>Alloc</TableCell>
+                      <TableCell align="right" sx={{ width: '14%' }}>Unalloc</TableCell>
+                      <TableCell align="right" sx={{ width: '12%' }}>Total</TableCell>
+                      <TableCell sx={{ width: '28%' }}>Coverage</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -239,9 +237,7 @@ export default function ServiceStatsCard({ region, service, rotaId, onToast }) {
                         : 0;
                       return (
                         <TableRow key={stat.shiftType}>
-                          <TableCell sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {stat.shiftType}
-                          </TableCell>
+                          <TableCell>{stat.shiftType}</TableCell>
                           <TableCell align="right">{stat.allocationCount}</TableCell>
                           <TableCell align="right">{stat.shiftCount - stat.allocationCount}</TableCell>
                           <TableCell align="right">{stat.shiftCount}</TableCell>
