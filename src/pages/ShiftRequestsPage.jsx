@@ -1,47 +1,27 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  Drawer,
   Box,
   Typography,
-  IconButton,
-  Divider,
+  Stack,
+  Paper,
   Chip,
   Button,
   CircularProgress,
   Alert,
   ToggleButton,
   ToggleButtonGroup,
-  Stack,
-  Paper,
+  Divider,
+  Snackbar,
 } from '@mui/material';
 import {
-  Close as CloseIcon,
   Inbox as InboxIcon,
   CheckCircle as ApproveIcon,
   Cancel as RejectIcon,
 } from '@mui/icons-material';
 import { format, formatDistanceToNow } from 'date-fns';
 import { listShiftRequests, resolveShiftRequest } from '../api/shiftRequests';
-import SuitabilityMatrix, { SummaryBadge } from './SuitabilityMatrix';
-
-const SUMMARY_RANK = { STRONG: 0, OK: 1, WEAK: 2 };
-
-// Default order for PENDING: STRONG > OK > WEAK > unknown, then oldest first.
-// For audit views (approved/rejected/filled/all), most-recent activity first.
-function sortRequests(requests, statusFilter) {
-  const arr = [...requests];
-  if (statusFilter === 'PENDING') {
-    arr.sort((a, b) => {
-      const ra = SUMMARY_RANK[a.fit?.summary] ?? 99;
-      const rb = SUMMARY_RANK[b.fit?.summary] ?? 99;
-      if (ra !== rb) return ra - rb;
-      return new Date(a.requestedAt) - new Date(b.requestedAt);
-    });
-  } else {
-    arr.sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
-  }
-  return arr;
-}
+import { useShiftRequestUpdates } from '../hooks/useShiftRequestUpdates';
+import SuitabilityMatrix, { SummaryBadge } from '../components/SuitabilityMatrix';
 
 const STATUS_FILTERS = ['PENDING', 'ALL', 'APPROVED', 'REJECTED', 'FILLED'];
 
@@ -52,9 +32,10 @@ const STATUS_CHIP_COLOR = {
   FILLED: 'default',
 };
 
+const SUMMARY_RANK = { STRONG: 0, OK: 1, WEAK: 2 };
+
 function formatShiftLine(shift) {
   if (!shift) return '';
-  // shift.shiftStart is "YYYY-MM-DD"; build a Date in local time so the day-of-week is correct.
   const dateLabel = format(new Date(`${shift.shiftStart}T00:00:00`), 'EEE d MMM');
   const start = (shift.startTime || '').slice(0, 5);
   const end = (shift.endTime || '').slice(0, 5);
@@ -71,32 +52,37 @@ function relativeTime(iso) {
   }
 }
 
-export default function ShiftRequestsDrawer({
-  open,
-  onClose,
-  rotaId,
-  refreshSignal,
-  setSnackbar,
-  onResolved,
-}) {
+function sortGroup(requests, statusFilter) {
+  const arr = [...requests];
+  if (statusFilter === 'PENDING') {
+    arr.sort((a, b) => {
+      const ra = SUMMARY_RANK[a.fit?.summary] ?? 99;
+      const rb = SUMMARY_RANK[b.fit?.summary] ?? 99;
+      if (ra !== rb) return ra - rb;
+      return new Date(a.requestedAt) - new Date(b.requestedAt);
+    });
+  } else {
+    arr.sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
+  }
+  return arr;
+}
+
+export default function ShiftRequestsPage() {
   const [statusFilter, setStatusFilter] = useState('PENDING');
   const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [resolvingId, setResolvingId] = useState(null);
+  const [toast, setToast] = useState(null);
 
-  const sortedRequests = useMemo(
-    () => sortRequests(requests, statusFilter),
-    [requests, statusFilter]
-  );
+  const closeToast = () => setToast(null);
 
   const load = useCallback(async () => {
-    if (!rotaId) return;
     setLoading(true);
     setError(null);
     try {
       const status = statusFilter === 'ALL' ? null : statusFilter;
-      const data = await listShiftRequests(rotaId, status);
+      const data = await listShiftRequests(null, status);
       setRequests(Array.isArray(data) ? data : []);
     } catch (err) {
       if (import.meta.env.DEV) console.error('Failed to load shift requests:', err);
@@ -104,35 +90,51 @@ export default function ShiftRequestsDrawer({
     } finally {
       setLoading(false);
     }
-  }, [rotaId, statusFilter]);
+  }, [statusFilter]);
 
-  useEffect(() => {
-    if (open) load();
-  }, [open, load, refreshSignal]);
+  useEffect(() => { load(); }, [load]);
 
-  const toast = (message) => {
-    if (setSnackbar) setSnackbar({ message, opened: true });
-  };
+  const handleNotification = useCallback(() => { load(); }, [load]);
+  useShiftRequestUpdates(handleNotification);
+
+  const groupedByRota = useMemo(() => {
+    const map = new Map();
+    for (const req of requests) {
+      const key = req.rotaId ?? 'unknown';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(req);
+    }
+    const groups = [];
+    for (const [rotaId, reqs] of map.entries()) {
+      groups.push({ rotaId, requests: sortGroup(reqs, statusFilter) });
+    }
+    groups.sort((a, b) => Number(a.rotaId) - Number(b.rotaId));
+    return groups;
+  }, [requests, statusFilter]);
+
+  const totalPending = useMemo(
+    () => requests.filter(r => r.status === 'PENDING').length,
+    [requests]
+  );
 
   const handleResolve = async (request, action) => {
     setResolvingId(request.id);
     try {
       await resolveShiftRequest(request.id, action);
-      toast(action === 'APPROVE' ? 'Request approved' : 'Request rejected');
+      setToast({
+        message: action === 'APPROVE' ? 'Request approved' : 'Request rejected',
+        severity: 'success',
+      });
       await load();
-      if (action === 'APPROVE' && onResolved) onResolved();
     } catch (err) {
       const status = err.response?.status;
       const serverMsg = err.response?.data?.message;
-      if (status === 404) {
-        toast('Request not found');
-      } else if (status === 409) {
-        toast(serverMsg || 'Request is already resolved');
-      } else if (status === 401 || status === 403) {
-        toast('Session expired — please log in again');
-      } else {
-        toast(serverMsg || 'Failed to resolve request');
-      }
+      let message;
+      if (status === 404) message = 'Request not found';
+      else if (status === 409) message = serverMsg || 'Request is already resolved';
+      else if (status === 401 || status === 403) message = 'Session expired — please log in again';
+      else message = serverMsg || 'Failed to resolve request';
+      setToast({ message, severity: 'error' });
       await load();
     } finally {
       setResolvingId(null);
@@ -140,54 +142,57 @@ export default function ShiftRequestsDrawer({
   };
 
   return (
-    <Drawer
-      anchor="right"
-      open={open}
-      onClose={onClose}
-      PaperProps={{ sx: { width: 480 } }}
-    >
-      <Box sx={{ p: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <InboxIcon />
-            <Typography variant="h6">Shift Requests</Typography>
-          </Box>
-          <IconButton onClick={onClose} size="small" aria-label="Close">
-            <CloseIcon />
-          </IconButton>
+    <Box sx={{ p: 3, maxWidth: 1100, mx: 'auto' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+        <InboxIcon />
+        <Typography variant="h5">Shift Requests</Typography>
+        {totalPending > 0 && (
+          <Chip
+            label={`${totalPending} pending`}
+            color="warning"
+            size="small"
+            sx={{ ml: 1 }}
+          />
+        )}
+      </Box>
+
+      <ToggleButtonGroup
+        value={statusFilter}
+        exclusive
+        size="small"
+        onChange={(_, v) => v && setStatusFilter(v)}
+        sx={{ mb: 3, flexWrap: 'wrap' }}
+      >
+        {STATUS_FILTERS.map((s) => (
+          <ToggleButton key={s} value={s}>{s}</ToggleButton>
+        ))}
+      </ToggleButtonGroup>
+
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+          <CircularProgress />
         </Box>
+      )}
 
-        <ToggleButtonGroup
-          value={statusFilter}
-          exclusive
-          size="small"
-          onChange={(_, v) => v && setStatusFilter(v)}
-          sx={{ mb: 2, flexWrap: 'wrap' }}
-        >
-          {STATUS_FILTERS.map((s) => (
-            <ToggleButton key={s} value={s}>{s}</ToggleButton>
-          ))}
-        </ToggleButtonGroup>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-        <Divider sx={{ mb: 2 }} />
+      {!loading && !error && groupedByRota.length === 0 && (
+        <Alert severity="info">No requests in this status.</Alert>
+      )}
 
-        {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-            <CircularProgress />
+      {!loading && !error && groupedByRota.map((group) => (
+        <Box key={group.rotaId} sx={{ mb: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              Rota #{group.rotaId}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              · {group.requests.length} request{group.requests.length === 1 ? '' : 's'}
+            </Typography>
           </Box>
-        )}
-
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
-        )}
-
-        {!loading && !error && sortedRequests.length === 0 && (
-          <Alert severity="info">No requests in this status.</Alert>
-        )}
-
-        {!loading && !error && sortedRequests.length > 0 && (
-          <Stack spacing={1.5} sx={{ maxHeight: 'calc(100vh - 220px)', overflow: 'auto' }}>
-            {sortedRequests.map((req) => {
+          <Divider sx={{ mb: 1.5 }} />
+          <Stack spacing={1.5}>
+            {group.requests.map((req) => {
               const isResolving = resolvingId === req.id;
               return (
                 <Paper key={req.id} variant="outlined" sx={{ p: 1.5 }}>
@@ -241,14 +246,21 @@ export default function ShiftRequestsDrawer({
               );
             })}
           </Stack>
-        )}
-
-        <Box sx={{ mt: 2 }}>
-          <Button variant="outlined" fullWidth onClick={load} disabled={loading}>
-            Reload
-          </Button>
         </Box>
-      </Box>
-    </Drawer>
+      ))}
+
+      <Snackbar
+        open={!!toast}
+        autoHideDuration={5000}
+        onClose={closeToast}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        {toast ? (
+          <Alert severity={toast.severity || 'info'} onClose={closeToast} variant="filled">
+            {toast.message}
+          </Alert>
+        ) : undefined}
+      </Snackbar>
+    </Box>
   );
 }

@@ -5,8 +5,10 @@ import { API_ENDPOINTS } from './endpoint';
 // token via interceptor — call sites do not need to set Authorization.
 
 // status: omit (or pass falsy) to return all statuses; defaults to PENDING.
+// rotaId: omit to fetch across all rotas.
 export async function listShiftRequests(rotaId, status = 'PENDING') {
-  const params = { rotaId };
+  const params = {};
+  if (rotaId != null) params.rotaId = rotaId;
   if (status) params.status = status;
   const { data } = await axiosInstance.get(API_ENDPOINTS.shiftRequests, { params });
   return data;

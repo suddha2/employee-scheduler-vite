@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Table, TableHead, TableBody, TableRow, TableCell,
   TableContainer, Paper, Typography, Box, Tooltip, Button, CircularProgress,
@@ -14,7 +14,6 @@ import {
   Visibility,
   VisibilityOff,
   DeleteSweep as ClearAllIcon,
-  Inbox as InboxIcon,
   Campaign as CampaignIcon,
 } from "@mui/icons-material";
 import { format } from "date-fns";
@@ -27,12 +26,9 @@ import axiosInstance from '../components/axiosInstance';
 import { calculateDuration } from '../utils/shiftCalculations';
 import { setEmpSummary, buildAssignmentMap } from '../utils/scheduleData';
 import { fetchCurrentSchedule, fetchScheduleVersion, fetchCurrentVersionMeta } from '../api/schedules';
-import { listShiftRequests } from '../api/shiftRequests';
 import { publishUnallocatedShifts } from '../api/stats';
-import { useShiftRequestUpdates } from '../hooks/useShiftRequestUpdates';
 import { DroppableCell } from "../components/droppableCell";
 import ScheduleRow from "../components/ScheduleRow";
-import ShiftRequestsDrawer from "../components/ShiftRequestsDrawer";
 
 // Import versioning components
 import VersionHistorySidebar from '../components/Versionhistorysidebar';
@@ -91,10 +87,6 @@ export default function ViewSchedules() {
   // ✅ NEW: State for clearing assignments (front-end only)
   const [clearedCells, setClearedCells] = useState(new Set());
 
-  // Shift requests inbox
-  const [shiftRequestsDrawerOpen, setShiftRequestsDrawerOpen] = useState(false);
-  const [pendingRequestCount, setPendingRequestCount] = useState(0);
-  const [shiftRequestsRefresh, setShiftRequestsRefresh] = useState(0);
   const [publishing, setPublishing] = useState(false);
 
   const navigate = useNavigate();
@@ -216,28 +208,6 @@ export default function ViewSchedules() {
     if (!id) return;
     loadSchedule();
   }, [id]);
-
-  // Pending shift-request count for the toolbar badge
-  const refreshPendingCount = useCallback(async () => {
-    if (!id) return;
-    try {
-      const rs = await listShiftRequests(id, 'PENDING');
-      setPendingRequestCount(Array.isArray(rs) ? rs.length : 0);
-    } catch {
-      // best-effort; don't surface to user
-    }
-  }, [id]);
-
-  useEffect(() => { refreshPendingCount(); }, [refreshPendingCount]);
-
-  // STOMP: refresh badge + drawer on every shift-request notification for this rota
-  const handleShiftRequestNotification = useCallback((payload) => {
-    if (Number(payload?.rotaId) !== Number(id)) return;
-    setShiftRequestsRefresh(n => n + 1);
-    refreshPendingCount();
-  }, [id, refreshPendingCount]);
-
-  useShiftRequestUpdates(handleShiftRequestNotification);
 
   const handlePublish = async () => {
     if (!id || publishing) return;
@@ -1010,14 +980,6 @@ export default function ViewSchedules() {
             </span>
           </Tooltip>
 
-          <Tooltip title="Shift requests">
-            <IconButton onClick={() => setShiftRequestsDrawerOpen(true)}>
-              <Badge badgeContent={pendingRequestCount} color="error">
-                <InboxIcon />
-              </Badge>
-            </IconButton>
-          </Tooltip>
-
           <Tooltip title="Version history">
             <IconButton onClick={() => setVersionSidebarOpen(true)}>
               <HistoryIcon />
@@ -1129,15 +1091,6 @@ export default function ViewSchedules() {
         onClose={() => setVersionSidebarOpen(false)}
         onVersionSelect={handleVersionSelect}
         currentVersionId={currentVersion?.versionId}
-      />
-
-      <ShiftRequestsDrawer
-        open={shiftRequestsDrawerOpen}
-        onClose={() => setShiftRequestsDrawerOpen(false)}
-        rotaId={id}
-        refreshSignal={shiftRequestsRefresh}
-        setSnackbar={setSnackbar}
-        onResolved={() => { refreshPendingCount(); loadSchedule(); }}
       />
 
       <SaveScheduleDialog

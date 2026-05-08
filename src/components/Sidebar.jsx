@@ -24,7 +24,8 @@ import {
     ExpandMore,
     ChevronLeft as ChevronLeftIcon,
     Menu as MenuIcon,
-    Archive as ArchiveIcon
+    Archive as ArchiveIcon,
+    Inbox as InboxIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -68,6 +69,11 @@ export default function Sidebar({ open, onClose, onToggle }) {
             icon: <ArchiveIcon />,
             path: '/paycycleSchedule/archived',
             subItem: true
+        },
+        {
+            title: 'Shift Requests',
+            icon: <InboxIcon />,
+            path: '/shift-requests'
         },
         // {
         //     title: 'View Schedules',

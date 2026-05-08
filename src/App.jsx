@@ -16,6 +16,7 @@ import PayCycleSchedule from './pages/PayCycleScheduleView';
 import ArchivedPayCycleView from './pages/ArchivedPayCycleView';
 import ServiceStatsView from './pages/ServiceStatsView';
 import EmpStatsView from './pages/EmpStatsView';
+import ShiftRequestsPage from './pages/ShiftRequestsPage';
 import ShiftTemplatesList from './pages/ShiftTemplatesList';
 import ShiftTemplateForm from './pages/ShiftTemplateForm';
 import { AxiosInterceptorSetup } from './components/AxiosInterceptorSetup';
@@ -145,6 +146,17 @@ export default function App() {
                   <ProtectedRoute>
                     <Layout>
                       <EmpStatsView />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/shift-requests"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <ShiftRequestsPage />
                     </Layout>
                   </ProtectedRoute>
                 }
