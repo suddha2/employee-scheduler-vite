@@ -255,17 +255,19 @@ export default function ServiceStatsCard({ region, service, rotaId, onToast }) {
           );
         })}
       </CardContent>
-      <CardActions sx={{ px: 2, pb: 2, pt: 0, justifyContent: 'flex-end' }}>
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={publishing ? <CircularProgress size={14} /> : <CampaignIcon />}
-          onClick={handlePublish}
-          disabled={publishing || !rotaId}
-        >
-          {publishing ? 'Publishing…' : 'Publish unallocated'}
-        </Button>
-      </CardActions>
+      {hasUnallocated && (
+        <CardActions sx={{ px: 2, pb: 2, pt: 0, justifyContent: 'flex-end' }}>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={publishing ? <CircularProgress size={14} /> : <CampaignIcon />}
+            onClick={handlePublish}
+            disabled={publishing || !rotaId}
+          >
+            {publishing ? 'Publishing…' : 'Publish unallocated'}
+          </Button>
+        </CardActions>
+      )}
     </Card>
   );
 }
