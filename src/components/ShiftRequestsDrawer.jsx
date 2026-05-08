@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Drawer,
   Box,
@@ -22,6 +22,26 @@ import {
 } from '@mui/icons-material';
 import { format, formatDistanceToNow } from 'date-fns';
 import { listShiftRequests, resolveShiftRequest } from '../api/shiftRequests';
+import SuitabilityMatrix, { SummaryBadge } from './SuitabilityMatrix';
+
+const SUMMARY_RANK = { STRONG: 0, OK: 1, WEAK: 2 };
+
+// Default order for PENDING: STRONG > OK > WEAK > unknown, then oldest first.
+// For audit views (approved/rejected/filled/all), most-recent activity first.
+function sortRequests(requests, statusFilter) {
+  const arr = [...requests];
+  if (statusFilter === 'PENDING') {
+    arr.sort((a, b) => {
+      const ra = SUMMARY_RANK[a.fit?.summary] ?? 99;
+      const rb = SUMMARY_RANK[b.fit?.summary] ?? 99;
+      if (ra !== rb) return ra - rb;
+      return new Date(a.requestedAt) - new Date(b.requestedAt);
+    });
+  } else {
+    arr.sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
+  }
+  return arr;
+}
 
 const STATUS_FILTERS = ['PENDING', 'ALL', 'APPROVED', 'REJECTED', 'FILLED'];
 
@@ -64,6 +84,11 @@ export default function ShiftRequestsDrawer({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [resolvingId, setResolvingId] = useState(null);
+
+  const sortedRequests = useMemo(
+    () => sortRequests(requests, statusFilter),
+    [requests, statusFilter]
+  );
 
   const load = useCallback(async () => {
     if (!rotaId) return;
@@ -156,13 +181,13 @@ export default function ShiftRequestsDrawer({
           <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
         )}
 
-        {!loading && !error && requests.length === 0 && (
+        {!loading && !error && sortedRequests.length === 0 && (
           <Alert severity="info">No requests in this status.</Alert>
         )}
 
-        {!loading && !error && requests.length > 0 && (
+        {!loading && !error && sortedRequests.length > 0 && (
           <Stack spacing={1.5} sx={{ maxHeight: 'calc(100vh - 220px)', overflow: 'auto' }}>
-            {requests.map((req) => {
+            {sortedRequests.map((req) => {
               const isResolving = resolvingId === req.id;
               return (
                 <Paper key={req.id} variant="outlined" sx={{ p: 1.5 }}>
@@ -176,12 +201,17 @@ export default function ShiftRequestsDrawer({
                         {req.shift?.durationInHours}h · requested {relativeTime(req.requestedAt)}
                       </Typography>
                     </Box>
-                    <Chip
-                      label={req.status}
-                      size="small"
-                      color={STATUS_CHIP_COLOR[req.status] || 'default'}
-                    />
+                    <Stack direction="column" alignItems="flex-end" spacing={0.5}>
+                      <Chip
+                        label={req.status}
+                        size="small"
+                        color={STATUS_CHIP_COLOR[req.status] || 'default'}
+                      />
+                      {req.status === 'PENDING' && <SummaryBadge summary={req.fit?.summary} />}
+                    </Stack>
                   </Box>
+
+                  {req.status === 'PENDING' && <SuitabilityMatrix fit={req.fit} />}
 
                   {req.status === 'PENDING' && (
                     <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
