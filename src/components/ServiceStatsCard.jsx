@@ -46,7 +46,7 @@ function aggregateByShiftType(allStats) {
 }
 
 function coverageStyle(percent) {
-  if (percent >= 80) return { chip: 'success', headerBg: 'success.light' };
+  if (percent >= 80) return { chip: 'success', headerBg: 'transparent' };
   if (percent >= 50) return { chip: 'warning', headerBg: 'warning.light' };
   return { chip: 'error', headerBg: 'error.light' };
 }
