@@ -43,7 +43,12 @@ export const API_ENDPOINTS = {
   // Statistics
   serviceStats: `${API_BASE_URL}/api/stats/serviceStats`,
   empStats: `${API_BASE_URL}/api/stats/empStats`,
-  
+
+  // Shift Requests (admin)
+  shiftRequests: `${API_BASE_URL}/api/admin/shift-requests`,
+  shiftRequestResolve: (id) => `${API_BASE_URL}/api/admin/shift-requests/${id}/resolve`,
+  publishUnallocated: (rotaId) => `${API_BASE_URL}/api/stats/publish/${rotaId}`,
+
   // WebSocket
   websoc: `${API_BASE_URL}/ws`,
 };
