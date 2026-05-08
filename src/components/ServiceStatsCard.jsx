@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Box,
   Card,
   CardContent,
+  CardActions,
   Typography,
   Chip,
   Table,
@@ -15,9 +16,13 @@ import {
   AccordionDetails,
   LinearProgress,
   Tooltip,
+  Button,
+  CircularProgress,
 } from '@mui/material';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CampaignIcon from '@mui/icons-material/Campaign';
+import { publishUnallocatedShiftsForService } from '../api/stats';
 
 function aggregateByShiftType(allStats) {
   const map = new Map();
@@ -82,7 +87,38 @@ function CoverageBar({ percent }) {
   );
 }
 
-export default function ServiceStatsCard({ region, service }) {
+export default function ServiceStatsCard({ region, service, rotaId, onToast }) {
+  const [publishing, setPublishing] = useState(false);
+
+  const handlePublish = async () => {
+    if (!rotaId || publishing) return;
+    setPublishing(true);
+    try {
+      const result = await publishUnallocatedShiftsForService(rotaId, service.location);
+      const message = result?.message ||
+        (result?.broadcastSent
+          ? `Broadcast sent for ${service.location}`
+          : `No unallocated shifts at ${service.location} to publish`);
+      onToast?.({
+        message,
+        severity: result?.broadcastSent ? 'success' : 'info',
+      });
+    } catch (err) {
+      const status = err.response?.status;
+      const serverMsg = err.response?.data?.message;
+      if (status === 401 || status === 403) {
+        onToast?.({ message: 'Session expired — please log in again', severity: 'error' });
+      } else {
+        onToast?.({
+          message: serverMsg || `Failed to publish for ${service.location}`,
+          severity: 'error',
+        });
+      }
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   const summary = useMemo(() => {
     const allStats = service.weeks?.flatMap(w => w.shiftStats ?? []) ?? [];
     const totalsByType = aggregateByShiftType(allStats);
@@ -219,6 +255,17 @@ export default function ServiceStatsCard({ region, service }) {
           );
         })}
       </CardContent>
+      <CardActions sx={{ px: 2, pb: 2, pt: 0, justifyContent: 'flex-end' }}>
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={publishing ? <CircularProgress size={14} /> : <CampaignIcon />}
+          onClick={handlePublish}
+          disabled={publishing || !rotaId}
+        >
+          {publishing ? 'Publishing…' : 'Publish unallocated'}
+        </Button>
+      </CardActions>
     </Card>
   );
 }

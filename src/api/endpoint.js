@@ -48,6 +48,8 @@ export const API_ENDPOINTS = {
   shiftRequests: `${API_BASE_URL}/api/admin/shift-requests`,
   shiftRequestResolve: (id) => `${API_BASE_URL}/api/admin/shift-requests/${id}/resolve`,
   publishUnallocated: (rotaId) => `${API_BASE_URL}/api/stats/publish/${rotaId}`,
+  publishUnallocatedForService: (rotaId, service) =>
+    `${API_BASE_URL}/api/stats/publish/${rotaId}/service/${encodeURIComponent(service)}`,
 
   // WebSocket
   websoc: `${API_BASE_URL}/ws`,

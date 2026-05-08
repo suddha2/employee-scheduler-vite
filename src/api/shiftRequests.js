@@ -19,8 +19,3 @@ export async function resolveShiftRequest(id, action) {
   );
   return data;
 }
-
-export async function publishUnallocatedShifts(rotaId) {
-  const { data } = await axiosInstance.post(API_ENDPOINTS.publishUnallocated(rotaId));
-  return data;
-}

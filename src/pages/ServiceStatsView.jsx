@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Box, Grid, Alert, CircularProgress } from '@mui/material';
+import { Box, Grid, Alert, CircularProgress, Snackbar } from '@mui/material';
 import { fetchServiceStats } from '../api/stats';
 import ServiceStatsCard from '../components/ServiceStatsCard';
 
@@ -11,6 +11,10 @@ export default function ServiceStatsView() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showToast = useCallback((t) => setToast(t), []);
+  const closeToast = () => setToast(null);
 
   useEffect(() => {
     if (!rotaId) {
@@ -85,10 +89,32 @@ export default function ServiceStatsView() {
             md={4}
             key={`${region.region}|${service.location}`}
           >
-            <ServiceStatsCard region={region} service={service} />
+            <ServiceStatsCard
+              region={region}
+              service={service}
+              rotaId={rotaId}
+              onToast={showToast}
+            />
           </Grid>
         ))}
       </Grid>
+
+      <Snackbar
+        open={!!toast}
+        autoHideDuration={5000}
+        onClose={closeToast}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        {toast ? (
+          <Alert
+            severity={toast.severity || 'info'}
+            onClose={closeToast}
+            variant="filled"
+          >
+            {toast.message}
+          </Alert>
+        ) : undefined}
+      </Snackbar>
     </Box>
   );
 }
