@@ -53,7 +53,7 @@ function coverageStyle(percent) {
 
 function CoverageBar({ percent }) {
   return (
-    <Box sx={{ position: 'relative', width: '100%', maxWidth: 120 }}>
+    <Box sx={{ position: 'relative', width: '100%', minWidth: 0 }}>
       <LinearProgress
         variant="determinate"
         value={percent}
@@ -70,15 +70,14 @@ function CoverageBar({ percent }) {
         variant="caption"
         sx={{
           position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
+          inset: 0,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           fontWeight: 500,
-          fontSize: '0.75rem',
+          fontSize: '0.7rem',
+          color: 'common.white',
+          textShadow: '0 0 2px rgba(0,0,0,0.6)',
         }}
       >
         {percent}%
@@ -180,22 +179,24 @@ export default function ServiceStatsCard({ region, service, rotaId, onToast }) {
 
         <Box sx={{ mb: 2 }}>
           <Typography variant="subtitle2">{grandTotalLabel}</Typography>
-          <Table size="small">
+          <Table size="small" sx={{ tableLayout: 'fixed', '& td, & th': { px: 0.5 } }}>
             <TableHead>
               <TableRow>
-                <TableCell>Shift Type</TableCell>
-                <TableCell>Alloc Count</TableCell>
-                <TableCell>Unalloc Count</TableCell>
-                <TableCell>Shift Count</TableCell>
+                <TableCell>Type</TableCell>
+                <TableCell align="right">Alloc</TableCell>
+                <TableCell align="right">Unalloc</TableCell>
+                <TableCell align="right">Total</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {totalsByType.map((stat) => (
                 <TableRow key={stat.shiftType}>
-                  <TableCell>{stat.shiftType}</TableCell>
-                  <TableCell>{stat.allocationCount}</TableCell>
-                  <TableCell>{stat.shiftCount - stat.allocationCount}</TableCell>
-                  <TableCell>{stat.shiftCount}</TableCell>
+                  <TableCell sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {stat.shiftType}
+                  </TableCell>
+                  <TableCell align="right">{stat.allocationCount}</TableCell>
+                  <TableCell align="right">{stat.shiftCount - stat.allocationCount}</TableCell>
+                  <TableCell align="right">{stat.shiftCount}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -220,15 +221,15 @@ export default function ServiceStatsCard({ region, service, rotaId, onToast }) {
                   )}
                 </Box>
               </AccordionSummary>
-              <AccordionDetails>
-                <Table size="small">
+              <AccordionDetails sx={{ p: 1, overflowX: 'auto' }}>
+                <Table size="small" sx={{ tableLayout: 'fixed', '& td, & th': { px: 0.5 } }}>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Shift Type</TableCell>
-                      <TableCell>Alloc Count</TableCell>
-                      <TableCell>Unalloc Count</TableCell>
-                      <TableCell>Shift Count</TableCell>
-                      <TableCell>Coverage</TableCell>
+                      <TableCell>Type</TableCell>
+                      <TableCell align="right">Alloc</TableCell>
+                      <TableCell align="right">Unalloc</TableCell>
+                      <TableCell align="right">Total</TableCell>
+                      <TableCell sx={{ width: '40%' }}>Coverage</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -238,11 +239,13 @@ export default function ServiceStatsCard({ region, service, rotaId, onToast }) {
                         : 0;
                       return (
                         <TableRow key={stat.shiftType}>
-                          <TableCell>{stat.shiftType}</TableCell>
-                          <TableCell>{stat.allocationCount}</TableCell>
-                          <TableCell>{stat.shiftCount - stat.allocationCount}</TableCell>
-                          <TableCell>{stat.shiftCount}</TableCell>
-                          <TableCell sx={{ minWidth: 140 }}>
+                          <TableCell sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {stat.shiftType}
+                          </TableCell>
+                          <TableCell align="right">{stat.allocationCount}</TableCell>
+                          <TableCell align="right">{stat.shiftCount - stat.allocationCount}</TableCell>
+                          <TableCell align="right">{stat.shiftCount}</TableCell>
+                          <TableCell>
                             <CoverageBar percent={percent} />
                           </TableCell>
                         </TableRow>
