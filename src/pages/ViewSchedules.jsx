@@ -31,6 +31,7 @@ import { fetchCurrentSchedule, fetchScheduleVersion, fetchCurrentVersionMeta } f
 import { publishUnallocatedShifts } from '../api/stats';
 import { DroppableCell } from "../components/droppableCell";
 import ScheduleRow from "../components/ScheduleRow";
+import ConflictsDrawer from "../components/ConflictsDrawer";
 
 // Import versioning components
 import VersionHistorySidebar from '../components/Versionhistorysidebar';
@@ -76,6 +77,7 @@ export default function ViewSchedules() {
   // of cellKeys to mark matching cells.
   const [backendConflictShiftIds, setBackendConflictShiftIds] = useState(new Set());
   const [backendConflictMessages, setBackendConflictMessages] = useState(new Map());
+  const [conflictsDrawerOpen, setConflictsDrawerOpen] = useState(false);
 
   const backendConflictCells = useMemo(() => {
     if (backendConflictShiftIds.size === 0) return { cells: new Set(), cellInfo: new Map() };
@@ -481,6 +483,20 @@ export default function ViewSchedules() {
     estimateSize: () => 150,
     overscan: 5,
   });
+
+  // Drawer-click handler: parse the row id (location|shiftType) out of the
+  // cellKey, find the matching virtualized row, and scroll it into view.
+  const handleNavigateToConflict = (cellKey) => {
+    const parts = cellKey.split('|');
+    if (parts.length !== 5) return;
+    const [location, shiftType] = parts;
+    const rowKey = `${location}|${shiftType}`;
+    const idx = rowData.findIndex((r) => r.key === rowKey);
+    if (idx >= 0) {
+      rowVirtualizer.scrollToIndex(idx, { align: 'start' });
+    }
+    setConflictsDrawerOpen(false);
+  };
 
   const handleRemove = (cellKey, emp) => {
 
@@ -974,11 +990,13 @@ export default function ViewSchedules() {
           )}
 
           {conflictCells.size > 0 && (
-            <Tooltip title="Cells where an employee is double-booked under an invalid same-day combination">
+            <Tooltip title="Click to list every conflict and jump to it">
               <Chip
                 icon={<WarningAmberIcon />}
                 label={`${conflictCells.size} conflict${conflictCells.size === 1 ? '' : 's'}`}
                 color="error"
+                clickable
+                onClick={() => setConflictsDrawerOpen(true)}
                 sx={{ mr: 2 }}
               />
             </Tooltip>
@@ -1166,6 +1184,14 @@ export default function ViewSchedules() {
         assignmentMap={assignmentMap}
         onSaveComplete={handleSaveComplete}
         onSaveConflict={handleSaveConflict}
+      />
+
+      <ConflictsDrawer
+        open={conflictsDrawerOpen}
+        onClose={() => setConflictsDrawerOpen(false)}
+        conflictCells={conflictCells}
+        conflictCellInfo={conflictCellInfo}
+        onNavigate={handleNavigateToConflict}
       />
       {/* ✅ Add Conflict Dialog */}
       <ConflictDialog
