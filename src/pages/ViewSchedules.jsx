@@ -15,6 +15,7 @@ import {
   VisibilityOff,
   DeleteSweep as ClearAllIcon,
   Campaign as CampaignIcon,
+  WarningAmber as WarningAmberIcon,
 } from "@mui/icons-material";
 import { format } from "date-fns";
 import { DndContext, DragOverlay, pointerWithin } from "@dnd-kit/core";
@@ -25,6 +26,7 @@ import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
 import { calculateDuration } from '../utils/shiftCalculations';
 import { setEmpSummary, buildAssignmentMap } from '../utils/scheduleData';
+import { isAllowedDayShiftTypes, findConflictCells } from '../utils/shiftConflicts';
 import { fetchCurrentSchedule, fetchScheduleVersion, fetchCurrentVersionMeta } from '../api/schedules';
 import { publishUnallocatedShifts } from '../api/stats';
 import { DroppableCell } from "../components/droppableCell";
@@ -58,6 +60,16 @@ export default function ViewSchedules() {
   const [assignmentMap, setAssignmentMap] = useState({});
   const [datesByWeekday, setDatesByWeekday] = useState(emptyDatesByWeekday);
   const [pinnedMap, setPinnedMap] = useState({});
+  // conflictCells: Set<cellKey>; conflictCellInfo: Map<cellKey, {employees, peers}>
+  // Computed once per assignmentMap change so the schedule view surfaces
+  // double-booking issues on load without requiring a drag interaction.
+  const { conflictCells, conflictCellInfo } = useMemo(
+    () => {
+      const { conflictCells, cellInfo } = findConflictCells(assignmentMap);
+      return { conflictCells, conflictCellInfo: cellInfo };
+    },
+    [assignmentMap]
+  );
   const [groupedAssignments, setGroupedAssignments] = useState({});
   const [summarizedEmpList, setSummarizedEmpList] = useState([]);
   const [highlighted, setHighlighted] = useState({});
@@ -833,56 +845,6 @@ export default function ViewSchedules() {
       loadSchedule();
     }
   };
-  /**
- * Check if shift types are allowed on same day
- * Same business rules as backend validation
- */
-  const isAllowedDayShiftTypes = (shifts) => {
-    if (!shifts || shifts.length === 0) return true;
-    if (shifts.length === 1) return true;
-
-    const types = shifts.map(s => s.shiftType);
-    const locations = shifts.map(s => s.location);
-
-    // All FLOATING at different locations
-    const allFloating = types.every(t => t === 'FLOATING');
-    if (allFloating) {
-      const uniqueLocs = new Set(locations);
-      return uniqueLocs.size === locations.length;
-    }
-
-    // No mixing FLOATING with non-FLOATING
-    const hasFloating = types.some(t => t === 'FLOATING');
-    const hasNonFloating = types.some(t =>
-      t === 'DAY' || t === 'LONG_DAY' || t === 'WAKING_NIGHT' || t === 'SLEEP_IN'
-    );
-
-    if (hasFloating && hasNonFloating) {
-      return false;
-    }
-
-    // ✅ CRITICAL: LONG_DAY + SLEEP_IN at SAME location is ALLOWED
-    if (shifts.length === 2) {
-      const hasLongDay = types.includes('LONG_DAY');
-      const hasSleepIn = types.includes('SLEEP_IN');
-
-      if (hasLongDay && hasSleepIn) {
-        // Check if both at same location
-        const longDayLoc = shifts.find(s => s.shiftType === 'LONG_DAY')?.location;
-        const sleepInLoc = shifts.find(s => s.shiftType === 'SLEEP_IN')?.location;
-
-        return longDayLoc === sleepInLoc; // ✅ Valid if same location
-      }
-    }
-
-    // Any other 2+ non-floating is invalid
-    if (shifts.length >= 2 && !allFloating) {
-      return false;
-    }
-
-    return true;
-  };
-
   if (loading) {
     return <LoadingSpinner />
   }
@@ -922,6 +884,17 @@ export default function ViewSchedules() {
                 Viewing historical version (read-only)
               </Box>
             </Alert>
+          )}
+
+          {conflictCells.size > 0 && (
+            <Tooltip title="Cells where an employee is double-booked under an invalid same-day combination">
+              <Chip
+                icon={<WarningAmberIcon />}
+                label={`${conflictCells.size} conflict${conflictCells.size === 1 ? '' : 's'}`}
+                color="error"
+                sx={{ mr: 2 }}
+              />
+            </Tooltip>
           )}
 
           {pendingChanges.length > 0 && (
@@ -1055,6 +1028,8 @@ export default function ViewSchedules() {
                   datesByWeekday={datesByWeekday}
                   assignmentMap={assignmentMap}
                   pinnedMap={pinnedMap}
+                  conflictCells={conflictCells}
+                  conflictCellInfo={conflictCellInfo}
                   highlighted={highlighted}
                   handleRemove={handleRemove}
                   activeDragId={activeDragId}

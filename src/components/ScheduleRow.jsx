@@ -11,6 +11,8 @@ const ScheduleRow = memo(({
   datesByWeekday,
   assignmentMap,
   pinnedMap,
+  conflictCells,
+  conflictCellInfo,
   highlighted,
   handleRemove,
   activeDragId,
@@ -96,6 +98,8 @@ const ScheduleRow = memo(({
                     id={droppableId}
                     assigned={clearedCells.has(cellKey) ? [] : cellEmployees}
                     pinnedIds={pinnedMap?.[cellKey]}
+                    hasConflict={conflictCells?.has(cellKey)}
+                    conflictInfo={conflictCellInfo?.get(cellKey)}
                     highlighted={highlighted[cellKey] ?? []}
                     onRemove={handleRemove}
                     isDragging={!!activeDragId}
@@ -134,6 +138,7 @@ const ScheduleRow = memo(({
     prevProps.virtualRow.start === nextProps.virtualRow.start &&
     prevProps.assignmentMap === nextProps.assignmentMap &&
     prevProps.pinnedMap === nextProps.pinnedMap &&
+    prevProps.conflictCells === nextProps.conflictCells &&
     prevProps.changeHighlights === nextProps.changeHighlights
   );
 });

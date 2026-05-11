@@ -1,14 +1,29 @@
 import { memo } from "react";
 import { Box, Chip, Tooltip } from "@mui/material";
 import PushPinIcon from "@mui/icons-material/PushPin";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { useDroppable } from "@dnd-kit/core";
 import { shiftColors, shiftTypes, getPriorityColor } from "../components/shiftTypeGrading";
+
+function buildConflictTooltip(conflictInfo) {
+  if (!conflictInfo) return 'Same-day shift conflict';
+  const names = Array.from(conflictInfo.employees || []).join(', ');
+  const peerLabels = (conflictInfo.peers || [])
+    .map((p) => `${p.location} · ${p.shiftType} @ ${(p.startTime || '').slice(0, 5)}`)
+    .filter((v, i, a) => a.indexOf(v) === i); // dedupe
+  const lines = [];
+  if (names) lines.push(`Conflict: ${names}`);
+  if (peerLabels.length) lines.push(`Clashes with: ${peerLabels.join('; ')}`);
+  return lines.join('\n') || 'Same-day shift conflict';
+}
 
 // Memoize to prevent re-renders when parent updates
 export const DroppableCell = memo(({
   id,
   assigned,
   pinnedIds,
+  hasConflict,
+  conflictInfo,
   onRemove,
   highlighted,
   isDragging
@@ -41,15 +56,23 @@ export const DroppableCell = memo(({
     }
   };
 
+  const cellBorder = hasConflict
+    ? "2px solid #d32f2f"
+    : isOver ? "2px dashed #3f51b5" : "1px dashed #ccc";
+  const cellBackground = hasConflict
+    ? "#ffebee"
+    : isOver ? "#e3f2fd" : "#bfdbf0ff";
+
   return (
-    <Tooltip title={id} arrow>
+    <Tooltip title={hasConflict ? buildConflictTooltip(conflictInfo) : id} arrow>
       <Box
         ref={setNodeRef}
         sx={{
           flexGrow: 1,
-          border: isOver ? "2px dashed #3f51b5" : "1px dashed #ccc",
+          position: 'relative',
+          border: cellBorder,
           borderRadius: 1,
-          backgroundColor: isOver ? "#e3f2fd" : "#bfdbf0ff",
+          backgroundColor: cellBackground,
           padding: 0.5,
           mt: 0.5,
           display: "flex",
@@ -59,6 +82,18 @@ export const DroppableCell = memo(({
           transition: "border 0.15s ease, background-color 0.15s ease",
         }}
       >
+        {hasConflict && (
+          <WarningAmberIcon
+            sx={{
+              position: 'absolute',
+              top: 2,
+              right: 2,
+              fontSize: 16,
+              color: 'error.main',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
         {allVisible.length > 0 ? (
           allVisible.map((emp) => {
             const isPinned = pinnedIds?.has(emp.id);
@@ -113,6 +148,9 @@ export const DroppableCell = memo(({
   const prevPinned = prevProps.pinnedIds ? [...prevProps.pinnedIds].sort().join(',') : '';
   const nextPinned = nextProps.pinnedIds ? [...nextProps.pinnedIds].sort().join(',') : '';
   if (prevPinned !== nextPinned) return false;
+
+  // Conflict flag: cheap reference / boolean comparison.
+  if (prevProps.hasConflict !== nextProps.hasConflict) return false;
 
   return true; // Props are equal, skip re-render
 });
