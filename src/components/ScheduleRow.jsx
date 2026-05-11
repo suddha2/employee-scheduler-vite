@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Box, Typography, Chip } from '@mui/material';
 import { format } from 'date-fns';
 import { DroppableCell } from './droppableCell';
+import { parseLocalDate } from '../utils/dates';
 
 const ScheduleRow = memo(({
   row,
@@ -43,7 +44,7 @@ const ScheduleRow = memo(({
           {datesByWeekday[day].map((date) => {
             const dateStr = date;
             const matching = assignments.filter((a) => {
-              const shiftDateStr = format(new Date(a.shift.shiftStart), "yyyy-MM-dd");
+              const shiftDateStr = format(parseLocalDate(a.shift.shiftStart), "yyyy-MM-dd");
               return shiftDateStr === dateStr;
             });
 
@@ -57,7 +58,7 @@ const ScheduleRow = memo(({
             });
 
             return Array.from(uniqueShifts.values()).map((assignment) => {
-              const shiftDateStr = format(new Date(assignment.shift.shiftStart), "yyyy-MM-dd");
+              const shiftDateStr = format(parseLocalDate(assignment.shift.shiftStart), "yyyy-MM-dd");
               const shiftStartTime = assignment.shift.shiftTemplate.startTime;
               const shiftId = assignment.shift.id;
               const cellKey = `${location}|${shiftType}|${shiftDateStr}|${shiftStartTime}|${shiftId}`;
@@ -84,7 +85,7 @@ const ScheduleRow = memo(({
                   }}
                 >
                   <Typography variant="caption" fontWeight="bold" display="block">
-                    {format(new Date(assignment.shift.shiftStart), "MMM d")}
+                    {format(parseLocalDate(assignment.shift.shiftStart), "MMM d")}
                   </Typography>
                   <Typography variant="caption" display="block" color="text.secondary">
                     {assignment.shift.shiftTemplate.startTime.slice(0, 5)}-

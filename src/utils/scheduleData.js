@@ -1,4 +1,5 @@
 import { format } from 'date-fns';
+import { parseLocalDate } from './dates';
 
 // Build a keyed map of cell -> assigned employees, plus a per-weekday
 // list of date strings (sorted), from a flat list of shift assignments.
@@ -35,14 +36,14 @@ export function buildAssignmentMap(assignments, weekdayOrder) {
   );
 
   uniqueDateStrings.forEach((dateStr) => {
-    const weekday = format(new Date(dateStr), "EEE");
+    const weekday = format(parseLocalDate(dateStr), "EEE");
     if (datesByWeekday[weekday] && !datesByWeekday[weekday].includes(dateStr)) {
       datesByWeekday[weekday].push(dateStr);
     }
   });
 
   Object.keys(datesByWeekday).forEach(day => {
-    datesByWeekday[day].sort((a, b) => new Date(a) - new Date(b));
+    datesByWeekday[day].sort((a, b) => parseLocalDate(a) - parseLocalDate(b));
   });
 
   return { assignmentMap: map, datesByWeekday };

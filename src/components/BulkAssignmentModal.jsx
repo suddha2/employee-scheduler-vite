@@ -24,6 +24,7 @@ import {
     SwapHoriz as OverrideIcon,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
+import { parseLocalDate } from '../utils/dates';
 
 export default function BulkAssignmentModal({
     open,
@@ -54,26 +55,45 @@ export default function BulkAssignmentModal({
     const availableCells = useMemo(() => {
         if (!rotaData?.shiftAssignmentList) return [];
 
+        // Dedupe by shift.id so a shift with empCount>1 (multiple
+        // shiftAssignment rows sharing the same shift.id) renders as one cell.
+        const seen = new Set();
         return rotaData.shiftAssignmentList
             .filter(a =>
                 a.shift.shiftTemplate.location === location &&
                 a.shift.shiftTemplate.shiftType === shiftType
             )
+            .filter(a => {
+                if (seen.has(a.shift.id)) return false;
+                seen.add(a.shift.id);
+                return true;
+            })
             .map(a => {
                 const date = a.shift.shiftStart;
                 const shiftStartTime = a.shift.shiftTemplate.startTime;
                 const shiftId = a.shift.id;
+                const empCount = a.shift.shiftTemplate.empCount ?? 1;
                 const cellKey = `${location}|${shiftType}|${date}|${shiftStartTime}|${shiftId}`;
 
-                // Check if already assigned to THIS employee
-                const isAssignedToThisEmployee = assignmentMap[cellKey]?.some(emp => emp.id === employee?.id);
+                const currentlyAssigned = assignmentMap[cellKey] || [];
+                const isAssignedToThisEmployee = currentlyAssigned.some(emp => emp.id === employee?.id);
 
-                // Check if assigned to ANOTHER employee
-                const assignedToOther = assignmentMap[cellKey]?.filter(emp => emp.id !== employee?.id) || [];
+                // Everyone OTHER than the dropped employee already on this slot.
+                const assignedToOther = currentlyAssigned.filter(emp => emp.id !== employee?.id);
                 const hasOtherAssignment = assignedToOther.length > 0;
 
-                // Get names of other assigned employees
-                const otherEmployeeNames = assignedToOther.map(emp => `${emp.firstName} ${emp.lastName}`).join(', ');
+                // True when the slot is full and the dropped employee isn't
+                // already on it. Adding this employee would require evicting
+                // one of the existing ones.
+                const isFull = !isAssignedToThisEmployee && assignedToOther.length >= empCount;
+
+                // True when this employee fits without displacing anyone --
+                // either the slot is empty or has spare capacity.
+                const hasRoomForMore = !isAssignedToThisEmployee && assignedToOther.length < empCount;
+
+                const otherEmployeeNames = assignedToOther
+                    .map(emp => `${emp.firstName} ${emp.lastName}`)
+                    .join(', ');
 
                 const hasConflict = !isAssignedToThisEmployee && employee && checkForConflicts
                     ? checkForConflicts(employee.id, date, cellKey).length > 0
@@ -84,8 +104,12 @@ export default function BulkAssignmentModal({
                     date,
                     shiftStartTime,
                     shiftId,
+                    empCount,
+                    assignedCount: currentlyAssigned.length,
                     isAssignedToThisEmployee,
                     hasOtherAssignment,
+                    hasRoomForMore,
+                    isFull,
                     otherEmployeeNames,
                     hasConflict,
                 };
@@ -99,56 +123,69 @@ export default function BulkAssignmentModal({
 
         if (availableCells.length === 0) return { grid, weekdayOrder };
 
-        // Find the Monday of the week containing the earliest date
+        // Find the Monday of the week containing the earliest date.
+        // Use parseLocalDate so that "YYYY-MM-DD" doesn't get parsed as UTC
+        // midnight (which would shift the local date by one day in any
+        // timezone behind UTC and push cells into the wrong week column).
         const sortedDates = [...new Set(availableCells.map(c => c.date))].sort();
-        const firstDate = new Date(sortedDates[0]);
+        const firstDate = parseLocalDate(sortedDates[0]);
         const dayOfWeek = firstDate.getDay(); // 0=Sun, 1=Mon ... 6=Sat
         const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
         const firstMonday = new Date(firstDate);
         firstMonday.setDate(firstDate.getDate() - daysFromMonday);
-        firstMonday.setHours(0, 0, 0, 0);
 
         availableCells.forEach(cell => {
-            const date = new Date(cell.date);
-            date.setHours(0, 0, 0, 0);
+            const date = parseLocalDate(cell.date);
             const weekday = format(date, 'EEE');
 
             const diffDays = Math.round((date - firstMonday) / (1000 * 60 * 60 * 24));
             const weekNum = Math.floor(diffDays / 7) + 1;
 
-            if (!grid[weekNum]) {
-                grid[weekNum] = {};
-            }
+            if (!grid[weekNum]) grid[weekNum] = {};
+            // A single (week, weekday) bucket can hold multiple shifts when
+            // a location has more than one shift of the same shiftType on the
+            // same day (e.g. an early DAY 08:00–16:00 and a late DAY 14:00–22:00).
+            // Keep them all -- the renderer stacks them inside the day cell.
+            if (!grid[weekNum][weekday]) grid[weekNum][weekday] = [];
+            grid[weekNum][weekday].push(cell);
+        });
 
-            grid[weekNum][weekday] = cell;
+        // Sort each bucket by start time so the stacked shifts read chronologically.
+        Object.values(grid).forEach(dayMap => {
+            Object.values(dayMap).forEach(cells => {
+                cells.sort((a, b) => (a.shiftStartTime || '').localeCompare(b.shiftStartTime || ''));
+            });
         });
 
         return { grid, weekdayOrder };
     }, [availableCells]);
 
-    // Calculate override statistics (only counts cells that will result in actual new assignments)
+    // Counts: how many selected cells will result in new assignments, and of
+    // those, how many will *displace* someone (slot already at empCount).
     const overrideStats = useMemo(() => {
         const selectedCellsArray = Array.from(selectedCells);
         const newAssignments = selectedCellsArray.filter(cellKey => {
             const cell = availableCells.find(c => c.cellKey === cellKey);
             return cell && !cell.isAssignedToThisEmployee;
         });
-        const cellsWithOtherAssignments = newAssignments.filter(cellKey => {
+        const cellsToOverride = newAssignments.filter(cellKey => {
             const cell = availableCells.find(c => c.cellKey === cellKey);
-            return cell?.hasOtherAssignment;
+            return cell?.isFull;
         });
 
         return {
             total: newAssignments.length,
-            willOverride: cellsWithOtherAssignments.length,
-            cellsToOverride: cellsWithOtherAssignments,
+            willOverride: cellsToOverride.length,
+            cellsToOverride,
         };
     }, [selectedCells, availableCells]);
 
     const handleToggleCell = (cellKey, cell) => {
         if (cell.hasConflict) return;
         if (cell.isAssignedToThisEmployee) return;
-        if (cell.hasOtherAssignment && !allowOverride) return;
+        // A full slot is only selectable when override is explicitly allowed;
+        // a partially-filled slot with room is always selectable (append).
+        if (cell.isFull && !allowOverride) return;
 
         setSelectedCells(prev => {
             const next = new Set(prev);
@@ -165,7 +202,7 @@ export default function BulkAssignmentModal({
         const validCells = availableCells
             .filter(c => !c.hasConflict)
             .filter(c => !c.isAssignedToThisEmployee)
-            .filter(c => allowOverride || !c.hasOtherAssignment)
+            .filter(c => allowOverride || !c.isFull)
             .map(c => c.cellKey);
         setSelectedCells(new Set(validCells));
     };
@@ -179,12 +216,13 @@ export default function BulkAssignmentModal({
             ? [targetCellKey]
             : Array.from(selectedCells);
 
-        // ✅ Build override info
+        // Only set shouldOverride when the slot is at capacity; partially-
+        // filled slots get an APPEND in the parent rather than a replace.
         const overrideInfo = cellsToAssign.map(cellKey => {
             const cell = availableCells.find(c => c.cellKey === cellKey);
             return {
                 cellKey,
-                shouldOverride: cell?.hasOtherAssignment || false,
+                shouldOverride: cell?.isFull || false,
                 replacedEmployees: cell?.otherEmployeeNames || '',
             };
         });
@@ -211,33 +249,36 @@ export default function BulkAssignmentModal({
             };
         }
 
+        const dateLabel = format(parseLocalDate(cell.date), 'MMM d');
+        const slotLabel = cell.empCount > 1
+            ? ` · ${cell.assignedCount}/${cell.empCount} slots filled`
+            : '';
+
         if (cell.hasConflict) {
             return {
                 display: '❌',
                 color: 'error.light',
                 disabled: true,
-                tooltip: 'Conflict with existing assignment',
+                tooltip: `${dateLabel} - Conflict with existing assignment`,
             };
         }
 
         if (isSelected) {
-            // ✅ Show override indicator if cell has other assignment
-            if (cell.hasOtherAssignment) {
+            if (cell.isFull) {
                 return {
-                    display: '⇄', // Override symbol
+                    display: '⇄',
                     color: 'warning.main',
                     backgroundColor: 'warning.light',
                     disabled: false,
-                    tooltip: `${format(new Date(cell.date), 'MMM d')} - Will replace: ${cell.otherEmployeeNames}`,
+                    tooltip: `${dateLabel}${slotLabel} - Will replace: ${cell.otherEmployeeNames}`,
                 };
             }
-
             return {
                 display: '✓',
                 color: 'primary.main',
                 backgroundColor: 'primary.light',
                 disabled: false,
-                tooltip: format(new Date(cell.date), 'MMM d'),
+                tooltip: `${dateLabel}${slotLabel}`,
             };
         }
 
@@ -247,37 +288,47 @@ export default function BulkAssignmentModal({
                 color: 'success.main',
                 backgroundColor: 'success.light',
                 disabled: false,
-                tooltip: `${format(new Date(cell.date), 'MMM d')} (already assigned to ${employee.firstName})`,
+                tooltip: `${dateLabel}${slotLabel} (already assigned to ${employee.firstName})`,
             };
         }
 
-        if (cell.hasOtherAssignment) {
-            // ✅ Show as blocked if override not allowed
-            if (!allowOverride) {
+        if (cell.hasRoomForMore) {
+            // Slot has spare capacity — appendable without override even if
+            // someone else is already on it.
+            if (cell.hasOtherAssignment) {
                 return {
-                    display: '🔒',
-                    color: 'grey.500',
-                    backgroundColor: 'grey.200',
-                    disabled: true,
-                    tooltip: `${format(new Date(cell.date), 'MMM d')} - Assigned to: ${cell.otherEmployeeNames} (enable override to replace)`,
+                    display: '+',
+                    color: 'info.main',
+                    backgroundColor: 'info.light',
+                    disabled: false,
+                    tooltip: `${dateLabel}${slotLabel} - Currently: ${cell.otherEmployeeNames} (click to add as additional employee)`,
                 };
             }
-
             return {
-                display: '○',
-                color: 'warning.main',
-                backgroundColor: 'warning.light',
+                display: '□',
+                color: 'grey.500',
+                backgroundColor: 'grey.100',
                 disabled: false,
-                tooltip: `${format(new Date(cell.date), 'MMM d')} - Currently: ${cell.otherEmployeeNames} (click to override)`,
+                tooltip: `${dateLabel}${slotLabel}`,
             };
         }
 
+        // cell.isFull from here on
+        if (!allowOverride) {
+            return {
+                display: '🔒',
+                color: 'grey.500',
+                backgroundColor: 'grey.200',
+                disabled: true,
+                tooltip: `${dateLabel}${slotLabel} - Assigned to: ${cell.otherEmployeeNames} (enable override to replace)`,
+            };
+        }
         return {
-            display: '□',
-            color: 'grey.500',
-            backgroundColor: 'grey.100',
+            display: '○',
+            color: 'warning.main',
+            backgroundColor: 'warning.light',
             disabled: false,
-            tooltip: format(new Date(cell.date), 'MMM d'),
+            tooltip: `${dateLabel}${slotLabel} - Currently: ${cell.otherEmployeeNames} (click to override)`,
         };
     };
 
@@ -316,7 +367,7 @@ export default function BulkAssignmentModal({
                             <Box>
                                 <Typography variant="body1">Single Assignment</Typography>
                                 <Typography variant="caption" color="text.secondary">
-                                    Assign only to {format(new Date(targetCellKey.split('|')[2]), 'MMM d')}
+                                    Assign only to {format(parseLocalDate(targetCellKey.split('|')[2]), 'MMM d')}
                                 </Typography>
                             </Box>
                         }
@@ -411,36 +462,87 @@ export default function BulkAssignmentModal({
                                                 {weekNum}
                                             </Box>
                                             {weekdayOrder.map(day => {
-                                                const cell = grid[weekNum]?.[day];
-                                                const isSelected = cell && selectedCells.has(cell.cellKey);
-                                                const cellStyle = getCellDisplay(cell, isSelected);
+                                                const cells = grid[weekNum]?.[day] || [];
 
+                                                if (cells.length === 0) {
+                                                    // No shift of this type on this day -- placeholder.
+                                                    const cellStyle = getCellDisplay(null, false);
+                                                    return (
+                                                        <Tooltip key={day} title={cellStyle.tooltip} arrow>
+                                                            <Box
+                                                                sx={{
+                                                                    p: 2,
+                                                                    textAlign: 'center',
+                                                                    fontSize: '1.2rem',
+                                                                    backgroundColor: 'grey.100',
+                                                                    color: cellStyle.color,
+                                                                    border: '1px solid',
+                                                                    borderColor: 'divider',
+                                                                    borderRadius: 1,
+                                                                    cursor: 'not-allowed',
+                                                                }}
+                                                            >
+                                                                {cellStyle.display}
+                                                            </Box>
+                                                        </Tooltip>
+                                                    );
+                                                }
+
+                                                const stacked = cells.length > 1;
                                                 return (
-                                                    <Tooltip key={day} title={cellStyle.tooltip} arrow>
-                                                        <Box
-                                                            onClick={() => cell && !cellStyle.disabled && handleToggleCell(cell.cellKey, cell)}
-                                                            sx={{
-                                                                p: 2,
-                                                                textAlign: 'center',
-                                                                fontSize: '1.2rem',
-                                                                backgroundColor: cellStyle.backgroundColor || 'grey.100',
-                                                                color: cellStyle.color,
-                                                                border: '1px solid',
-                                                                borderColor: 'divider',
-                                                                borderRadius: 1,
-                                                                cursor: cellStyle.disabled ? 'not-allowed' : 'pointer',
-                                                                transition: 'all 0.2s',
-                                                                '&:hover': cellStyle.disabled ? {} : {
-                                                                    backgroundColor: 'primary.light',
-                                                                    boxShadow: 3,
-                                                                    borderColor: 'primary.main',
-                                                                    zIndex: 1,
-                                                                },
-                                                            }}
-                                                        >
-                                                            {cellStyle.display}
-                                                        </Box>
-                                                    </Tooltip>
+                                                    <Box
+                                                        key={day}
+                                                        sx={{
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            gap: 0.5,
+                                                        }}
+                                                    >
+                                                        {cells.map((cell) => {
+                                                            const isSelected = selectedCells.has(cell.cellKey);
+                                                            const cellStyle = getCellDisplay(cell, isSelected);
+                                                            return (
+                                                                <Tooltip key={cell.cellKey} title={cellStyle.tooltip} arrow>
+                                                                    <Box
+                                                                        onClick={() => !cellStyle.disabled && handleToggleCell(cell.cellKey, cell)}
+                                                                        sx={{
+                                                                            p: stacked ? 0.5 : 2,
+                                                                            textAlign: 'center',
+                                                                            fontSize: stacked ? '0.9rem' : '1.2rem',
+                                                                            backgroundColor: cellStyle.backgroundColor || 'grey.100',
+                                                                            color: cellStyle.color,
+                                                                            border: '1px solid',
+                                                                            borderColor: 'divider',
+                                                                            borderRadius: 1,
+                                                                            cursor: cellStyle.disabled ? 'not-allowed' : 'pointer',
+                                                                            transition: 'all 0.2s',
+                                                                            display: 'flex',
+                                                                            flexDirection: 'column',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'center',
+                                                                            lineHeight: 1.2,
+                                                                            '&:hover': cellStyle.disabled ? {} : {
+                                                                                backgroundColor: 'primary.light',
+                                                                                boxShadow: 3,
+                                                                                borderColor: 'primary.main',
+                                                                                zIndex: 1,
+                                                                            },
+                                                                        }}
+                                                                    >
+                                                                        {stacked && (
+                                                                            <Typography
+                                                                                variant="caption"
+                                                                                sx={{ fontSize: '0.6rem', lineHeight: 1, mb: 0.25 }}
+                                                                            >
+                                                                                {cell.shiftStartTime?.slice(0, 5)}
+                                                                            </Typography>
+                                                                        )}
+                                                                        {cellStyle.display}
+                                                                    </Box>
+                                                                </Tooltip>
+                                                            );
+                                                        })}
+                                                    </Box>
                                                 );
                                             })}
                                         </React.Fragment>
