@@ -64,7 +64,7 @@ export const DroppableCell = memo(({
     : isOver ? "#e3f2fd" : "#bfdbf0ff";
 
   return (
-    <Tooltip title={hasConflict ? buildConflictTooltip(conflictInfo) : id} arrow>
+    <Tooltip title={hasConflict ? buildConflictTooltip(conflictInfo) : ''} arrow disableHoverListener={!hasConflict}>
       <Box
         ref={setNodeRef}
         sx={{
