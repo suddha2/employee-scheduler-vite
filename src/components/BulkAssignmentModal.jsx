@@ -55,6 +55,17 @@ export default function BulkAssignmentModal({
     const availableCells = useMemo(() => {
         if (!rotaData?.shiftAssignmentList) return [];
 
+        // Count how many shiftAssignment rows share each shift.id -- that's
+        // the slot count for that shift (backend returns one row per required
+        // employee slot, including unallocated ones). We use this as a robust
+        // empCount source because the shiftTemplate.empCount field is not
+        // always populated on the schedule response.
+        const slotCountByShiftId = new Map();
+        rotaData.shiftAssignmentList.forEach((a) => {
+            const id = a.shift.id;
+            slotCountByShiftId.set(id, (slotCountByShiftId.get(id) || 0) + 1);
+        });
+
         // Dedupe by shift.id so a shift with empCount>1 (multiple
         // shiftAssignment rows sharing the same shift.id) renders as one cell.
         const seen = new Set();
@@ -72,7 +83,14 @@ export default function BulkAssignmentModal({
                 const date = a.shift.shiftStart;
                 const shiftStartTime = a.shift.shiftTemplate.startTime;
                 const shiftId = a.shift.id;
-                const empCount = a.shift.shiftTemplate.empCount ?? 1;
+                // Prefer the larger of the explicit template field and the
+                // derived row count, then floor at 1. This works whether the
+                // backend exposes empCount or not.
+                const empCount = Math.max(
+                    slotCountByShiftId.get(shiftId) || 0,
+                    a.shift.shiftTemplate.empCount ?? 0,
+                    1,
+                );
                 const cellKey = `${location}|${shiftType}|${date}|${shiftStartTime}|${shiftId}`;
 
                 const currentlyAssigned = assignmentMap[cellKey] || [];

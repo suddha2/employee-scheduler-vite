@@ -1,15 +1,17 @@
 import { memo } from "react";
 import { Box, Chip, Tooltip } from "@mui/material";
+import PushPinIcon from "@mui/icons-material/PushPin";
 import { useDroppable } from "@dnd-kit/core";
 import { shiftColors, shiftTypes, getPriorityColor } from "../components/shiftTypeGrading";
 
 // Memoize to prevent re-renders when parent updates
-export const DroppableCell = memo(({ 
-  id, 
-  assigned, 
-  onRemove, 
+export const DroppableCell = memo(({
+  id,
+  assigned,
+  pinnedIds,
+  onRemove,
   highlighted,
-  isDragging 
+  isDragging
 }) => {
   // Only enable droppable when actively dragging - CRITICAL for performance
   const { isOver, setNodeRef } = useDroppable({ 
@@ -58,20 +60,32 @@ export const DroppableCell = memo(({
         }}
       >
         {allVisible.length > 0 ? (
-          allVisible.map((emp) => (
-            <Chip
-              key={`${cellKey}-${emp.id}`}
-              label={`${emp.firstName} ${emp.lastName}`}
-              onDelete={() => onRemove(cellKey, emp)}
-              size="small"
-              sx={{
-                whiteSpace: "nowrap",
-                backgroundColor: highlighted.some((e) => e.id === emp.id)
-                  ? "#a5d6a7"
-                  : "#1976D2",
-              }}
-            />
-          ))
+          allVisible.map((emp) => {
+            const isPinned = pinnedIds?.has(emp.id);
+            return (
+              <Tooltip
+                key={`${cellKey}-${emp.id}`}
+                title={isPinned ? 'Pinned — solver will preserve this assignment' : ''}
+                arrow
+                disableHoverListener={!isPinned}
+              >
+                <Chip
+                  label={`${emp.firstName} ${emp.lastName}`}
+                  icon={isPinned ? <PushPinIcon sx={{ fontSize: 14 }} /> : undefined}
+                  onDelete={() => onRemove(cellKey, emp)}
+                  size="small"
+                  sx={{
+                    whiteSpace: "nowrap",
+                    backgroundColor: highlighted.some((e) => e.id === emp.id)
+                      ? "#a5d6a7"
+                      : "#1976D2",
+                    color: '#fff',
+                    '& .MuiChip-icon': { color: '#fff' },
+                  }}
+                />
+              </Tooltip>
+            );
+          })
         ) : (
           <em style={getUrgencyStyle(shiftType)}>Unassigned</em>
         )}
@@ -83,17 +97,23 @@ export const DroppableCell = memo(({
   if (prevProps.isDragging !== nextProps.isDragging) return false;
   if (prevProps.assigned.length !== nextProps.assigned.length) return false;
   if (prevProps.highlighted.length !== nextProps.highlighted.length) return false;
-  
+
   // Deep compare assigned employee IDs
   const prevIds = prevProps.assigned.map(e => e.id).sort().join(',');
   const nextIds = nextProps.assigned.map(e => e.id).sort().join(',');
   if (prevIds !== nextIds) return false;
-  
+
   // Deep compare highlighted employee IDs
   const prevHighIds = prevProps.highlighted.map(e => e.id).sort().join(',');
   const nextHighIds = nextProps.highlighted.map(e => e.id).sort().join(',');
   if (prevHighIds !== nextHighIds) return false;
-  
+
+  // Compare pinned IDs: covers the case where saving toggles pin state but
+  // the assigned list stays the same.
+  const prevPinned = prevProps.pinnedIds ? [...prevProps.pinnedIds].sort().join(',') : '';
+  const nextPinned = nextProps.pinnedIds ? [...nextProps.pinnedIds].sort().join(',') : '';
+  if (prevPinned !== nextPinned) return false;
+
   return true; // Props are equal, skip re-render
 });
 

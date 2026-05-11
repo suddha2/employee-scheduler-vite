@@ -8,10 +8,15 @@ import { parseLocalDate } from './dates';
 export function buildAssignmentMap(assignments, weekdayOrder) {
   const map = {};
   const seen = {};
+  // pinnedMap[cellKey] -> Set of pinned employee ids (mirrors map[cellKey]
+  // contents). Reading `assignment.pinned` from the API response surfaces the
+  // backend's per-assignment pin state so the UI can show a pin icon.
+  const pinnedMap = {};
   const datesByWeekday = {};
   weekdayOrder.forEach((day) => { datesByWeekday[day] = []; });
 
-  assignments.forEach(({ shift, employee }) => {
+  assignments.forEach((assignment) => {
+    const { shift, employee, pinned } = assignment;
     const location = shift.shiftTemplate.location;
     const shiftType = shift.shiftTemplate.shiftType;
     const date = shift.shiftStart;
@@ -28,6 +33,10 @@ export function buildAssignmentMap(assignments, weekdayOrder) {
     if (employee && !seen[key].has(employee.id)) {
       map[key].push(employee);
       seen[key].add(employee.id);
+      if (pinned) {
+        if (!pinnedMap[key]) pinnedMap[key] = new Set();
+        pinnedMap[key].add(employee.id);
+      }
     }
   });
 
@@ -46,7 +55,7 @@ export function buildAssignmentMap(assignments, weekdayOrder) {
     datesByWeekday[day].sort((a, b) => parseLocalDate(a) - parseLocalDate(b));
   });
 
-  return { assignmentMap: map, datesByWeekday };
+  return { assignmentMap: map, datesByWeekday, pinnedMap };
 }
 
 // Aggregate per-employee shift counts and hours by shift type.

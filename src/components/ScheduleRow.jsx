@@ -10,6 +10,7 @@ const ScheduleRow = memo(({
   weekdayOrder,
   datesByWeekday,
   assignmentMap,
+  pinnedMap,
   highlighted,
   handleRemove,
   activeDragId,
@@ -94,6 +95,7 @@ const ScheduleRow = memo(({
                   <DroppableCell
                     id={droppableId}
                     assigned={clearedCells.has(cellKey) ? [] : cellEmployees}
+                    pinnedIds={pinnedMap?.[cellKey]}
                     highlighted={highlighted[cellKey] ?? []}
                     onRemove={handleRemove}
                     isDragging={!!activeDragId}
@@ -131,6 +133,7 @@ const ScheduleRow = memo(({
     prevProps.row.key === nextProps.row.key &&
     prevProps.virtualRow.start === nextProps.virtualRow.start &&
     prevProps.assignmentMap === nextProps.assignmentMap &&
+    prevProps.pinnedMap === nextProps.pinnedMap &&
     prevProps.changeHighlights === nextProps.changeHighlights
   );
 });

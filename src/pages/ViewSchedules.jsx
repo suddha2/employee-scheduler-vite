@@ -57,6 +57,7 @@ export default function ViewSchedules() {
   const [rotaData, setRotaData] = useState(null);
   const [assignmentMap, setAssignmentMap] = useState({});
   const [datesByWeekday, setDatesByWeekday] = useState(emptyDatesByWeekday);
+  const [pinnedMap, setPinnedMap] = useState({});
   const [groupedAssignments, setGroupedAssignments] = useState({});
   const [summarizedEmpList, setSummarizedEmpList] = useState([]);
   const [highlighted, setHighlighted] = useState({});
@@ -242,12 +243,13 @@ export default function ViewSchedules() {
 
     setGroupedAssignments(grouped);
 
-    const { assignmentMap: newMap, datesByWeekday: newDates } = buildAssignmentMap(
+    const { assignmentMap: newMap, datesByWeekday: newDates, pinnedMap: newPinned } = buildAssignmentMap(
       rotaData.shiftAssignmentList,
       weekdayOrder
     );
     setAssignmentMap(newMap);
     setDatesByWeekday(newDates);
+    setPinnedMap(newPinned);
 
     // CRITICAL FIX: Only update originalAssignmentMap for CURRENT version
     // NOT for historical versions (historical versions should be read-only)
@@ -1052,6 +1054,7 @@ export default function ViewSchedules() {
                   weekdayOrder={weekdayOrder}
                   datesByWeekday={datesByWeekday}
                   assignmentMap={assignmentMap}
+                  pinnedMap={pinnedMap}
                   highlighted={highlighted}
                   handleRemove={handleRemove}
                   activeDragId={activeDragId}
