@@ -98,27 +98,21 @@ export const DroppableCell = memo(({
           allVisible.map((emp) => {
             const isPinned = pinnedIds?.has(emp.id);
             return (
-              <Tooltip
+              <Chip
                 key={`${cellKey}-${emp.id}`}
-                title={isPinned ? 'Pinned — solver will preserve this assignment' : ''}
-                arrow
-                disableHoverListener={!isPinned}
-              >
-                <Chip
-                  label={`${emp.firstName} ${emp.lastName}`}
-                  icon={isPinned ? <PushPinIcon sx={{ fontSize: 14 }} /> : undefined}
-                  onDelete={() => onRemove(cellKey, emp)}
-                  size="small"
-                  sx={{
-                    whiteSpace: "nowrap",
-                    backgroundColor: highlighted.some((e) => e.id === emp.id)
-                      ? "#a5d6a7"
-                      : "#1976D2",
-                    color: '#fff',
-                    '& .MuiChip-icon': { color: '#fff' },
-                  }}
-                />
-              </Tooltip>
+                label={`${emp.firstName} ${emp.lastName}`}
+                icon={isPinned ? <PushPinIcon sx={{ fontSize: 14 }} /> : undefined}
+                onDelete={() => onRemove(cellKey, emp)}
+                size="small"
+                sx={{
+                  whiteSpace: "nowrap",
+                  backgroundColor: highlighted.some((e) => e.id === emp.id)
+                    ? "#a5d6a7"
+                    : "#1976D2",
+                  color: '#fff',
+                  '& .MuiChip-icon': { color: '#fff' },
+                }}
+              />
             );
           })
         ) : (
