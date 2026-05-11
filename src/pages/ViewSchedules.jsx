@@ -60,16 +60,102 @@ export default function ViewSchedules() {
   const [assignmentMap, setAssignmentMap] = useState({});
   const [datesByWeekday, setDatesByWeekday] = useState(emptyDatesByWeekday);
   const [pinnedMap, setPinnedMap] = useState({});
-  // conflictCells: Set<cellKey>; conflictCellInfo: Map<cellKey, {employees, peers}>
-  // Computed once per assignmentMap change so the schedule view surfaces
-  // double-booking issues on load without requiring a drag interaction.
-  const { conflictCells, conflictCellInfo } = useMemo(
+  // Locally-detected conflicts (same-employee double-bookings under
+  // invalid same-day rules). Recomputed on every assignmentMap change.
+  const localConflicts = useMemo(
     () => {
       const { conflictCells, cellInfo } = findConflictCells(assignmentMap);
       return { conflictCells, conflictCellInfo: cellInfo };
     },
     [assignmentMap]
   );
+
+  // Backend-reported conflicts after a failed save (409). Stored as a Set
+  // of shift ids -- the backend conflict shape varies (shiftId / shift.id /
+  // id), so we extract whichever field is present and use the shiftId portion
+  // of cellKeys to mark matching cells.
+  const [backendConflictShiftIds, setBackendConflictShiftIds] = useState(new Set());
+  const [backendConflictMessages, setBackendConflictMessages] = useState(new Map());
+
+  const backendConflictCells = useMemo(() => {
+    if (backendConflictShiftIds.size === 0) return { cells: new Set(), cellInfo: new Map() };
+    const cells = new Set();
+    const cellInfo = new Map();
+    Object.keys(assignmentMap).forEach((cellKey) => {
+      const parts = cellKey.split('|');
+      if (parts.length !== 5) return;
+      const shiftId = Number(parts[4]);
+      if (backendConflictShiftIds.has(shiftId)) {
+        cells.add(cellKey);
+        const msg = backendConflictMessages.get(shiftId);
+        cellInfo.set(cellKey, {
+          employees: new Set([msg ? `Server: ${msg}` : 'Server rejected this shift']),
+          peers: [],
+        });
+      }
+    });
+    return { cells, cellInfo };
+  }, [assignmentMap, backendConflictShiftIds, backendConflictMessages]);
+
+  // Merge local + backend conflict sources into one set the renderer reads.
+  const conflictCells = useMemo(() => {
+    if (backendConflictCells.cells.size === 0) return localConflicts.conflictCells;
+    const merged = new Set(localConflicts.conflictCells);
+    backendConflictCells.cells.forEach((k) => merged.add(k));
+    return merged;
+  }, [localConflicts.conflictCells, backendConflictCells.cells]);
+
+  const conflictCellInfo = useMemo(() => {
+    if (backendConflictCells.cellInfo.size === 0) return localConflicts.conflictCellInfo;
+    const merged = new Map(localConflicts.conflictCellInfo);
+    backendConflictCells.cellInfo.forEach((info, key) => {
+      const existing = merged.get(key);
+      if (existing) {
+        info.employees.forEach((e) => existing.employees.add(e));
+      } else {
+        merged.set(key, info);
+      }
+    });
+    return merged;
+  }, [localConflicts.conflictCellInfo, backendConflictCells.cellInfo]);
+
+  // Extract a shift id from one backend conflict entry. The server payload
+  // may name the field differently across endpoints; try the common shapes.
+  const extractShiftId = (conflict) => {
+    const candidate = conflict?.shiftId
+      ?? conflict?.shift?.id
+      ?? conflict?.shiftAssignmentId
+      ?? conflict?.id;
+    const n = Number(candidate);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const handleSaveConflict = ({ conflicts, message }) => {
+    const shiftIds = new Set();
+    const messages = new Map();
+    (conflicts || []).forEach((c) => {
+      const id = extractShiftId(c);
+      if (id != null) {
+        shiftIds.add(id);
+        if (c?.message || c?.reason) {
+          messages.set(id, c.message || c.reason);
+        }
+      }
+    });
+    setBackendConflictShiftIds(shiftIds);
+    setBackendConflictMessages(messages);
+    setSnackbar({
+      message: shiftIds.size > 0
+        ? `${message || 'Save failed'}: ${shiftIds.size} conflict${shiftIds.size === 1 ? '' : 's'} highlighted on the schedule.`
+        : (message || 'Save failed: conflicts detected (no shift ids in response).'),
+      opened: true,
+    });
+  };
+
+  const clearBackendConflicts = () => {
+    setBackendConflictShiftIds(new Set());
+    setBackendConflictMessages(new Map());
+  };
   const [groupedAssignments, setGroupedAssignments] = useState({});
   const [summarizedEmpList, setSummarizedEmpList] = useState([]);
   const [highlighted, setHighlighted] = useState({});
@@ -814,6 +900,7 @@ export default function ViewSchedules() {
     setOriginalAssignmentMap(JSON.parse(JSON.stringify(assignmentMap)));
     setPendingChanges([]);
     setChangeHighlights({});
+    clearBackendConflicts();
     loadSchedule();
     setSnackbar({
       message: `Version ${versionData.version.versionNumber} saved successfully`,
@@ -1078,6 +1165,7 @@ export default function ViewSchedules() {
         pendingChanges={pendingChanges}
         assignmentMap={assignmentMap}
         onSaveComplete={handleSaveComplete}
+        onSaveConflict={handleSaveConflict}
       />
       {/* ✅ Add Conflict Dialog */}
       <ConflictDialog

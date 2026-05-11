@@ -35,6 +35,7 @@ export default function SaveScheduleDialog({
   pendingChanges,
   assignmentMap,
   onSaveComplete,
+  onSaveConflict,
 }) {
   const [versionLabel, setVersionLabel] = useState('');
   const [comment, setComment] = useState('');
@@ -108,12 +109,21 @@ export default function SaveScheduleDialog({
       setPinAllChanges(false);  // ✅ RESET
       onClose();
     } catch (err) {
-      console.error('Failed to save version:', err);
+      if (import.meta.env.DEV) console.error('Failed to save version:', err);
 
-      // ✅ HANDLE CONFLICT ERROR (409)
       if (err.response?.status === 409) {
         const conflicts = err.response?.data?.conflicts || [];
-        setError(`Pin validation failed: ${conflicts.length} conflict(s) detected. Please fix conflicting shift assignments before saving.`);
+        const message = err.response?.data?.message || 'Pin validation failed';
+        // Hand the conflict list up to the parent so it can highlight the
+        // offending cells on the grid; dialog stays open so the user can
+        // also read the error inline.
+        if (onSaveConflict) {
+          onSaveConflict({ conflicts, message });
+        }
+        setError(
+          `${message}: ${conflicts.length} conflict${conflicts.length === 1 ? '' : 's'} detected. ` +
+          `Conflicting cells are highlighted on the schedule.`
+        );
       } else {
         const errorMsg = err.response?.data?.message || 'Failed to save version';
         setError(errorMsg);
