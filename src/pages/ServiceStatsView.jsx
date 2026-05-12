@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Box, Grid, Alert, CircularProgress, Snackbar } from '@mui/material';
-import { fetchServiceStats } from '../api/stats';
+import { fetchServiceStats, fetchServicePublishHistory } from '../api/stats';
 import ServiceStatsCard from '../components/ServiceStatsCard';
 
 export default function ServiceStatsView() {
@@ -9,12 +9,25 @@ export default function ServiceStatsView() {
   const rotaId = searchParams.get('id');
 
   const [data, setData] = useState([]);
+  // service location -> { publishCount, lastPublishedAt } | null
+  const [publishHistory, setPublishHistory] = useState(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
 
   const showToast = useCallback((t) => setToast(t), []);
   const closeToast = () => setToast(null);
+
+  // Card calls this after a successful publish so the badge/colour update
+  // without a follow-up GET. We trust the POST response's totalPublishCount
+  // and stamp lastPublishedAt with the local clock.
+  const updateServiceHistory = useCallback((service, history) => {
+    setPublishHistory((prev) => {
+      const next = new Map(prev);
+      next.set(service, history);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (!rotaId) {
@@ -26,16 +39,47 @@ export default function ServiceStatsView() {
     setLoading(true);
     setError(null);
 
-    fetchServiceStats(rotaId, { signal: controller.signal })
-      .then((res) => setData(Array.isArray(res) ? res : []))
-      .catch((err) => {
+    (async () => {
+      try {
+        const stats = await fetchServiceStats(rotaId, { signal: controller.signal });
+        const safeStats = Array.isArray(stats) ? stats : [];
+        if (controller.signal.aborted) return;
+        setData(safeStats);
+
+        // Collect unique service names so we don't double-fetch a service
+        // that appears under multiple regions in the payload.
+        const services = new Set();
+        safeStats.forEach((region) => {
+          (region.services ?? []).forEach((s) => {
+            if (s?.location) services.add(s.location);
+          });
+        });
+
+        // Parallel fetch -- N requests for N services. Each one returns null
+        // on 404 (no publishes yet) and falls through silently on errors so
+        // a single stale entry doesn't break the page.
+        const entries = await Promise.all(
+          Array.from(services).map(async (svc) => {
+            const history = await fetchServicePublishHistory(rotaId, svc, {
+              signal: controller.signal,
+            }).catch(() => null);
+            return [svc, history];
+          })
+        );
+        if (controller.signal.aborted) return;
+        const map = new Map();
+        entries.forEach(([svc, history]) => {
+          if (history) map.set(svc, history);
+        });
+        setPublishHistory(map);
+      } catch (err) {
         if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
         if (import.meta.env.DEV) console.error('Failed to load service stats:', err);
         setError(err.response?.data?.message || 'Failed to load service stats');
-      })
-      .finally(() => {
+      } finally {
         if (!controller.signal.aborted) setLoading(false);
-      });
+      }
+    })();
 
     return () => controller.abort();
   }, [rotaId]);
@@ -93,6 +137,8 @@ export default function ServiceStatsView() {
               region={region}
               service={service}
               rotaId={rotaId}
+              publishHistory={publishHistory.get(service.location) || null}
+              onPublishHistoryChange={updateServiceHistory}
               onToast={showToast}
             />
           </Grid>

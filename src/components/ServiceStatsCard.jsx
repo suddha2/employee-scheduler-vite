@@ -17,12 +17,46 @@ import {
   LinearProgress,
   Tooltip,
   Button,
+  Badge,
   CircularProgress,
+  Stack,
 } from '@mui/material';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CampaignIcon from '@mui/icons-material/Campaign';
+import { formatDistanceToNow } from 'date-fns';
 import { publishUnallocatedShiftsForService } from '../api/stats';
+
+const ONE_HOUR_MS = 60 * 60 * 1000;
+const ONE_DAY_MS = 24 * ONE_HOUR_MS;
+
+// Translate a "how long ago was the last publish" timestamp into a colour
+// bucket. Used to tint the Publish button so a quick scan tells you whether
+// a service was just broadcast (green), getting stale (amber), or cold.
+function publishRecency(lastPublishedAt) {
+  if (!lastPublishedAt) return 'never';
+  const ts = new Date(lastPublishedAt).getTime();
+  if (Number.isNaN(ts)) return 'never';
+  const ago = Date.now() - ts;
+  if (ago < ONE_HOUR_MS) return 'recent';
+  if (ago < ONE_DAY_MS) return 'stale';
+  return 'cold';
+}
+
+function recencyButtonColor(bucket) {
+  if (bucket === 'recent') return 'success';
+  if (bucket === 'stale') return 'warning';
+  return 'inherit';
+}
+
+function recencyLabel(lastPublishedAt) {
+  if (!lastPublishedAt) return 'Never published';
+  try {
+    return `Published ${formatDistanceToNow(new Date(lastPublishedAt), { addSuffix: true })}`;
+  } catch {
+    return 'Published recently';
+  }
+}
 
 function aggregateByShiftType(allStats) {
   const map = new Map();
@@ -86,7 +120,14 @@ function CoverageBar({ percent }) {
   );
 }
 
-export default function ServiceStatsCard({ region, service, rotaId, onToast }) {
+export default function ServiceStatsCard({
+  region,
+  service,
+  rotaId,
+  publishHistory,
+  onPublishHistoryChange,
+  onToast,
+}) {
   const [publishing, setPublishing] = useState(false);
 
   const handlePublish = async () => {
@@ -101,6 +142,20 @@ export default function ServiceStatsCard({ region, service, rotaId, onToast }) {
       onToast?.({
         message,
         severity: result?.broadcastSent ? 'success' : 'info',
+      });
+
+      // Backend's POST response now carries totalPublishCount; trust it for the
+      // counter and stamp lastPublishedAt with local time. broadcastSent=false
+      // still counts as a publish attempt -- the backend records the call --
+      // so we bump the counter either way.
+      const nextCount = result?.totalPublishCount
+        ?? result?.publishCount
+        ?? ((publishHistory?.publishCount ?? 0) + 1);
+      const nextLast = result?.lastPublishedAt
+        ?? new Date().toISOString();
+      onPublishHistoryChange?.(service.location, {
+        publishCount: nextCount,
+        lastPublishedAt: nextLast,
       });
     } catch (err) {
       const status = err.response?.status;
@@ -256,15 +311,38 @@ export default function ServiceStatsCard({ region, service, rotaId, onToast }) {
       </CardContent>
       {hasUnallocated && (
         <CardActions sx={{ px: 2, pb: 2, pt: 0, justifyContent: 'flex-end' }}>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={publishing ? <CircularProgress size={14} /> : <CampaignIcon />}
-            onClick={handlePublish}
-            disabled={publishing || !rotaId}
+          <Stack
+            direction="column"
+            alignItems="flex-end"
+            spacing={0.5}
           >
-            {publishing ? 'Publishing…' : 'Publish unallocated'}
-          </Button>
+            <Tooltip
+              title={publishHistory?.lastPublishedAt
+                ? `Last broadcast: ${new Date(publishHistory.lastPublishedAt).toLocaleString()}`
+                : 'No previous broadcast for this service.'}
+            >
+              <Badge
+                badgeContent={publishHistory?.publishCount ?? 0}
+                color="primary"
+                showZero={false}
+                overlap="rectangular"
+              >
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color={recencyButtonColor(publishRecency(publishHistory?.lastPublishedAt))}
+                  startIcon={publishing ? <CircularProgress size={14} /> : <CampaignIcon />}
+                  onClick={handlePublish}
+                  disabled={publishing || !rotaId}
+                >
+                  {publishing ? 'Publishing…' : 'Publish unallocated'}
+                </Button>
+              </Badge>
+            </Tooltip>
+            <Typography variant="caption" color="text.secondary">
+              {recencyLabel(publishHistory?.lastPublishedAt)}
+            </Typography>
+          </Stack>
         </CardActions>
       )}
     </Card>
