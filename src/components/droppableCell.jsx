@@ -57,12 +57,22 @@ export const DroppableCell = memo(({
     }
   };
 
+  // True when this cell currently has the find-targeted employee assigned.
+  // Drives the cell-level amber highlight (cell border + background tint)
+  // instead of a per-chip outline -- much easier to spot when scanning.
+  const isFoundInCell = findHighlightedEmpId != null &&
+    assigned.some((e) => e.id === findHighlightedEmpId);
+
   const cellBorder = hasConflict
     ? "2px solid #d32f2f"
-    : isOver ? "2px dashed #3f51b5" : "1px dashed #ccc";
+    : isFoundInCell
+      ? "2px solid #ed6c02"
+      : isOver ? "2px dashed #3f51b5" : "1px dashed #ccc";
   const cellBackground = hasConflict
     ? "#ffebee"
-    : isOver ? "#e3f2fd" : "#bfdbf0ff";
+    : isFoundInCell
+      ? "#fff3e0"
+      : isOver ? "#e3f2fd" : "#bfdbf0ff";
 
   return (
     <Tooltip title={hasConflict ? buildConflictTooltip(conflictInfo) : ''} arrow disableHoverListener={!hasConflict}>
@@ -98,7 +108,6 @@ export const DroppableCell = memo(({
         {allVisible.length > 0 ? (
           allVisible.map((emp) => {
             const isPinned = pinnedIds?.has(emp.id);
-            const isFound = findHighlightedEmpId === emp.id;
             return (
               <Chip
                 key={`${cellKey}-${emp.id}`}
@@ -113,11 +122,6 @@ export const DroppableCell = memo(({
                     : "#1976D2",
                   color: '#fff',
                   '& .MuiChip-icon': { color: '#fff' },
-                  // Amber outline (find-highlight) lives outside the chip so it
-                  // doesn't collide with the chip's own border. Distinct from
-                  // green = drag-target and red = conflict.
-                  outline: isFound ? '2px solid #ed6c02' : 'none',
-                  outlineOffset: isFound ? 2 : 0,
                 }}
               />
             );
