@@ -12,7 +12,8 @@ import {
     IconButton,
     useTheme,
     useMediaQuery,
-    Collapse
+    Collapse,
+    Badge
 } from '@mui/material';
 import {
     Home as HomeIcon,
@@ -28,6 +29,7 @@ import {
     Inbox as InboxIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useShiftRequestsNotifications } from '../contexts/ShiftRequestsContext';
 
 const DRAWER_WIDTH = 260;
 
@@ -37,6 +39,7 @@ export default function Sidebar({ open, onClose, onToggle }) {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const [statsOpen, setStatsOpen] = useState(false);
+    const { newCount: newShiftRequestCount } = useShiftRequestsNotifications();
 
     const handleStatsClick = () => {
         setStatsOpen(!statsOpen);
@@ -72,7 +75,16 @@ export default function Sidebar({ open, onClose, onToggle }) {
         },
         {
             title: 'Shift Requests',
-            icon: <InboxIcon />,
+            icon: (
+                <Badge
+                    badgeContent={newShiftRequestCount}
+                    color="error"
+                    overlap="circular"
+                    invisible={!newShiftRequestCount}
+                >
+                    <InboxIcon />
+                </Badge>
+            ),
             path: '/shift-requests'
         },
         // {

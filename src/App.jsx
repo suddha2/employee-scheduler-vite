@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { AuthProvider } from './contexts/AuthContext';
+import { ShiftRequestsProvider } from './contexts/ShiftRequestsContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
@@ -28,8 +29,9 @@ export default function App() {
         <Router>
           <AuthProvider>
             <AxiosInterceptorSetup />
-            <Navbar />
-            <Routes>
+            <ShiftRequestsProvider>
+              <Navbar />
+              <Routes>
               {/* Public Routes */}
               <Route path="/" element={<Navigate to="/dashboard" />} />
               <Route path="/login" element={<LoginPage />} />
@@ -161,7 +163,8 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-            </Routes>
+              </Routes>
+            </ShiftRequestsProvider>
           </AuthProvider>
         </Router>
       </LocalizationProvider>

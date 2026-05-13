@@ -20,7 +20,7 @@ import {
 } from '@mui/icons-material';
 import { format, formatDistanceToNow } from 'date-fns';
 import { listShiftRequests, resolveShiftRequest } from '../api/shiftRequests';
-import { useShiftRequestUpdates } from '../hooks/useShiftRequestUpdates';
+import { useShiftRequestsNotifications } from '../contexts/ShiftRequestsContext';
 import SuitabilityMatrix, { SummaryBadge } from '../components/SuitabilityMatrix';
 
 const STATUS_FILTERS = ['PENDING', 'ALL', 'APPROVED', 'REJECTED', 'FILLED'];
@@ -94,8 +94,15 @@ export default function ShiftRequestsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleNotification = useCallback(() => { load(); }, [load]);
-  useShiftRequestUpdates(handleNotification);
+  // Subscribe to the app-level STOMP context. Any incoming payload bumps
+  // `lastPayload`; we refetch on each one. Also mark the global counter as
+  // read on mount so the sidebar badge clears when the admin opens this view.
+  const { lastPayload, markAllRead } = useShiftRequestsNotifications();
+  useEffect(() => { markAllRead(); }, [markAllRead]);
+  useEffect(() => {
+    if (!lastPayload) return;
+    load();
+  }, [lastPayload, load]);
 
   const groupedByRota = useMemo(() => {
     const map = new Map();
