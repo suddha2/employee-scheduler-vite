@@ -24,6 +24,7 @@ export const DroppableCell = memo(({
   pinnedIds,
   hasConflict,
   conflictInfo,
+  findHighlightedEmpId,
   onRemove,
   highlighted,
   isDragging
@@ -97,6 +98,7 @@ export const DroppableCell = memo(({
         {allVisible.length > 0 ? (
           allVisible.map((emp) => {
             const isPinned = pinnedIds?.has(emp.id);
+            const isFound = findHighlightedEmpId === emp.id;
             return (
               <Chip
                 key={`${cellKey}-${emp.id}`}
@@ -111,6 +113,11 @@ export const DroppableCell = memo(({
                     : "#1976D2",
                   color: '#fff',
                   '& .MuiChip-icon': { color: '#fff' },
+                  // Amber outline (find-highlight) lives outside the chip so it
+                  // doesn't collide with the chip's own border. Distinct from
+                  // green = drag-target and red = conflict.
+                  outline: isFound ? '2px solid #ed6c02' : 'none',
+                  outlineOffset: isFound ? 2 : 0,
                 }}
               />
             );
@@ -145,6 +152,16 @@ export const DroppableCell = memo(({
 
   // Conflict flag: cheap reference / boolean comparison.
   if (prevProps.hasConflict !== nextProps.hasConflict) return false;
+
+  // Find-highlight only matters when the targeted employee is on this cell;
+  // gate the re-render so unrelated cells stay memo'd.
+  if (prevProps.findHighlightedEmpId !== nextProps.findHighlightedEmpId) {
+    const prevHasIt = prevProps.findHighlightedEmpId != null &&
+      prevProps.assigned.some(e => e.id === prevProps.findHighlightedEmpId);
+    const nextHasIt = nextProps.findHighlightedEmpId != null &&
+      nextProps.assigned.some(e => e.id === nextProps.findHighlightedEmpId);
+    if (prevHasIt || nextHasIt) return false;
+  }
 
   return true; // Props are equal, skip re-render
 });

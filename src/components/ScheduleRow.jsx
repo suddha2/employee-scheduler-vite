@@ -13,6 +13,7 @@ const ScheduleRow = memo(({
   pinnedMap,
   conflictCells,
   conflictCellInfo,
+  findHighlightedEmpId,
   highlighted,
   handleRemove,
   activeDragId,
@@ -100,6 +101,7 @@ const ScheduleRow = memo(({
                     pinnedIds={pinnedMap?.[cellKey]}
                     hasConflict={conflictCells?.has(cellKey)}
                     conflictInfo={conflictCellInfo?.get(cellKey)}
+                    findHighlightedEmpId={findHighlightedEmpId}
                     highlighted={highlighted[cellKey] ?? []}
                     onRemove={handleRemove}
                     isDragging={!!activeDragId}
@@ -139,6 +141,7 @@ const ScheduleRow = memo(({
     prevProps.assignmentMap === nextProps.assignmentMap &&
     prevProps.pinnedMap === nextProps.pinnedMap &&
     prevProps.conflictCells === nextProps.conflictCells &&
+    prevProps.findHighlightedEmpId === nextProps.findHighlightedEmpId &&
     prevProps.changeHighlights === nextProps.changeHighlights
   );
 });

@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Table, TableHead, TableBody, TableRow, TableCell,
   TableContainer, Paper, Typography, Box, Tooltip, Button, CircularProgress,
-  Badge, IconButton, AppBar, Toolbar, Chip, Snackbar, Alert
+  Badge, IconButton, AppBar, Toolbar, Chip, Snackbar, Alert,
+  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions
 } from "@mui/material";
 import {
   Save as SaveIcon,
@@ -78,6 +79,13 @@ export default function ViewSchedules() {
   const [backendConflictShiftIds, setBackendConflictShiftIds] = useState(new Set());
   const [backendConflictMessages, setBackendConflictMessages] = useState(new Map());
   const [conflictsDrawerOpen, setConflictsDrawerOpen] = useState(false);
+  // findHighlightedEmpId: when set, every chip for this employee renders
+  // with an amber outline so the admin can scan their assignments. The
+  // floating Employees list also gets a search-driven UI to set/clear it.
+  const [findHighlightedEmpId, setFindHighlightedEmpId] = useState(null);
+  // clearTarget: opens the confirm dialog for "Clear all assignments" for
+  // a specific employee. count is precomputed so the dialog can show it.
+  const [clearTarget, setClearTarget] = useState(null);
 
   const backendConflictCells = useMemo(() => {
     if (backendConflictShiftIds.size === 0) return { cells: new Set(), cellInfo: new Map() };
@@ -309,6 +317,52 @@ export default function ViewSchedules() {
     if (!id) return;
     loadSchedule();
   }, [id]);
+
+  // Toggle the "highlight this employee's assignments" amber chip ring.
+  const handleToggleFindHighlight = (empId) => {
+    setFindHighlightedEmpId((prev) => (prev === empId ? null : empId));
+  };
+
+  // Count this employee's current allocations and open the confirm dialog.
+  // If they have none, just toast — no point bringing up a dialog.
+  const handleAskClearAll = (employee) => {
+    let count = 0;
+    Object.values(assignmentMap).forEach((emps) => {
+      if (emps.some((e) => e.id === employee.id)) count += 1;
+    });
+    if (count === 0) {
+      setSnackbar({
+        message: `${employee.firstName} ${employee.lastName} has no assignments to clear.`,
+        opened: true,
+      });
+      return;
+    }
+    setClearTarget({ employee, count });
+  };
+
+  // Remove the targeted employee from every cell in one setAssignmentMap.
+  // The existing change-tracker memo picks this up and emits one UNASSIGNED
+  // pendingChange per affected cell, so Save / Discard work unchanged.
+  const handleConfirmClearAll = () => {
+    if (!clearTarget) return;
+    const { employee, count } = clearTarget;
+    setAssignmentMap((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((cellKey) => {
+        const filtered = next[cellKey].filter((e) => e.id !== employee.id);
+        if (filtered.length !== next[cellKey].length) next[cellKey] = filtered;
+      });
+      return next;
+    });
+    // If we were "finding" this employee, drop the highlight too — there's
+    // nothing left for it to point at locally until Save is undone.
+    if (findHighlightedEmpId === employee.id) setFindHighlightedEmpId(null);
+    setSnackbar({
+      message: `Cleared ${count} assignment${count === 1 ? '' : 's'} for ${employee.firstName} ${employee.lastName}.`,
+      opened: true,
+    });
+    setClearTarget(null);
+  };
 
   const handlePublish = async () => {
     if (!id || publishing) return;
@@ -1002,6 +1056,20 @@ export default function ViewSchedules() {
             </Tooltip>
           )}
 
+          {findHighlightedEmpId != null && (() => {
+            const emp = summarizedEmpList?.find((e) => e.id === findHighlightedEmpId);
+            const label = emp ? `Highlighting ${emp.firstName} ${emp.lastName}` : 'Highlighting…';
+            return (
+              <Chip
+                label={label}
+                color="warning"
+                variant="outlined"
+                onDelete={() => setFindHighlightedEmpId(null)}
+                sx={{ mr: 2 }}
+              />
+            );
+          })()}
+
           {pendingChanges.length > 0 && (
             <Chip
               label={`${pendingChanges.length} pending changes`}
@@ -1135,6 +1203,7 @@ export default function ViewSchedules() {
                   pinnedMap={pinnedMap}
                   conflictCells={conflictCells}
                   conflictCellInfo={conflictCellInfo}
+                  findHighlightedEmpId={findHighlightedEmpId}
                   highlighted={highlighted}
                   handleRemove={handleRemove}
                   activeDragId={activeDragId}
@@ -1149,7 +1218,12 @@ export default function ViewSchedules() {
         </TableContainer>
       </Box>
 
-      <FloatingEmployeeList employees={summarizedEmpList || []} />
+      <FloatingEmployeeList
+        employees={summarizedEmpList || []}
+        findHighlightedEmpId={findHighlightedEmpId}
+        onToggleFindHighlight={handleToggleFindHighlight}
+        onClearAllForEmployee={handleAskClearAll}
+      />
 
       <DragOverlay>
         {draggedEmployee ? (
@@ -1223,6 +1297,32 @@ export default function ViewSchedules() {
         onConfirm={handleConfirmDiscard}
         pendingChanges={pendingChanges}
       />
+
+      <Dialog
+        open={!!clearTarget}
+        onClose={() => setClearTarget(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Clear all assignments?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Remove{' '}
+            <strong>
+              {clearTarget?.employee.firstName} {clearTarget?.employee.lastName}
+            </strong>{' '}
+            from <strong>{clearTarget?.count}</strong> cell
+            {clearTarget?.count === 1 ? '' : 's'}? Changes can be discarded
+            before saving.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setClearTarget(null)}>Cancel</Button>
+          <Button onClick={handleConfirmClearAll} variant="contained" color="error">
+            Clear All
+          </Button>
+        </DialogActions>
+      </Dialog>
       {/* Add before </DndContext> closing tag, around line 850 */}
       <BulkAssignmentModal
         open={bulkAssignmentModal.open}

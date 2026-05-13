@@ -7,14 +7,27 @@ import {
   Collapse,
   Divider,
   TextField,
+  Button,
+  Stack,
 } from "@mui/material";
-import { ExpandLess, ExpandMore } from "@mui/icons-material";
+import {
+  ExpandLess,
+  ExpandMore,
+  Search as SearchIcon,
+  DeleteSweep as DeleteSweepIcon,
+} from "@mui/icons-material";
 import { useDraggable, DragOverlay } from "@dnd-kit/core";
 import { shiftColors, shiftTypes, getPriorityColor, shiftTypeShortText } from "../components/shiftTypeGrading";
 
 const SHIFT_COLUMN_WIDTH = 24;
 
-function EmployeeItem({ employee }) {
+function EmployeeItem({
+  employee,
+  showActions,
+  isFindHighlighted,
+  onToggleFindHighlight,
+  onClearAllForEmployee,
+}) {
   const id = `emp|${employee.id}`;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id });
 
@@ -24,99 +37,154 @@ function EmployeeItem({ employee }) {
     0
   );
 
+  // Wrapper handler: stop the drag handlers from claiming the click/mousedown
+  // so the button row works even though the surrounding row is a drag source.
+  const stopAndRun = (fn) => (e) => {
+    e.stopPropagation();
+    fn?.();
+  };
+
   return (
     <Box
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
       sx={{
         px: 1,
         py: 0.5,
         mb: 1,
         borderRadius: 1,
         fontSize: 14,
-        backgroundColor: isDragging ? "primary.light" : "grey.100",
-        cursor: "grab",
+        backgroundColor: isFindHighlighted
+          ? 'rgba(237, 108, 2, 0.12)' // warning.light tint when this row is "being found"
+          : isDragging
+            ? 'primary.light'
+            : 'grey.100',
         userSelect: "none",
         transition: "background-color 0.2s",
+        outline: isFindHighlighted ? '1px solid #ed6c02' : 'none',
         "&:hover": {
-          backgroundColor: "grey.200",
+          backgroundColor: isFindHighlighted ? 'rgba(237, 108, 2, 0.18)' : 'grey.200',
         },
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
       }}
     >
-      <Box sx={{ flexGrow: 1, display: "flex", alignItems: "center" }}>
-        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-          {employee.firstName} {employee.lastName}
-        </Typography>
-        <Typography
-          variant="caption"
-          sx={{
-            ml: 1,
-            px: 0.6,
-            py: 0.2,
-            borderRadius: 1,
-            backgroundColor: "grey.300",
-            color: "text.primary",
-            fontSize: 11,
-            fontWeight: 500,
-          }}
-        >
-          {totalHours}
-        </Typography>
-      </Box>
+      <Box
+        ref={setNodeRef}
+        {...listeners}
+        {...attributes}
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          cursor: "grab",
+        }}
+      >
+        <Box sx={{ flexGrow: 1, display: "flex", alignItems: "center" }}>
+          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+            {employee.firstName} {employee.lastName}
+          </Typography>
+          <Typography
+            variant="caption"
+            sx={{
+              ml: 1,
+              px: 0.6,
+              py: 0.2,
+              borderRadius: 1,
+              backgroundColor: "grey.300",
+              color: "text.primary",
+              fontSize: 11,
+              fontWeight: 500,
+            }}
+          >
+            {totalHours}
+          </Typography>
+        </Box>
 
-      <Box sx={{ display: "flex" }}>
-        {shiftTypes.map((type) => {
-          const summary = employee.shiftTypeSummary?.[type];
-          const count = summary?.count ?? 0;
-          const hours = summary?.hours ?? 0;
+        <Box sx={{ display: "flex" }}>
+          {shiftTypes.map((type) => {
+            const summary = employee.shiftTypeSummary?.[type];
+            const count = summary?.count ?? 0;
+            const hours = summary?.hours ?? 0;
 
-          return (
-            <Box
-              key={type}
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                width: SHIFT_COLUMN_WIDTH,
-                boxSizing: "border-box",
-              }}
-            >
+            return (
               <Box
+                key={type}
                 sx={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: "50%",
-                  backgroundColor: getPriorityColor(shiftColors[type]),
-                  color: "white",
-                  fontSize: 12,
                   display: "flex",
+                  flexDirection: "column",
                   alignItems: "center",
-                  justifyContent: "center",
+                  width: SHIFT_COLUMN_WIDTH,
+                  boxSizing: "border-box",
                 }}
-                title={`${type} shift count`}
               >
-                {count}
+                <Box
+                  sx={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: "50%",
+                    backgroundColor: getPriorityColor(shiftColors[type]),
+                    color: "white",
+                    fontSize: 12,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                  title={`${type} shift count`}
+                >
+                  {count}
+                </Box>
+                <Typography
+                  variant="caption"
+                  sx={{ fontSize: 10, color: "text.secondary", lineHeight: 1.2 }}
+                >
+                  {hours}
+                </Typography>
               </Box>
-              <Typography
-                variant="caption"
-                sx={{ fontSize: 10, color: "text.secondary", lineHeight: 1.2 }}
-              >
-                {hours}
-              </Typography>
-            </Box>
-          );
-        })}
+            );
+          })}
+        </Box>
       </Box>
+
+      {/* Inline actions: only rendered while the user is searching, so the
+          idle list stays uncluttered. Buttons stopPropagation on click and
+          mousedown so they never start a drag. */}
+      {showActions && (
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ mt: 0.75 }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <Button
+            size="small"
+            variant={isFindHighlighted ? 'contained' : 'outlined'}
+            color="warning"
+            startIcon={<SearchIcon />}
+            onClick={stopAndRun(() => onToggleFindHighlight?.(employee.id))}
+            sx={{ flex: 1, fontSize: 11, py: 0.25 }}
+          >
+            {isFindHighlighted ? 'Stop highlighting' : 'Highlight shifts'}
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteSweepIcon />}
+            onClick={stopAndRun(() => onClearAllForEmployee?.(employee))}
+            sx={{ flex: 1, fontSize: 11, py: 0.25 }}
+          >
+            Clear all
+          </Button>
+        </Stack>
+      )}
     </Box>
   );
 }
 
 
-export default function FloatingEmployeeList({ employees = [] }) {
+export default function FloatingEmployeeList({
+  employees = [],
+  findHighlightedEmpId = null,
+  onToggleFindHighlight,
+  onClearAllForEmployee,
+}) {
   const [open, setOpen] = useState(true);
   const [activeId, setActiveId] = useState(null);
   const columnWidths = [200, 150, 150, 150, 150, 150, 150, 150];
@@ -285,7 +353,14 @@ export default function FloatingEmployeeList({ employees = [] }) {
             </Box>
             {filteredEmployees.length > 0 ? (
               filteredEmployees.map((emp) => (
-                <EmployeeItem key={emp.id} employee={emp} />
+                <EmployeeItem
+                  key={emp.id}
+                  employee={emp}
+                  showActions={searchQuery.trim().length > 0}
+                  isFindHighlighted={findHighlightedEmpId === emp.id}
+                  onToggleFindHighlight={onToggleFindHighlight}
+                  onClearAllForEmployee={onClearAllForEmployee}
+                />
               ))
             ) : (
               <Typography variant="body2" color="text.secondary">
