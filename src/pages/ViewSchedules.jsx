@@ -86,6 +86,11 @@ export default function ViewSchedules() {
   // clearTarget: opens the confirm dialog for "Clear all assignments" for
   // a specific employee. count is precomputed so the dialog can show it.
   const [clearTarget, setClearTarget] = useState(null);
+  // selectedSlotKey: when an admin clicks an unassigned cell we mark its
+  // cellKey here. The floating employees list then filters to employees who
+  // have no other assignment on that date, so they're guaranteed-free for
+  // the slot. Click again to toggle off, or use the chip's ×.
+  const [selectedSlotKey, setSelectedSlotKey] = useState(null);
 
   const backendConflictCells = useMemo(() => {
     if (backendConflictShiftIds.size === 0) return { cells: new Set(), cellInfo: new Map() };
@@ -322,6 +327,40 @@ export default function ViewSchedules() {
   const handleToggleFindHighlight = (empId) => {
     setFindHighlightedEmpId((prev) => (prev === empId ? null : empId));
   };
+
+  // Click an unassigned cell -> select it. Click the same cell again ->
+  // deselect. Only fires for cells that are actually empty (the cell
+  // component gates on that).
+  const handleSelectSlot = (cellKey) => {
+    setSelectedSlotKey((prev) => (prev === cellKey ? null : cellKey));
+  };
+
+  // Derived: when a slot is selected, this carries the date + display label
+  // and a Set of employee ids who already have *any* assignment on that date
+  // (and so should be excluded from the floating list filter).
+  const slotFilterInfo = useMemo(() => {
+    if (!selectedSlotKey) return null;
+    const parts = selectedSlotKey.split('|');
+    if (parts.length !== 5) return null;
+    const [location, shiftType, date, startTime] = parts;
+
+    const busyIds = new Set();
+    Object.entries(assignmentMap).forEach(([cellKey, employees]) => {
+      const p = cellKey.split('|');
+      if (p.length !== 5) return;
+      if (p[2] !== date) return;
+      employees.forEach((e) => busyIds.add(e.id));
+    });
+
+    return {
+      cellKey: selectedSlotKey,
+      date,
+      location,
+      shiftType,
+      startTime: (startTime || '').slice(0, 5),
+      busyIds,
+    };
+  }, [selectedSlotKey, assignmentMap]);
 
   // Count this employee's current allocations and open the confirm dialog.
   // If they have none, just toast — no point bringing up a dialog.
@@ -1056,6 +1095,24 @@ export default function ViewSchedules() {
             </Tooltip>
           )}
 
+          {slotFilterInfo && (() => {
+            let dateLabel = slotFilterInfo.date;
+            try {
+              const d = new Date(`${slotFilterInfo.date}T00:00:00`);
+              dateLabel = format(d, 'EEE d MMM');
+            } catch { /* keep raw */ }
+            const label = `Free on ${dateLabel} · ${slotFilterInfo.location} · ${slotFilterInfo.startTime}`;
+            return (
+              <Chip
+                label={label}
+                color="primary"
+                variant="outlined"
+                onDelete={() => setSelectedSlotKey(null)}
+                sx={{ mr: 2 }}
+              />
+            );
+          })()}
+
           {findHighlightedEmpId != null && (() => {
             const emp = summarizedEmpList?.find((e) => e.id === findHighlightedEmpId);
             const label = emp ? `Highlighting ${emp.firstName} ${emp.lastName}` : 'Highlighting…';
@@ -1204,6 +1261,8 @@ export default function ViewSchedules() {
                   conflictCells={conflictCells}
                   conflictCellInfo={conflictCellInfo}
                   findHighlightedEmpId={findHighlightedEmpId}
+                  selectedSlotKey={selectedSlotKey}
+                  onSelectSlot={handleSelectSlot}
                   highlighted={highlighted}
                   handleRemove={handleRemove}
                   activeDragId={activeDragId}
@@ -1223,6 +1282,8 @@ export default function ViewSchedules() {
         findHighlightedEmpId={findHighlightedEmpId}
         onToggleFindHighlight={handleToggleFindHighlight}
         onClearAllForEmployee={handleAskClearAll}
+        slotFilterInfo={slotFilterInfo}
+        onClearSlotFilter={() => setSelectedSlotKey(null)}
       />
 
       <DragOverlay>

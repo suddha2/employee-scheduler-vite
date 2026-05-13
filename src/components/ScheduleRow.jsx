@@ -14,6 +14,8 @@ const ScheduleRow = memo(({
   conflictCells,
   conflictCellInfo,
   findHighlightedEmpId,
+  selectedSlotKey,
+  onSelectSlot,
   highlighted,
   handleRemove,
   activeDragId,
@@ -102,6 +104,8 @@ const ScheduleRow = memo(({
                     hasConflict={conflictCells?.has(cellKey)}
                     conflictInfo={conflictCellInfo?.get(cellKey)}
                     findHighlightedEmpId={findHighlightedEmpId}
+                    isSelectedForFilter={selectedSlotKey === cellKey}
+                    onSelectSlot={onSelectSlot ? () => onSelectSlot(cellKey) : undefined}
                     highlighted={highlighted[cellKey] ?? []}
                     onRemove={handleRemove}
                     isDragging={!!activeDragId}
@@ -142,6 +146,7 @@ const ScheduleRow = memo(({
     prevProps.pinnedMap === nextProps.pinnedMap &&
     prevProps.conflictCells === nextProps.conflictCells &&
     prevProps.findHighlightedEmpId === nextProps.findHighlightedEmpId &&
+    prevProps.selectedSlotKey === nextProps.selectedSlotKey &&
     prevProps.changeHighlights === nextProps.changeHighlights
   );
 });

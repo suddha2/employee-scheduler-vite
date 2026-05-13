@@ -25,6 +25,8 @@ export const DroppableCell = memo(({
   hasConflict,
   conflictInfo,
   findHighlightedEmpId,
+  isSelectedForFilter,
+  onSelectSlot,
   onRemove,
   highlighted,
   isDragging
@@ -63,21 +65,32 @@ export const DroppableCell = memo(({
   const isFoundInCell = findHighlightedEmpId != null &&
     assigned.some((e) => e.id === findHighlightedEmpId);
 
+  // Clicking an *empty* cell selects it for the "free on this date" filter
+  // in the floating employees list. Filled cells ignore the click so the
+  // chip drag affordance still owns the interaction there.
+  const isEmpty = assigned.length === 0;
+  const handleCellClick = (isEmpty && onSelectSlot && !isDragging) ? onSelectSlot : undefined;
+
   const cellBorder = hasConflict
     ? "2px solid #d32f2f"
     : isFoundInCell
       ? "2px solid #ed6c02"
-      : isOver ? "2px dashed #3f51b5" : "1px dashed #ccc";
+      : isSelectedForFilter
+        ? "2px solid #1976d2"
+        : isOver ? "2px dashed #3f51b5" : "1px dashed #ccc";
   const cellBackground = hasConflict
     ? "#ffebee"
     : isFoundInCell
       ? "#fff3e0"
-      : isOver ? "#e3f2fd" : "#bfdbf0ff";
+      : isSelectedForFilter
+        ? "#e3f2fd"
+        : isOver ? "#e3f2fd" : "#bfdbf0ff";
 
   return (
     <Tooltip title={hasConflict ? buildConflictTooltip(conflictInfo) : ''} arrow disableHoverListener={!hasConflict}>
       <Box
         ref={setNodeRef}
+        onClick={handleCellClick}
         sx={{
           flexGrow: 1,
           position: 'relative',
@@ -90,6 +103,7 @@ export const DroppableCell = memo(({
           flexWrap: "wrap",
           gap: 0.5,
           minHeight: 40,
+          cursor: handleCellClick ? 'pointer' : 'default',
           transition: "border 0.15s ease, background-color 0.15s ease",
         }}
       >
@@ -172,6 +186,9 @@ export const DroppableCell = memo(({
 
   // Conflict flag: cheap reference / boolean comparison.
   if (prevProps.hasConflict !== nextProps.hasConflict) return false;
+
+  // Slot-filter selection flag.
+  if (prevProps.isSelectedForFilter !== nextProps.isSelectedForFilter) return false;
 
   // Find-highlight only matters when the targeted employee is on this cell;
   // gate the re-render so unrelated cells stay memo'd.

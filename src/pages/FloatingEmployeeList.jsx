@@ -9,6 +9,7 @@ import {
   TextField,
   Button,
   Stack,
+  Chip,
 } from "@mui/material";
 import {
   ExpandLess,
@@ -16,6 +17,8 @@ import {
   Search as SearchIcon,
   DeleteSweep as DeleteSweepIcon,
 } from "@mui/icons-material";
+import { format } from "date-fns";
+import { parseLocalDate } from "../utils/dates";
 import { useDraggable, DragOverlay } from "@dnd-kit/core";
 import { shiftColors, shiftTypes, getPriorityColor, shiftTypeShortText } from "../components/shiftTypeGrading";
 
@@ -184,6 +187,8 @@ export default function FloatingEmployeeList({
   findHighlightedEmpId = null,
   onToggleFindHighlight,
   onClearAllForEmployee,
+  slotFilterInfo = null,
+  onClearSlotFilter,
 }) {
   const [open, setOpen] = useState(true);
   const [activeId, setActiveId] = useState(null);
@@ -237,8 +242,20 @@ export default function FloatingEmployeeList({
   const filteredEmployees = employees.filter((emp) => {
     const matchesSearch = `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesContract = contractFilter === "All" || emp.contractType === contractFilter;
-    return matchesSearch && matchesContract;
+    // When a slot is selected for filtering, exclude anyone already busy on that date.
+    const matchesSlotFilter = !slotFilterInfo || !slotFilterInfo.busyIds?.has(emp.id);
+    return matchesSearch && matchesContract && matchesSlotFilter;
   });
+
+  // Pretty-print the active slot filter for the inline chip.
+  let slotFilterLabel = '';
+  if (slotFilterInfo) {
+    let dateLabel = slotFilterInfo.date;
+    try {
+      dateLabel = format(parseLocalDate(slotFilterInfo.date), 'EEE d MMM');
+    } catch { /* fallback to raw date string */ }
+    slotFilterLabel = `Free on ${dateLabel}`;
+  }
 
 
 
@@ -315,6 +332,22 @@ export default function FloatingEmployeeList({
               <option key={type} value={type}>{type}</option>
             ))}
           </TextField>
+
+          {slotFilterInfo && (
+            <Box sx={{ mb: 2 }}>
+              <Chip
+                label={slotFilterLabel}
+                color="primary"
+                size="small"
+                variant="outlined"
+                onDelete={onClearSlotFilter}
+                sx={{ maxWidth: '100%' }}
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                Showing only employees with no shift on this date.
+              </Typography>
+            </Box>
+          )}
 
 
           <Box sx={{ maxHeight: 350, overflowY: "auto", position: "relative" }}>
