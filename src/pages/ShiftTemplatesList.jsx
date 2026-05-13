@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Box,
@@ -58,6 +58,36 @@ const ShiftTemplatesList = () => {
     const [regions, setRegions] = useState([]);
     const shiftTypes = ['LONG_DAY', 'DAY', 'SLEEP_IN', 'WAKING_NIGHT', 'FLOATING','CARE_CALL'];
     const daysOfWeek = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+    // Rank lookup so we can sort rows by day-of-week in calendar order
+    // rather than the alphabetical default a string sort would give.
+    const dayRank = useMemo(() => {
+        const r = {};
+        daysOfWeek.forEach((d, i) => { r[d] = i; });
+        return r;
+    }, []);
+
+    // Group filtered templates by Service (location). Within each group
+    // sort by day-of-week then start time so the rows read chronologically.
+    // Group order is alphabetical by service name.
+    const groupedByService = useMemo(() => {
+        const groups = new Map();
+        filteredTemplates.forEach((t) => {
+            const key = t.location || '(Unassigned service)';
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(t);
+        });
+        groups.forEach((items) => {
+            items.sort((a, b) => {
+                const da = dayRank[a.dayOfWeek] ?? 99;
+                const db = dayRank[b.dayOfWeek] ?? 99;
+                if (da !== db) return da - db;
+                return (a.startTime || '').localeCompare(b.startTime || '');
+            });
+        });
+        return Array.from(groups.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([service, items]) => ({ service, items }));
+    }, [filteredTemplates, dayRank]);
 
     useEffect(() => {
         fetchRegions();
@@ -274,7 +304,7 @@ const ShiftTemplatesList = () => {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {filteredTemplates.length === 0 ? (
+                            {groupedByService.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={10} align="center">
                                         <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
@@ -283,56 +313,79 @@ const ShiftTemplatesList = () => {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                filteredTemplates.map((template) => (
-                                    <TableRow key={template.id}>
-                                        <TableCell>{template.region}</TableCell>
-                                        <TableCell>{template.location}</TableCell>
-                                        <TableCell>{template.dayOfWeek}</TableCell>
-                                        <TableCell>
-                                            <Chip
-                                                label={template.shiftType.replace('_', ' ')}
-                                                color={getShiftTypeColor(template.shiftType)}
-                                                size="small"
-                                            />
-                                        </TableCell>
-                                        <TableCell>
-                                            {formatTime(template.startTime)} - {formatTime(template.endTime)}
-                                        </TableCell>
-                                        <TableCell>{template.totalHours || '-'}</TableCell>
-                                        <TableCell>{template.empCount}</TableCell>
-                                        <TableCell>{template.priority}</TableCell>
-                                        <TableCell>
-                                            <Chip
-                                                label={template.active ? 'Active' : 'Inactive'}
-                                                color={template.active ? 'success' : 'default'}
-                                                size="small"
-                                            />
-                                        </TableCell>
-                                        <TableCell>
-                                            <IconButton
-                                                color="primary"
-                                                onClick={() => navigate(`/shift-templates/edit/${template.id}`)}
-                                                size="small"
-                                            >
-                                                <EditIcon />
-                                            </IconButton>
-                                            <IconButton
-                                                color={template.active ? 'warning' : 'success'}
-                                                onClick={() => handleToggleActive(template)}
-                                                size="small"
-                                                title={template.active ? 'Deactivate' : 'Activate'}
-                                            >
-                                                {template.active ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                                            </IconButton>
-                                            <IconButton
-                                                color="error"
-                                                onClick={() => openDeleteDialog(template)}
-                                                size="small"
-                                            >
-                                                <DeleteIcon />
-                                            </IconButton>
-                                        </TableCell>
-                                    </TableRow>
+                                groupedByService.map(({ service, items }) => (
+                                    <React.Fragment key={service}>
+                                        <TableRow
+                                            sx={{
+                                                backgroundColor: 'grey.100',
+                                                '& td': { borderBottom: '2px solid', borderColor: 'divider' },
+                                            }}
+                                        >
+                                            <TableCell colSpan={10} sx={{ py: 1 }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                                                        {service}
+                                                    </Typography>
+                                                    <Chip
+                                                        label={`${items.length} template${items.length === 1 ? '' : 's'}`}
+                                                        size="small"
+                                                        variant="outlined"
+                                                    />
+                                                </Box>
+                                            </TableCell>
+                                        </TableRow>
+                                        {items.map((template) => (
+                                            <TableRow key={template.id}>
+                                                <TableCell>{template.region}</TableCell>
+                                                <TableCell>{template.location}</TableCell>
+                                                <TableCell>{template.dayOfWeek}</TableCell>
+                                                <TableCell>
+                                                    <Chip
+                                                        label={template.shiftType.replace('_', ' ')}
+                                                        color={getShiftTypeColor(template.shiftType)}
+                                                        size="small"
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    {formatTime(template.startTime)} - {formatTime(template.endTime)}
+                                                </TableCell>
+                                                <TableCell>{template.totalHours || '-'}</TableCell>
+                                                <TableCell>{template.empCount}</TableCell>
+                                                <TableCell>{template.priority}</TableCell>
+                                                <TableCell>
+                                                    <Chip
+                                                        label={template.active ? 'Active' : 'Inactive'}
+                                                        color={template.active ? 'success' : 'default'}
+                                                        size="small"
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <IconButton
+                                                        color="primary"
+                                                        onClick={() => navigate(`/shift-templates/edit/${template.id}`)}
+                                                        size="small"
+                                                    >
+                                                        <EditIcon />
+                                                    </IconButton>
+                                                    <IconButton
+                                                        color={template.active ? 'warning' : 'success'}
+                                                        onClick={() => handleToggleActive(template)}
+                                                        size="small"
+                                                        title={template.active ? 'Deactivate' : 'Activate'}
+                                                    >
+                                                        {template.active ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                                    </IconButton>
+                                                    <IconButton
+                                                        color="error"
+                                                        onClick={() => openDeleteDialog(template)}
+                                                        size="small"
+                                                    >
+                                                        <DeleteIcon />
+                                                    </IconButton>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </React.Fragment>
                                 ))
                             )}
                         </TableBody>
