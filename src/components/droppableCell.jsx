@@ -105,6 +105,22 @@ export const DroppableCell = memo(({
             }}
           />
         )}
+        {isFoundInCell && (
+          <Box
+            aria-label="Find-highlight marker"
+            sx={{
+              position: 'absolute',
+              bottom: 3,
+              right: 3,
+              width: 10,
+              height: 10,
+              bgcolor: '#ed6c02',
+              borderRadius: 0.5,
+              border: '1px solid #fff',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
         {allVisible.length > 0 ? (
           allVisible.map((emp) => {
             const isPinned = pinnedIds?.has(emp.id);
