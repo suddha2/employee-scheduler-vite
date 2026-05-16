@@ -20,12 +20,15 @@ import {
   Badge,
   CircularProgress,
   Stack,
+  IconButton,
 } from '@mui/material';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CampaignIcon from '@mui/icons-material/Campaign';
+import HistoryIcon from '@mui/icons-material/History';
 import { formatDistanceToNow } from 'date-fns';
 import { publishUnallocatedShiftsForService } from '../api/stats';
+import PublishHistoryDrawer from './PublishHistoryDrawer';
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const ONE_DAY_MS = 24 * ONE_HOUR_MS;
@@ -129,6 +132,7 @@ export default function ServiceStatsCard({
   onToast,
 }) {
   const [publishing, setPublishing] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const handlePublish = async () => {
     if (!rotaId || publishing) return;
@@ -311,6 +315,15 @@ export default function ServiceStatsCard({
       </CardContent>
       {hasUnallocated && (
         <CardActions sx={{ px: 2, pb: 2, pt: 0, justifyContent: 'flex-end' }}>
+          <Tooltip title="View publish history">
+            <IconButton
+              size="small"
+              onClick={() => setHistoryOpen(true)}
+              disabled={!rotaId}
+            >
+              <HistoryIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
           <Stack
             direction="column"
             alignItems="flex-end"
@@ -345,6 +358,12 @@ export default function ServiceStatsCard({
           </Stack>
         </CardActions>
       )}
+      <PublishHistoryDrawer
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        rotaId={rotaId}
+        service={service.location}
+      />
     </Card>
   );
 }

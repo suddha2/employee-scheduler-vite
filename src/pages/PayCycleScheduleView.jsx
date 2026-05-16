@@ -513,6 +513,25 @@ export default function PayCycleSchedule() {
                     {periods.map((period, index) => {
                         const currentPeriod = submissionStatus[period.id]?.reloadedPeriod || period;
 
+                        // Overall coverage excludes SLEEP_IN: it is auto-paired to its
+                        // LONG_DAY post-solve and never independently allocated, so
+                        // counting it would inflate coverage. Both sides sum per-type
+                        // ShiftAssignment counts, so the ratio is like-for-like and
+                        // cannot exceed 100%.
+                        const coverageRatio = (() => {
+                            const stats = currentPeriod.shiftStats || {};
+                            const assigned = currentPeriod.shiftAssignmentStats || {};
+                            let total = 0;
+                            let filled = 0;
+                            for (const [type, count] of Object.entries(stats)) {
+                                if (type === 'SLEEP_IN') continue;
+                                total += count || 0;
+                                filled += assigned[type] || 0;
+                            }
+                            return total > 0 ? filled / total : 0;
+                        })();
+                        const coveragePercent = Math.round(coverageRatio * 100);
+
                         return (
                             <Grid item xs={12} sm={6} md={4} key={`${location?.value}-${period.id}`}>
                                 <Card variant="outlined" sx={{
@@ -670,16 +689,16 @@ export default function PayCycleSchedule() {
                                                     <Box sx={{ position: 'relative', flexGrow: 1 }}>
                                                         <LinearProgress
                                                             variant="determinate"
-                                                            value={Math.round((currentPeriod.shiftAssignmentStats.TotalAssigned / currentPeriod.shiftCount) * 100)}
+                                                            value={coveragePercent}
                                                             sx={{
                                                                 height: 16,
                                                                 borderRadius: 8,
                                                                 bgcolor: '#eee',
                                                                 '& .MuiLinearProgress-bar': {
                                                                     backgroundColor:
-                                                                        currentPeriod.shiftAssignmentStats.TotalAssigned / currentPeriod.shiftCount >= 0.8
+                                                                        coverageRatio >= 0.8
                                                                             ? 'success.main'
-                                                                            : currentPeriod.shiftAssignmentStats.TotalAssigned / currentPeriod.shiftCount >= 0.5
+                                                                            : coverageRatio >= 0.5
                                                                                 ? 'warning.main'
                                                                                 : 'error.main',
                                                                 },
@@ -696,11 +715,11 @@ export default function PayCycleSchedule() {
                                                                 display: 'flex',
                                                                 alignItems: 'center',
                                                                 justifyContent: 'center',
-                                                                color: currentPeriod.shiftAssignmentStats.TotalAssigned / currentPeriod.shiftCount > 0.8 ? 'common.white' : 'text.primary',
+                                                                color: coverageRatio > 0.8 ? 'common.white' : 'text.primary',
                                                                 fontWeight: 500,
                                                             }}
                                                         >
-                                                            {Math.round((currentPeriod.shiftAssignmentStats.TotalAssigned / currentPeriod.shiftCount) * 100)}%
+                                                            {coveragePercent}%
                                                         </Typography>
                                                     </Box>
                                                 </Box>

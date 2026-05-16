@@ -64,6 +64,17 @@ export async function fetchServicePublishHistory(rotaId, service, { signal } = {
   }
 }
 
+// GET the full publish audit trail (most recent 50 events) for one service.
+// Called lazily — only when the history drawer is opened — so the stats
+// screen's normal render stays cheap.
+export async function fetchServicePublishLog(rotaId, service, { signal } = {}) {
+  const { data } = await axiosInstance.get(
+    API_ENDPOINTS.publishLogForService(rotaId, service),
+    { signal }
+  );
+  return Array.isArray(data) ? data : [];
+}
+
 // GET aggregate publish history for the rota-level "publish all" action.
 export async function fetchRotaPublishHistory(rotaId, { signal } = {}) {
   try {

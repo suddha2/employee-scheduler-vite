@@ -50,6 +50,8 @@ export const API_ENDPOINTS = {
   publishUnallocated: (rotaId) => `${API_BASE_URL}/api/stats/publish/${rotaId}`,
   publishUnallocatedForService: (rotaId, service) =>
     `${API_BASE_URL}/api/stats/publish/${rotaId}/service/${encodeURIComponent(service)}`,
+  publishLogForService: (rotaId, service) =>
+    `${API_BASE_URL}/api/stats/publish/${rotaId}/service/${encodeURIComponent(service)}/log`,
 
   // WebSocket
   websoc: `${API_BASE_URL}/ws`,
