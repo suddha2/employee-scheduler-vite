@@ -42,6 +42,7 @@ export default function EmployeeForm() {
     const [formData, setFormData] = useState({
         firstName: '',
         lastName: '',
+        email: '',
         gender: '',
         contractType: '',
         minHrs: '',
@@ -200,6 +201,7 @@ export default function EmployeeForm() {
             setFormData({
                 firstName: employee.firstName || '',
                 lastName: employee.lastName || '',
+                email: employee.email || '',
                 gender: employee.gender || '',
                 contractType: employee.contractType || '',
                 minHrs: employee.minHrs ?? '',
@@ -355,6 +357,9 @@ export default function EmployeeForm() {
         try {
             const payload = {
                 ...formData,
+                // Normalise so it matches the email the employee signs into the
+                // mobile app with (the backend looks employees up by email).
+                email: (formData.email || '').trim().toLowerCase(),
                 preferredService: serializeServiceWeights(serviceWeights),
                 restrictedService: formData.restrictedService,  // Services array
                 // ✅ ADD THESE MAPPINGS:
@@ -509,6 +514,18 @@ export default function EmployeeForm() {
                                     onChange={handleChange('lastName')}
                                     error={!!errors.lastName}
                                     helperText={errors.lastName}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <TextField
+                                    fullWidth
+                                    required
+                                    type="email"
+                                    label="Email"
+                                    value={formData.email}
+                                    onChange={handleChange('email')}
+                                    error={!!errors.email}
+                                    helperText={errors.email || 'Used for mobile app sign-in'}
                                 />
                             </Grid>
                             <Grid item xs={12} md={4}>

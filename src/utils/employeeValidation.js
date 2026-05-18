@@ -5,6 +5,11 @@ export function validateEmployee(formData, serviceWeights) {
 
   if (!formData.firstName?.trim()) errors.firstName = 'First name is required';
   if (!formData.lastName?.trim()) errors.lastName = 'Last name is required';
+  if (!formData.email?.trim()) {
+    errors.email = 'Email is required';
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+    errors.email = 'Enter a valid email address';
+  }
   if (!formData.gender) errors.gender = 'Gender is required';
   if (!formData.contractType) errors.contractType = 'Contract type is required';
 
