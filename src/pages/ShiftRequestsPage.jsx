@@ -17,6 +17,7 @@ import {
   Inbox as InboxIcon,
   CheckCircle as ApproveIcon,
   Cancel as RejectIcon,
+  Warning as WarningIcon,
 } from '@mui/icons-material';
 import { format, formatDistanceToNow } from 'date-fns';
 import { listShiftRequests, resolveShiftRequest } from '../api/shiftRequests';
@@ -220,34 +221,49 @@ export default function ShiftRequestsPage() {
                         color={STATUS_CHIP_COLOR[req.status] || 'default'}
                       />
                       {req.status === 'PENDING' && <SummaryBadge summary={req.fit?.summary} />}
+                      {req.status === 'PENDING' && req.conflict && (
+                        <Chip
+                          label="Conflict"
+                          size="small"
+                          color="error"
+                          icon={<WarningIcon />}
+                        />
+                      )}
                     </Stack>
                   </Box>
 
                   {req.status === 'PENDING' && <SuitabilityMatrix fit={req.fit} />}
 
                   {req.status === 'PENDING' && (
-                    <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
-                      <Button
-                        variant="contained"
-                        size="small"
-                        startIcon={<ApproveIcon />}
-                        onClick={() => handleResolve(req, 'APPROVE')}
-                        disabled={isResolving}
-                      >
-                        Approve
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        color="error"
-                        startIcon={<RejectIcon />}
-                        onClick={() => handleResolve(req, 'REJECT')}
-                        disabled={isResolving}
-                      >
-                        Reject
-                      </Button>
-                      {isResolving && <CircularProgress size={20} sx={{ alignSelf: 'center' }} />}
-                    </Stack>
+                    <>
+                      <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          startIcon={<ApproveIcon />}
+                          onClick={() => handleResolve(req, 'APPROVE')}
+                          disabled={isResolving || req.conflict}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          color="error"
+                          startIcon={<RejectIcon />}
+                          onClick={() => handleResolve(req, 'REJECT')}
+                          disabled={isResolving}
+                        >
+                          Reject
+                        </Button>
+                        {isResolving && <CircularProgress size={20} sx={{ alignSelf: 'center' }} />}
+                      </Stack>
+                      {req.conflict && (
+                        <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
+                          Approval blocked — same-day conflict for this employee.
+                        </Typography>
+                      )}
+                    </>
                   )}
                 </Paper>
               );
