@@ -243,15 +243,15 @@ const filteredData = data.filter((emp) =>
               );
 
               return (
-                <React.Fragment key={emp.name}>
+                <React.Fragment key={emp.id ?? emp.name}>
                   {shiftTypes.map((type, j) => {
                     let totalHours = 0;
                     let totalCount = 0;
                     const bgColor = isEvenEmployee ? shiftTypeColors[type]?.light : shiftTypeColors[type]?.dark;
 
                     return (
-                      <TableRow 
-                        key={`${emp.name}-${type}`}
+                      <TableRow
+                        key={`${emp.id ?? emp.name}-${type}`}
                         sx={{ 
                           backgroundColor: bgColor,
                           '&:hover': { 
