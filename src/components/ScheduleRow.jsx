@@ -71,10 +71,19 @@ const ScheduleRow = memo(({
               const droppableId = `cell|${cellKey}`;
               const changeType = changeHighlights[cellKey];
               const cellEmployees = assignmentMap[cellKey] ?? [];
+              // Backend marks an assignment as filled by approving a mobile shift
+              // request. Tint the cell so admins can spot request-filled slots.
+              // A pending local edit (changeType) takes visual priority, and the
+              // flag is cleared server-side on the next save.
+              const filledViaRequest =
+                assignment.filledViaRequest &&
+                cellEmployees.length > 0 &&
+                !clearedCells.has(cellKey);
 
               return (
                 <Box
                   key={cellKey}
+                  title={filledViaRequest ? 'Filled from a mobile shift request' : undefined}
                   sx={{
                     mb: 1,
                     position: 'relative',
@@ -84,7 +93,7 @@ const ScheduleRow = memo(({
                         changeType === 'UNASSIGNED' ? 'warning.main' :
                           changeType === 'REASSIGNED' ? 'info.main' : 'transparent',
                     pl: changeType ? 0.5 : 0,
-                    backgroundColor: 'transparent',
+                    backgroundColor: (!changeType && filledViaRequest) ? '#f3e5f5' : 'transparent',
                     borderRadius: 1,
                     opacity: 1,
                     transition: 'all 0.3s ease-in-out',
