@@ -25,6 +25,7 @@ import FloatingEmployeeList from "./FloatingEmployeeList";
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
+import { useAuth } from '../contexts/AuthContext';
 import { calculateDuration } from '../utils/shiftCalculations';
 import { setEmpSummary, buildAssignmentMap } from '../utils/scheduleData';
 import { isAllowedDayShiftTypes, findConflictCells } from '../utils/shiftConflicts';
@@ -55,6 +56,11 @@ function LoadingSpinner() {
 }
 
 export default function ViewSchedules() {
+  // Role-gated capabilities — hide write controls and short-circuit drag-drop
+  // when the current user can't edit. Server-side checks still enforce this
+  // (and would return 403), this is just the matching UI.
+  const { canEditSchedule, canPublishShifts } = useAuth();
+
   // Existing state
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ message: '', opened: false });
@@ -639,6 +645,8 @@ export default function ViewSchedules() {
   };
 
   function handleDragStart({ active }) {
+    // Read-only users (no edit capability) cannot drag.
+    if (!canEditSchedule) return;
     setActiveDragId(active.id);
     const [, empIdStr] = active.id.split("|");
     const empId = Number(empIdStr);
@@ -797,6 +805,7 @@ export default function ViewSchedules() {
     setActiveDragId(null);
     setDraggedEmployee(null);
 
+    if (!canEditSchedule) return;     // read-only: drop is a no-op
     if (!over) return;
 
     const [, empIdStr] = active.id.split("|");
@@ -1141,29 +1150,33 @@ export default function ViewSchedules() {
             </IconButton>
           </Tooltip>
 
-          <Tooltip title="Discard all changes">
-            <span>
-              <IconButton
-                onClick={handleDiscardChanges}
-                disabled={pendingChanges.length === 0 || viewingHistoricalVersion}
-                color="error"
-              >
-                <UndoIcon />
-              </IconButton>
-            </span>
-          </Tooltip>
+          {canEditSchedule && (
+            <Tooltip title="Discard all changes">
+              <span>
+                <IconButton
+                  onClick={handleDiscardChanges}
+                  disabled={pendingChanges.length === 0 || viewingHistoricalVersion}
+                  color="error"
+                >
+                  <UndoIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+          )}
 
-          <Tooltip title="Clear all assignments">
-            <span>
-              <IconButton
-                onClick={handleClearAllActual}
-                disabled={viewingHistoricalVersion || Object.values(assignmentMap).every(v => v.length === 0)}
-                color="error"
-              >
-                <ClearAllIcon />
-              </IconButton>
-            </span>
-          </Tooltip>
+          {canEditSchedule && (
+            <Tooltip title="Clear all assignments">
+              <span>
+                <IconButton
+                  onClick={handleClearAllActual}
+                  disabled={viewingHistoricalVersion || Object.values(assignmentMap).every(v => v.length === 0)}
+                  color="error"
+                >
+                  <ClearAllIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+          )}
 
           <Tooltip title={clearedCells.size > 0 ? "Restore all assignments" : "Hide all assignments (front-end only)"}>
             <span>
@@ -1177,13 +1190,15 @@ export default function ViewSchedules() {
             </span>
           </Tooltip>
 
-          <Tooltip title="Publish unallocated shifts">
-            <span>
-              <IconButton onClick={handlePublish} disabled={publishing || viewingHistoricalVersion}>
-                <CampaignIcon />
-              </IconButton>
-            </span>
-          </Tooltip>
+          {canPublishShifts && (
+            <Tooltip title="Publish unallocated shifts">
+              <span>
+                <IconButton onClick={handlePublish} disabled={publishing || viewingHistoricalVersion}>
+                  <CampaignIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+          )}
 
           <Tooltip title="Version history">
             <IconButton onClick={() => setVersionSidebarOpen(true)}>
@@ -1191,16 +1206,18 @@ export default function ViewSchedules() {
             </IconButton>
           </Tooltip>
 
-          <Badge badgeContent={pendingChanges.length} color="warning">
-            <Button
-              variant="contained"
-              startIcon={<SaveIcon />}
-              onClick={handleSave}
-              disabled={pendingChanges.length === 0 || viewingHistoricalVersion}
-            >
-              Save
-            </Button>
-          </Badge>
+          {canEditSchedule && (
+            <Badge badgeContent={pendingChanges.length} color="warning">
+              <Button
+                variant="contained"
+                startIcon={<SaveIcon />}
+                onClick={handleSave}
+                disabled={pendingChanges.length === 0 || viewingHistoricalVersion}
+              >
+                Save
+              </Button>
+            </Badge>
+          )}
         </Toolbar>
       </AppBar>
 

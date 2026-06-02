@@ -23,6 +23,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { listShiftRequests, resolveShiftRequest } from '../api/shiftRequests';
 import { useShiftRequestsNotifications } from '../contexts/ShiftRequestsContext';
 import SuitabilityMatrix, { SummaryBadge } from '../components/SuitabilityMatrix';
+import { useAuth } from '../contexts/AuthContext';
 
 const STATUS_FILTERS = ['PENDING', 'ALL', 'APPROVED', 'REJECTED', 'FILLED'];
 
@@ -69,6 +70,11 @@ function sortGroup(requests, statusFilter) {
 }
 
 export default function ShiftRequestsPage() {
+  // Role-gated: only resolvers see the Approve/Reject buttons. Read-only and
+  // people-managers (OPS_MANAGER excepted) still see the full list, just
+  // without the action buttons.
+  const { canResolveRequests } = useAuth();
+
   const [statusFilter, setStatusFilter] = useState('PENDING');
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -234,7 +240,7 @@ export default function ShiftRequestsPage() {
 
                   {req.status === 'PENDING' && <SuitabilityMatrix fit={req.fit} />}
 
-                  {req.status === 'PENDING' && (
+                  {req.status === 'PENDING' && canResolveRequests && (
                     <>
                       <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
                         <Button

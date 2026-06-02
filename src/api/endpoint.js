@@ -5,6 +5,12 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 export const API_ENDPOINTS = {
   // Authentication
   login: `${API_BASE_URL}/login`,
+  me: `${API_BASE_URL}/me`,
+
+  // Admin user management
+  adminUsers: `${API_BASE_URL}/api/admin/users`,
+  adminUserById: (id) => `${API_BASE_URL}/api/admin/users/${id}`,
+  adminUserPassword: (id) => `${API_BASE_URL}/api/admin/users/${id}/password`,
   
   // Locations/Regions
   locations: `${API_BASE_URL}/api/regions`,
