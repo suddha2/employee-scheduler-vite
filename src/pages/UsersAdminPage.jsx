@@ -222,7 +222,7 @@ export default function UsersAdminPage() {
                         <Table>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell>Username</TableCell>
+                                    <TableCell>Email</TableCell>
                                     <TableCell>Role</TableCell>
                                     <TableCell>Status</TableCell>
                                     <TableCell>Created</TableCell>
@@ -335,7 +335,9 @@ export default function UsersAdminPage() {
                 <DialogContent>
                     <Stack spacing={2} sx={{ mt: 1 }}>
                         <TextField
-                            label="Username"
+                            label="Email"
+                            type="email"
+                            helperText="Must match the user's Microsoft 365 sign-in address."
                             value={formUser?.username ?? ''}
                             onChange={(e) => setFormUser({ ...formUser, username: e.target.value })}
                             fullWidth
