@@ -34,9 +34,13 @@ import {
 } from '@mui/icons-material';
 import axiosInstance from '../components/axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
+import { useAuth } from '../contexts/AuthContext';
 
 const ShiftTemplatesList = () => {
     const navigate = useNavigate();
+    // Role-gated: only people-managers (ADMIN/OPS_MANAGER) see Create/Edit/
+    // Toggle/Delete controls. Everyone else still sees the templates table.
+    const { canManagePeople } = useAuth();
 
     // State
     const [templates, setTemplates] = useState([]);
@@ -215,6 +219,7 @@ const ShiftTemplatesList = () => {
                 {/* Header */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                     <Typography variant="h5">Shift Templates</Typography>
+                    {canManagePeople && (
                     <Button
                         variant="contained"
                         startIcon={<AddIcon />}
@@ -222,6 +227,7 @@ const ShiftTemplatesList = () => {
                     >
                         Create Template
                     </Button>
+                    )}
                 </Box>
 
                 {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -360,28 +366,34 @@ const ShiftTemplatesList = () => {
                                                     />
                                                 </TableCell>
                                                 <TableCell>
-                                                    <IconButton
-                                                        color="primary"
-                                                        onClick={() => navigate(`/shift-templates/edit/${template.id}`)}
-                                                        size="small"
-                                                    >
-                                                        <EditIcon />
-                                                    </IconButton>
-                                                    <IconButton
-                                                        color={template.active ? 'warning' : 'success'}
-                                                        onClick={() => handleToggleActive(template)}
-                                                        size="small"
-                                                        title={template.active ? 'Deactivate' : 'Activate'}
-                                                    >
-                                                        {template.active ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                                                    </IconButton>
-                                                    <IconButton
-                                                        color="error"
-                                                        onClick={() => openDeleteDialog(template)}
-                                                        size="small"
-                                                    >
-                                                        <DeleteIcon />
-                                                    </IconButton>
+                                                    {canManagePeople ? (
+                                                        <>
+                                                            <IconButton
+                                                                color="primary"
+                                                                onClick={() => navigate(`/shift-templates/edit/${template.id}`)}
+                                                                size="small"
+                                                            >
+                                                                <EditIcon />
+                                                            </IconButton>
+                                                            <IconButton
+                                                                color={template.active ? 'warning' : 'success'}
+                                                                onClick={() => handleToggleActive(template)}
+                                                                size="small"
+                                                                title={template.active ? 'Deactivate' : 'Activate'}
+                                                            >
+                                                                {template.active ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                                            </IconButton>
+                                                            <IconButton
+                                                                color="error"
+                                                                onClick={() => openDeleteDialog(template)}
+                                                                size="small"
+                                                            >
+                                                                <DeleteIcon />
+                                                            </IconButton>
+                                                        </>
+                                                    ) : (
+                                                        <Typography variant="caption" color="text.secondary">—</Typography>
+                                                    )}
                                                 </TableCell>
                                             </TableRow>
                                         ))}

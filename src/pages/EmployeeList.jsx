@@ -37,8 +37,14 @@ import {
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../components/axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function EmployeeList() {
+    // Role-gated: only users with people-management rights see the
+    // Add / Edit / Toggle-active controls. Everyone else still sees the
+    // employee table (read-only).
+    const { canManagePeople } = useAuth();
+
     // State management
     const [allEmployees, setAllEmployees] = useState([]); // ✅ Store all employees
     const [filteredEmployees, setFilteredEmployees] = useState([]); // ✅ Filtered results
@@ -216,14 +222,16 @@ export default function EmployeeList() {
                 {/* Header */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                     <Typography variant="h4">Employees</Typography>
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        startIcon={<AddIcon />}
-                        onClick={handleCreate}
-                    >
-                        Add Employee
-                    </Button>
+                    {canManagePeople && (
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            startIcon={<AddIcon />}
+                            onClick={handleCreate}
+                        >
+                            Add Employee
+                        </Button>
+                    )}
                 </Box>
 
                 {/* Search and Filters */}
@@ -421,24 +429,28 @@ export default function EmployeeList() {
                                                     </Tooltip>
                                                 </TableCell>
                                                 <TableCell align="center">
+                                                    {canManagePeople ? (
+                                                        <>
+                                                            <IconButton
+                                                                color="primary"
+                                                                onClick={() => handleEdit(employee.id)}
+                                                                title="Edit"
+                                                            >
+                                                                <EditIcon />
+                                                            </IconButton>
 
-                                                    <IconButton
-                                                        color="primary"
-                                                        onClick={() => handleEdit(employee.id)}
-                                                        title="Edit"
-                                                    >
-                                                        <EditIcon />
-                                                    </IconButton>
-
-                                                    <IconButton
-                                                        color={employee.active ? 'warning' : 'success'}
-                                                        onClick={() => handleToggleActive(employee.id)}
-                                                        size="small"
-                                                        title={employee.active ? 'Deactivate' : 'Activate'}
-                                                    >
-                                                        {employee.active ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                                                    </IconButton>
-
+                                                            <IconButton
+                                                                color={employee.active ? 'warning' : 'success'}
+                                                                onClick={() => handleToggleActive(employee.id)}
+                                                                size="small"
+                                                                title={employee.active ? 'Deactivate' : 'Activate'}
+                                                            >
+                                                                {employee.active ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                                            </IconButton>
+                                                        </>
+                                                    ) : (
+                                                        <Typography variant="caption" color="text.secondary">—</Typography>
+                                                    )}
                                                 </TableCell>
                                             </TableRow>
                                         ))
