@@ -13,7 +13,9 @@ import {
     useTheme,
     useMediaQuery,
     Collapse,
-    Badge
+    Badge,
+    Chip,
+    Stack
 } from '@mui/material';
 import {
     Home as HomeIcon,
@@ -42,7 +44,23 @@ export default function Sidebar({ open, onClose, onToggle }) {
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const [statsOpen, setStatsOpen] = useState(false);
     const { newCount: newShiftRequestCount } = useShiftRequestsNotifications();
-    const { canManageUsers, roles } = useAuth();
+    const { canManageUsers, roles, username } = useAuth();
+
+    // Display: highest role first, friendlier label.
+    const ROLE_LABELS = {
+        ADMIN: 'Admin',
+        OPS_MANAGER: 'Ops manager',
+        ROTA_EDITOR: 'Rota editor',
+        READ_ONLY: 'View only',
+    };
+    const ROLE_RANK = ['ADMIN', 'OPS_MANAGER', 'ROTA_EDITOR', 'READ_ONLY'];
+    const ROLE_COLOR = {
+        ADMIN: 'error',
+        OPS_MANAGER: 'warning',
+        ROTA_EDITOR: 'info',
+        READ_ONLY: 'default',
+    };
+    const primaryRole = ROLE_RANK.find((r) => roles?.includes(r)) || roles?.[0];
 
     const handleStatsClick = () => {
         setStatsOpen(!statsOpen);
@@ -251,7 +269,34 @@ export default function Sidebar({ open, onClose, onToggle }) {
 
             {/* Sidebar Footer */}
             <Divider />
-            <Box sx={{ p: 2, textAlign: 'center' }}>
+            <Box sx={{ p: 2 }}>
+                {(username || primaryRole) && (
+                    <Stack
+                        direction="row"
+                        alignItems="center"
+                        spacing={1}
+                        sx={{ mb: 1, minWidth: 0 }}
+                    >
+                        {username && (
+                            <Typography
+                                variant="body2"
+                                noWrap
+                                sx={{ fontWeight: 500, flexShrink: 1, minWidth: 0 }}
+                                title={username}
+                            >
+                                {username}
+                            </Typography>
+                        )}
+                        {primaryRole && (
+                            <Chip
+                                label={ROLE_LABELS[primaryRole] || primaryRole}
+                                color={ROLE_COLOR[primaryRole] || 'default'}
+                                size="small"
+                                sx={{ flexShrink: 0 }}
+                            />
+                        )}
+                    </Stack>
+                )}
                 <Typography variant="caption" color="textSecondary">
                     Employee Scheduler v2.0
                 </Typography>

@@ -56,7 +56,18 @@ export default function LoginPage() {
         setErrors({ email: false, password: false, message: null });
       } catch (err) {
         console.error('Login failed:', err);
-        setErrors({ ...newErrors, message: 'Invalid credentials or server error' });
+        const status = err.response?.status;
+        const serverMessage = err.response?.data?.message;
+        let message;
+        if (status === 401 && serverMessage && /inactive/i.test(serverMessage)) {
+          // Backend rejects soft-deleted users with this message.
+          message = 'Your account is inactive. Please contact an administrator.';
+        } else if (status === 401) {
+          message = 'Invalid username or password.';
+        } else {
+          message = serverMessage || 'Login failed — please try again.';
+        }
+        setErrors({ ...newErrors, message });
       }
     }
   };
