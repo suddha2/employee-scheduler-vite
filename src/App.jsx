@@ -20,6 +20,7 @@ import EmpStatsView from './pages/EmpStatsView';
 import ShiftRequestsPage from './pages/ShiftRequestsPage';
 import ShiftTemplatesList from './pages/ShiftTemplatesList';
 import ShiftTemplateForm from './pages/ShiftTemplateForm';
+import UsersAdminPage from './pages/UsersAdminPage';
 import { AxiosInterceptorSetup } from './components/AxiosInterceptorSetup';
 
 export default function App() {
@@ -159,6 +160,19 @@ export default function App() {
                   <ProtectedRoute>
                     <Layout>
                       <ShiftRequestsPage />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* User management — ADMIN or OPS_MANAGER only. Server-side
+                  enforcement is still the source of truth; the UI hides it. */}
+              <Route
+                path="/admin/users"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <UsersAdminPage />
                     </Layout>
                   </ProtectedRoute>
                 }

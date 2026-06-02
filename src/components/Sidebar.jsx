@@ -26,10 +26,12 @@ import {
     ChevronLeft as ChevronLeftIcon,
     Menu as MenuIcon,
     Archive as ArchiveIcon,
-    Inbox as InboxIcon
+    Inbox as InboxIcon,
+    ManageAccounts as ManageAccountsIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useShiftRequestsNotifications } from '../contexts/ShiftRequestsContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const DRAWER_WIDTH = 260;
 
@@ -40,6 +42,7 @@ export default function Sidebar({ open, onClose, onToggle }) {
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const [statsOpen, setStatsOpen] = useState(false);
     const { newCount: newShiftRequestCount } = useShiftRequestsNotifications();
+    const { canManageUsers, roles } = useAuth();
 
     const handleStatsClick = () => {
         setStatsOpen(!statsOpen);
@@ -87,6 +90,15 @@ export default function Sidebar({ open, onClose, onToggle }) {
             ),
             path: '/shift-requests'
         },
+        // Only ADMIN / OPS_MANAGER see the Users link. Hidden entirely for
+        // others, since they can't access the page anyway.
+        ...(canManageUsers
+            ? [{
+                title: 'Users',
+                icon: <ManageAccountsIcon />,
+                path: '/admin/users',
+            }]
+            : []),
         // {
         //     title: 'View Schedules',
         //     icon: <ScheduleIcon />,
