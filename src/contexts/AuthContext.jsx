@@ -1,8 +1,10 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import axios from 'axios';
 import { safeStorage } from '../utils/safeStorage';
 import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
+import { consumeRedirectResult, msalConfigured, msalRedirectInFlight, clearMsSignInPending } from '../auth/msalConfig';
 
 const AuthContext = createContext(null);
 
@@ -27,6 +29,11 @@ export function AuthProvider({ children }) {
     const [roles, setRoles] = useState([]);
     const [rolesLoaded, setRolesLoaded] = useState(false);
     const [username, setUsername] = useState(null);
+    // True between landing back from a Microsoft redirect and the backend
+    // exchange completing — LoginPage uses it to render a loading screen
+    // instead of flashing the password form. Initialised synchronously from
+    // a sessionStorage flag that loginWithMicrosoft sets before redirecting.
+    const [msSignInInProgress, setMsSignInInProgress] = useState(msalRedirectInFlight);
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -72,6 +79,53 @@ export function AuthProvider({ children }) {
             setRolesLoaded(false);
         }
     }, [token, fetchMe]);
+
+    // Handle a pending Microsoft sign-in redirect result on EVERY mount.
+    // This runs whichever page the user lands on (/auth/microsoft/callback,
+    // /login, /, etc.), which makes the flow resilient to mid-redirect
+    // bounces (e.g. another context's 401 reloads the page to /login —
+    // AuthContext on /login will still pick up MSAL's cached result and
+    // finish the sign-in).
+    //
+    // Ref guard so React StrictMode's double-effect doesn't consume the
+    // one-shot result on the first mount and bail on the second.
+    const msRedirectHandledRef = useRef(false);
+    useEffect(() => {
+        if (!msalConfigured) return;
+        if (msRedirectHandledRef.current) return;
+        msRedirectHandledRef.current = true;
+
+        (async () => {
+            try {
+                const result = await consumeRedirectResult();
+                if (!result?.idToken) {
+                    // Stale flag (user closed browser mid-redirect) — clear so the
+                    // login form shows instead of an indefinite spinner.
+                    clearMsSignInPending();
+                    setMsSignInInProgress(false);
+                    return;
+                }
+                const response = await axios.post(API_ENDPOINTS.microsoftLogin, {
+                    idToken: result.idToken,
+                });
+                clearMsSignInPending();
+                // Inline of login() — avoids a recursive call from useEffect.
+                safeStorage.set('token', response.data.token);
+                setToken(response.data.token);
+                setIsAuthenticated(true);
+                // Leave msSignInInProgress=true through the navigate so the
+                // login form never flashes; LoginPage unmounts once we land.
+                navigate('/paycycleSchedule', { replace: true });
+            } catch (err) {
+                // eslint-disable-next-line no-console
+                console.error('[AuthContext] Microsoft sign-in exchange failed:', err);
+                clearMsSignInPending();
+                setMsSignInInProgress(false);
+            }
+        })();
+        // Intentionally only on mount — the redirect result is one-shot.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const login = (newToken) => {
         safeStorage.set('token', newToken);
@@ -153,12 +207,13 @@ export function AuthProvider({ children }) {
         roles,
         rolesLoaded,
         username,
+        msSignInInProgress,
         login,
         logout,
         handleSessionExpiry,
         refreshRoles: fetchMe,
         ...capabilities,
-    }), [token, isAuthenticated, roles, rolesLoaded, username, capabilities, fetchMe]);
+    }), [token, isAuthenticated, roles, rolesLoaded, username, msSignInInProgress, capabilities, fetchMe]);
 
     return (
         <AuthContext.Provider value={value}>

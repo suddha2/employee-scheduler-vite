@@ -8,6 +8,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
 import Navbar from './components/Navbar';
 import LoginPage from './pages/LoginPage';
+import MicrosoftCallback from './pages/MicrosoftCallback';
 import Dashboard from './pages/Dashboard';
 import EmployeeList from './pages/EmployeeList';
 import EmployeeForm from './pages/EmployeeForm';
@@ -36,6 +37,11 @@ export default function App() {
               {/* Public Routes */}
               <Route path="/" element={<Navigate to="/dashboard" />} />
               <Route path="/login" element={<LoginPage />} />
+              {/* Microsoft sign-in landing — must be public (the user has no
+                  PASETO yet at this point). The component reads the MSAL
+                  redirect response, exchanges the ID token for a PASETO via
+                  /api/auth/microsoft, and navigates onward. */}
+              <Route path="/auth/microsoft/callback" element={<MicrosoftCallback />} />
 
               {/* Protected Routes - Wrapped in Layout */}
               <Route

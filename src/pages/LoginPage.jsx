@@ -9,6 +9,7 @@ import {
   Avatar,
   Alert,
   Divider,
+  CircularProgress,
 } from '@mui/material';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import {API_ENDPOINTS} from '../api/endpoint';
@@ -37,7 +38,7 @@ export default function LoginPage() {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, msSignInInProgress } = useAuth();
 
   useEffect(() => {
     // Check if redirected due to session expiry
@@ -90,41 +91,39 @@ export default function LoginPage() {
     setErrors({ email: false, password: false, message: null });
     setMsLoading(true);
     try {
-      const idToken = await loginWithMicrosoft();
-      const response = await axios.post(API_ENDPOINTS.microsoftLogin, { idToken });
-      login(response.data.token);
+      // Triggers a full-page redirect to Microsoft. After auth, the user
+      // lands at /auth/microsoft/callback which exchanges the ID token
+      // for a PASETO and finishes the sign-in. This function never resolves
+      // on the success path — the page has navigated away.
+      await loginWithMicrosoft();
     } catch (err) {
-      // MSAL throws with errorCode / errorMessage; the user closing the popup
-      // is normal, not an error worth surfacing.
-      const msalCode = err?.errorCode;
-      if (msalCode === 'user_cancelled' || msalCode === 'popup_window_error') {
-        setMsLoading(false);
-        return;
-      }
-      console.error('Microsoft sign-in failed:', err);
-
-      // Server-side errors map to the same patterns as password login.
-      const status = err.response?.status;
-      const serverMessage = err.response?.data?.message;
-      let message;
-      if (status === 403) {
-        message = 'This Microsoft account is not authorised. Contact an administrator.';
-      } else if (status === 401 && serverMessage && /inactive/i.test(serverMessage)) {
-        message = 'Your account is inactive. Please contact an administrator.';
-      } else if (status === 401) {
-        message = 'Microsoft sign-in failed — please try again.';
-      } else if (status === 503) {
-        message = 'Microsoft sign-in is not enabled on the server yet.';
-      } else if (msalCode) {
-        message = 'Microsoft sign-in failed — please try again.';
-      } else {
-        message = serverMessage || 'Microsoft sign-in failed.';
-      }
-      setErrors({ email: false, password: false, message });
-    } finally {
+      // Only fires if MSAL itself errors BEFORE the redirect (not configured,
+      // init failed, etc.). Network/server errors happen on the callback page.
+      console.error('Microsoft sign-in failed before redirect:', err);
       setMsLoading(false);
+      setErrors({
+        email: false,
+        password: false,
+        message: 'Microsoft sign-in is not available right now — please try again.',
+      });
     }
   };
+
+  // When AuthContext is mid-Microsoft-exchange (after redirect arrives back
+  // on /login), show a loading screen instead of flashing the password form.
+  if (msSignInInProgress) {
+    return (
+      <Container maxWidth="xs">
+        <Paper
+          elevation={6}
+          sx={{ mt: 12, p: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}
+        >
+          <CircularProgress />
+          <Typography variant="body1">Signing you in…</Typography>
+        </Paper>
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="xs">
