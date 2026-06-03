@@ -154,6 +154,13 @@ export function AuthProvider({ children }) {
         setRoles([]);
         setUsername(null);
         setRolesLoaded(false);
+        // msSignInInProgress is left `true` after a successful Microsoft sign-in
+        // so the login form doesn't flash during the navigate to /paycycleSchedule.
+        // Clear it on logout, otherwise LoginPage remounts and shows the spinner
+        // indefinitely. clearMsSignInPending() removes the sessionStorage flag too
+        // so a future page refresh starts clean.
+        clearMsSignInPending();
+        setMsSignInInProgress(false);
         sessionStorage.clear();
         navigate('/login');
     };
@@ -170,6 +177,8 @@ export function AuthProvider({ children }) {
         setRoles([]);
         setUsername(null);
         setRolesLoaded(false);
+        clearMsSignInPending();
+        setMsSignInInProgress(false);
 
         navigate('/login', {
             state: {
