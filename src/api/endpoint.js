@@ -5,6 +5,7 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 export const API_ENDPOINTS = {
   // Authentication
   login: `${API_BASE_URL}/login`,
+  microsoftLogin: `${API_BASE_URL}/api/auth/microsoft`,
   me: `${API_BASE_URL}/me`,
 
   // Admin user management

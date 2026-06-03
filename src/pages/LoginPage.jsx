@@ -8,19 +8,33 @@ import {
   Paper,
   Avatar,
   Alert,
+  Divider,
 } from '@mui/material';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import {API_ENDPOINTS} from '../api/endpoint';
 import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { loginWithMicrosoft, msalConfigured } from '../auth/msalConfig';
+
+// The little Microsoft 4-square logo, inlined so we don't pull a logo asset
+// in. Renders at the size of the button's startIcon slot.
+const MicrosoftLogo = () => (
+  <Box component="svg" viewBox="0 0 21 21" sx={{ width: 18, height: 18 }} aria-hidden>
+    <rect x="1"  y="1"  width="9" height="9" fill="#F25022" />
+    <rect x="11" y="1"  width="9" height="9" fill="#7FBA00" />
+    <rect x="1"  y="11" width="9" height="9" fill="#00A4EF" />
+    <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
+  </Box>
+);
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState({ email: false, password: false, message: null });
   const [showSessionExpired, setShowSessionExpired] = useState(false);
-  
+  const [msLoading, setMsLoading] = useState(false);
+
   const navigate = useNavigate();
   const location = useLocation();
   const { login, isAuthenticated } = useAuth();
@@ -69,6 +83,46 @@ export default function LoginPage() {
         }
         setErrors({ ...newErrors, message });
       }
+    }
+  };
+
+  const handleMicrosoftLogin = async () => {
+    setErrors({ email: false, password: false, message: null });
+    setMsLoading(true);
+    try {
+      const idToken = await loginWithMicrosoft();
+      const response = await axios.post(API_ENDPOINTS.microsoftLogin, { idToken });
+      login(response.data.token);
+    } catch (err) {
+      // MSAL throws with errorCode / errorMessage; the user closing the popup
+      // is normal, not an error worth surfacing.
+      const msalCode = err?.errorCode;
+      if (msalCode === 'user_cancelled' || msalCode === 'popup_window_error') {
+        setMsLoading(false);
+        return;
+      }
+      console.error('Microsoft sign-in failed:', err);
+
+      // Server-side errors map to the same patterns as password login.
+      const status = err.response?.status;
+      const serverMessage = err.response?.data?.message;
+      let message;
+      if (status === 403) {
+        message = 'This Microsoft account is not authorised. Contact an administrator.';
+      } else if (status === 401 && serverMessage && /inactive/i.test(serverMessage)) {
+        message = 'Your account is inactive. Please contact an administrator.';
+      } else if (status === 401) {
+        message = 'Microsoft sign-in failed — please try again.';
+      } else if (status === 503) {
+        message = 'Microsoft sign-in is not enabled on the server yet.';
+      } else if (msalCode) {
+        message = 'Microsoft sign-in failed — please try again.';
+      } else {
+        message = serverMessage || 'Microsoft sign-in failed.';
+      }
+      setErrors({ email: false, password: false, message });
+    } finally {
+      setMsLoading(false);
     }
   };
 
@@ -131,6 +185,30 @@ export default function LoginPage() {
           >
             Sign In
           </Button>
+
+          {msalConfigured && (
+            <>
+              <Divider sx={{ my: 2 }}>or</Divider>
+              <Button
+                type="button"
+                fullWidth
+                variant="outlined"
+                startIcon={<MicrosoftLogo />}
+                onClick={handleMicrosoftLogin}
+                disabled={msLoading}
+                sx={{
+                  mb: 1,
+                  color: 'text.primary',
+                  borderColor: 'divider',
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  '&:hover': { borderColor: 'text.primary' },
+                }}
+              >
+                {msLoading ? 'Opening Microsoft sign-in…' : 'Sign in with Microsoft'}
+              </Button>
+            </>
+          )}
         </Box>
       </Paper>
     </Container>
