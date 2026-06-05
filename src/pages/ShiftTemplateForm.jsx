@@ -96,12 +96,20 @@ const ShiftTemplateForm = () => {
         }
     }, [formData.region]);
 
-    // ✅ NEW: Fetch affected templates when bulk mode enabled
+    // Fetch affected templates when bulk mode is enabled.
+    //
+    // The cohort lookup *must* use the originally-loaded shiftType, not
+    // formData.shiftType. If the admin changed the dropdown to a new value
+    // before flipping bulk mode on, formData.shiftType is the *new* type and
+    // would point the bulk preview at the wrong rows (the existing templates
+    // of the target type, not the cohort the admin is logically editing).
+    // The bulk-update endpoint only mutates non-key fields anyway — it can't
+    // change shift type — so we always preview against the original.
     useEffect(() => {
-        if (bulkEditMode && formData.location && formData.shiftType) {
+        if (bulkEditMode && formData.location && originalFormData?.shiftType) {
             fetchAffectedTemplates();
         }
-    }, [bulkEditMode]);
+    }, [bulkEditMode, originalFormData]);
 
     const fetchRegions = async () => {
         try {
@@ -156,7 +164,9 @@ const ShiftTemplateForm = () => {
         }
     };
 
-    // ✅ NEW: Fetch templates that will be affected by bulk edit
+    // Fetch templates that will be affected by bulk edit.
+    // Lookup uses the original shiftType (see useEffect comment above) so a
+    // pending dropdown change doesn't redirect the preview at the wrong cohort.
     const fetchAffectedTemplates = async () => {
         setLoadingAffected(true);
         try {
@@ -165,7 +175,7 @@ const ShiftTemplateForm = () => {
                 {
                     params: {
                         location: formData.location,
-                        shiftType: formData.shiftType,
+                        shiftType: originalFormData?.shiftType || formData.shiftType,
                         region: formData.region
                     }
                 }
@@ -179,11 +189,17 @@ const ShiftTemplateForm = () => {
         }
     };
 
-    // ✅ NEW: Handle bulk mode toggle
+    // Handle bulk mode toggle. When turning bulk ON, revert any pending shift
+    // type change in the form back to the originally-loaded value — bulk
+    // update can't change shift type, and leaving a stale change visible in
+    // the (now-disabled) dropdown misleads the admin about what's being saved.
     const handleBulkModeToggle = (event) => {
         const enabled = event.target.checked;
+        if (enabled && originalFormData) {
+            setFormData(prev => ({ ...prev, shiftType: originalFormData.shiftType }));
+        }
         setBulkEditMode(enabled);
-        
+
         if (!enabled) {
             setAffectedTemplates([]);
         }
@@ -238,12 +254,15 @@ const ShiftTemplateForm = () => {
             };
 
             if (isEditMode && bulkEditMode && affectedTemplates.length > 1) {
-                // ✅ Bulk update endpoint
+                // ✅ Bulk update endpoint — cohort identified by the ORIGINAL
+                // shiftType (handleBulkModeToggle resets formData.shiftType to
+                // the original when bulk turns on, so they should already
+                // match; defaulting here is belt-and-braces).
                 await axiosInstance.put(
                     `${API_ENDPOINTS.shiftTemplates}/bulk-update`,
                     {
                         location: formData.location,
-                        shiftType: formData.shiftType,
+                        shiftType: originalFormData?.shiftType || formData.shiftType,
                         region: formData.region,
                         updates: {
                             startTime: formData.startTime,
