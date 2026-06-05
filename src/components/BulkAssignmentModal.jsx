@@ -139,7 +139,7 @@ export default function BulkAssignmentModal({
         const weekdayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         const grid = {};
 
-        if (availableCells.length === 0) return { grid, weekdayOrder };
+        if (availableCells.length === 0) return { grid, weekdayOrder, firstMonday: null };
 
         // Find the Monday of the week containing the earliest date.
         // Use parseLocalDate so that "YYYY-MM-DD" doesn't get parsed as UTC
@@ -175,7 +175,7 @@ export default function BulkAssignmentModal({
             });
         });
 
-        return { grid, weekdayOrder };
+        return { grid, weekdayOrder, firstMonday };
     }, [availableCells]);
 
     // Counts: how many selected cells will result in new assignments, and of
@@ -352,7 +352,19 @@ export default function BulkAssignmentModal({
 
     if (!employee) return null;
 
-    const { grid, weekdayOrder } = heatMapData;
+    const { grid, weekdayOrder, firstMonday } = heatMapData;
+
+    // Compute the calendar date for a given (week, weekday-index) coordinate.
+    // Used to label every grid cell with its actual date — even empty ones,
+    // where there's no `cell.date` available because no shift exists in that
+    // slot. Mirrors the firstMonday-based offset that `heatMapData` itself uses
+    // to bucket shifts into the grid, so empty and populated cells stay aligned.
+    const getCellDate = (weekNum, weekdayIdx) => {
+        if (!firstMonday) return null;
+        const d = new Date(firstMonday);
+        d.setDate(firstMonday.getDate() + (Number(weekNum) - 1) * 7 + weekdayIdx);
+        return d;
+    };
     const weeks = Object.keys(grid).sort((a, b) => Number(a) - Number(b));
 
     return (
@@ -479,8 +491,42 @@ export default function BulkAssignmentModal({
                                             <Box sx={{ fontWeight: 'bold', textAlign: 'center', p: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                 {weekNum}
                                             </Box>
-                                            {weekdayOrder.map(day => {
+                                            {weekdayOrder.map((day, weekdayIdx) => {
                                                 const cells = grid[weekNum]?.[day] || [];
+                                                // Resolve the actual calendar date for this grid coordinate.
+                                                // Prefer the date attached to a real shift cell (always present
+                                                // and authoritative); fall back to the firstMonday-based
+                                                // computation for empty slots that have no `cell.date`.
+                                                const cellDate = cells.length > 0
+                                                    ? parseLocalDate(cells[0].date)
+                                                    : getCellDate(weekNum, weekdayIdx);
+
+                                                // Compact, neutrally-styled date pill that sits above each
+                                                // cell's content. Small font, semi-bold, subtle background
+                                                // tint so it reads as a "label" rather than competing with
+                                                // the assignment indicator below.
+                                                const dateLabel = cellDate ? (
+                                                    <Typography
+                                                        variant="caption"
+                                                        sx={{
+                                                            fontSize: '0.65rem',
+                                                            fontWeight: 600,
+                                                            color: 'text.secondary',
+                                                            letterSpacing: '0.03em',
+                                                            textAlign: 'center',
+                                                            lineHeight: 1,
+                                                            mb: 0.5,
+                                                            px: 0.5,
+                                                            py: 0.25,
+                                                            backgroundColor: 'action.hover',
+                                                            borderRadius: 0.5,
+                                                            alignSelf: 'center',
+                                                            display: 'inline-block',
+                                                        }}
+                                                    >
+                                                        {format(cellDate, 'MMM d')}
+                                                    </Typography>
+                                                ) : null;
 
                                                 if (cells.length === 0) {
                                                     // No shift of this type on this day -- placeholder.
@@ -489,7 +535,8 @@ export default function BulkAssignmentModal({
                                                         <Tooltip key={day} title={cellStyle.tooltip} arrow>
                                                             <Box
                                                                 sx={{
-                                                                    p: 2,
+                                                                    p: 1,
+                                                                    pt: 0.75,
                                                                     textAlign: 'center',
                                                                     fontSize: '1.2rem',
                                                                     backgroundColor: 'grey.100',
@@ -498,9 +545,16 @@ export default function BulkAssignmentModal({
                                                                     borderColor: 'divider',
                                                                     borderRadius: 1,
                                                                     cursor: 'not-allowed',
+                                                                    display: 'flex',
+                                                                    flexDirection: 'column',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'flex-start',
                                                                 }}
                                                             >
-                                                                {cellStyle.display}
+                                                                {dateLabel}
+                                                                <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
+                                                                    {cellStyle.display}
+                                                                </Box>
                                                             </Box>
                                                         </Tooltip>
                                                     );
@@ -516,6 +570,7 @@ export default function BulkAssignmentModal({
                                                             gap: 0.5,
                                                         }}
                                                     >
+                                                        {dateLabel}
                                                         {cells.map((cell) => {
                                                             const isSelected = selectedCells.has(cell.cellKey);
                                                             const cellStyle = getCellDisplay(cell, isSelected);
