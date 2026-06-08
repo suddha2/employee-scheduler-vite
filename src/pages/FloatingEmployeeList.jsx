@@ -14,8 +14,6 @@ import {
 import {
   ExpandLess,
   ExpandMore,
-  Search as SearchIcon,
-  DeleteSweep as DeleteSweepIcon,
 } from "@mui/icons-material";
 import { format } from "date-fns";
 import { parseLocalDate } from "../utils/dates";
@@ -30,6 +28,7 @@ function EmployeeItem({
   isFindHighlighted,
   onToggleFindHighlight,
   onClearAllForEmployee,
+  onUnpinForEmployee,
 }) {
   const id = `emp|${employee.id}`;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id });
@@ -159,21 +158,28 @@ function EmployeeItem({
             size="small"
             variant={isFindHighlighted ? 'contained' : 'outlined'}
             color="warning"
-            startIcon={<SearchIcon />}
             onClick={stopAndRun(() => onToggleFindHighlight?.(employee.id))}
             sx={{ flex: 1, fontSize: 11, py: 0.25 }}
           >
-            {isFindHighlighted ? 'Stop highlighting' : 'Highlight shifts'}
+            {isFindHighlighted ? 'Stop highlighting' : 'Highlight All'}
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            color="warning"
+            onClick={stopAndRun(() => onUnpinForEmployee?.(employee))}
+            sx={{ flex: 1, fontSize: 11, py: 0.25 }}
+          >
+            Unpin All
           </Button>
           <Button
             size="small"
             variant="outlined"
             color="error"
-            startIcon={<DeleteSweepIcon />}
             onClick={stopAndRun(() => onClearAllForEmployee?.(employee))}
             sx={{ flex: 1, fontSize: 11, py: 0.25 }}
           >
-            Clear all
+            Unassign All
           </Button>
         </Stack>
       )}
@@ -187,6 +193,7 @@ export default function FloatingEmployeeList({
   findHighlightedEmpId = null,
   onToggleFindHighlight,
   onClearAllForEmployee,
+  onUnpinForEmployee,
   slotFilterInfo = null,
   onClearSlotFilter,
 }) {
@@ -393,6 +400,7 @@ export default function FloatingEmployeeList({
                   isFindHighlighted={findHighlightedEmpId === emp.id}
                   onToggleFindHighlight={onToggleFindHighlight}
                   onClearAllForEmployee={onClearAllForEmployee}
+                  onUnpinForEmployee={onUnpinForEmployee}
                 />
               ))
             ) : (

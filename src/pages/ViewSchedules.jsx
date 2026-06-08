@@ -92,6 +92,10 @@ export default function ViewSchedules() {
   // clearTarget: opens the confirm dialog for "Clear all assignments" for
   // a specific employee. count is precomputed so the dialog can show it.
   const [clearTarget, setClearTarget] = useState(null);
+  // unpinTarget: opens the confirm dialog for "Unpin" — counts the
+  // employee's currently-pinned assignments, removes only the pin flag,
+  // leaves the assignment in place. Mirrors clearTarget's shape.
+  const [unpinTarget, setUnpinTarget] = useState(null);
   // selectedSlotKey: when an admin clicks an unassigned cell we mark its
   // cellKey here. The floating employees list then filters to employees who
   // have no other assignment on that date, so they're guaranteed-free for
@@ -192,6 +196,10 @@ export default function ViewSchedules() {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [currentVersion, setCurrentVersion] = useState(null);
   const [originalAssignmentMap, setOriginalAssignmentMap] = useState({});
+  // Baseline copy of pinnedMap captured at load time. Used by the
+  // pendingChanges memo to detect pin-only diffs (Unpin button) and by
+  // handleConfirmDiscard to restore the original pin state on cancel.
+  const [originalPinnedMap, setOriginalPinnedMap] = useState({});
   const [pendingChanges, setPendingChanges] = useState([]);
   const [changeHighlights, setChangeHighlights] = useState({});
   const [viewingHistoricalVersion, setViewingHistoricalVersion] = useState(false);
@@ -385,6 +393,64 @@ export default function ViewSchedules() {
     setClearTarget({ employee, count });
   };
 
+  // Count this employee's currently-pinned assignments and open the
+  // unpin-confirm dialog. Toast and bail if there are none.
+  //
+  // "Unpin" releases the pin lock on every cell where this employee is
+  // both assigned and currently pinned — leaving the allocation intact
+  // so the next solve can move them but the current rota still has them
+  // sitting where they were. The change is queued through pendingChanges
+  // like Clear-all does, so Save / Discard semantics carry through.
+  const handleAskUnpin = (employee) => {
+    let count = 0;
+    Object.entries(pinnedMap).forEach(([cellKey, empSet]) => {
+      if (empSet && empSet.has(employee.id)) {
+        // Only count cells where the employee is still actually assigned —
+        // otherwise the pin is stale and there's nothing to unpin in the
+        // user's mental model.
+        const stillAssigned = (assignmentMap[cellKey] || []).some(
+          (e) => e.id === employee.id,
+        );
+        if (stillAssigned) count += 1;
+      }
+    });
+    if (count === 0) {
+      setSnackbar({
+        message: `${employee.firstName} ${employee.lastName} has no pinned assignments.`,
+        opened: true,
+      });
+      return;
+    }
+    setUnpinTarget({ employee, count });
+  };
+
+  // Remove the employee from every cell's pin Set. The pendingChanges
+  // memo diffs pinnedMap vs originalPinnedMap and emits one UNPIN
+  // pendingChange per affected cell.
+  const handleConfirmUnpin = () => {
+    if (!unpinTarget) return;
+    const { employee, count } = unpinTarget;
+    setPinnedMap((prev) => {
+      const next = {};
+      Object.keys(prev).forEach((cellKey) => {
+        const old = prev[cellKey];
+        if (old && old.has(employee.id)) {
+          const copy = new Set(old);
+          copy.delete(employee.id);
+          next[cellKey] = copy;
+        } else {
+          next[cellKey] = old;
+        }
+      });
+      return next;
+    });
+    setSnackbar({
+      message: `Unpinned ${count} assignment${count === 1 ? '' : 's'} for ${employee.firstName} ${employee.lastName}.`,
+      opened: true,
+    });
+    setUnpinTarget(null);
+  };
+
   // Remove the targeted employee from every cell in one setAssignmentMap.
   // The existing change-tracker memo picks this up and emits one UNASSIGNED
   // pendingChange per affected cell, so Save / Discard work unchanged.
@@ -457,7 +523,13 @@ export default function ViewSchedules() {
     if (Object.keys(originalAssignmentMap).length === 0 ||
       (!viewingHistoricalVersion && isCurrentVersion)) {
       setOriginalAssignmentMap(JSON.parse(JSON.stringify(newMap)));
-
+      // Mirror the baseline copy for pinnedMap. JSON can't round-trip a
+      // Set, so we rebuild each cell's Set by spreading.
+      const pinnedSnapshot = {};
+      Object.keys(newPinned || {}).forEach((k) => {
+        pinnedSnapshot[k] = new Set(newPinned[k]);
+      });
+      setOriginalPinnedMap(pinnedSnapshot);
     }
 
     // Always clear pending changes when viewing historical version
@@ -551,9 +623,40 @@ export default function ViewSchedules() {
       }
     });
 
+    // UNPIN diff: cells where the employee is still assigned (so we
+    // didn't already emit UNASSIGNED above) but the pin flag flipped
+    // true -> false. The save endpoint flips is_pinned to false on the
+    // matching row AND deletes the corresponding pinned_template_assignment
+    // entry so the next solve doesn't re-pin them.
+    Object.keys(originalPinnedMap).forEach((cellKey) => {
+      const wasPinned = originalPinnedMap[cellKey] || new Set();
+      const isPinned = pinnedMap[cellKey] || new Set();
+      const stillAssigned = new Set((assignmentMap[cellKey] || []).map((e) => e.id));
+      wasPinned.forEach((empId) => {
+        if (!isPinned.has(empId) && stillAssigned.has(empId)) {
+          const shiftId = getShiftIdFromCellKey(cellKey);
+          if (shiftId) {
+            const employee = (assignmentMap[cellKey] || []).find((e) => e.id === empId);
+            changes.push({
+              cellKey,
+              shiftId,
+              oldEmployeeId: empId,
+              newEmployeeId: empId,
+              changeReason: 'MANUAL_UNPIN',
+              changeType: 'UNPIN',
+              employee,
+            });
+            // Don't overwrite a more important highlight (ASSIGNED /
+            // UNASSIGNED / REASSIGNED) — UNPIN is a subtler change.
+            if (!highlights[cellKey]) highlights[cellKey] = 'UNPIN';
+          }
+        }
+      });
+    });
+
     setPendingChanges(changes);
     setChangeHighlights(highlights);
-  }, [assignmentMap, originalAssignmentMap, viewingHistoricalVersion]);
+  }, [assignmentMap, originalAssignmentMap, pinnedMap, originalPinnedMap, viewingHistoricalVersion]);
 
   const rowData = useMemo(() => {
     return Object.entries(groupedAssignments)
@@ -971,6 +1074,14 @@ export default function ViewSchedules() {
 
   const handleConfirmDiscard = () => {
     setAssignmentMap(JSON.parse(JSON.stringify(originalAssignmentMap)));
+    // Restore the pin state alongside — pendingChanges diffs against
+    // originalPinnedMap, so clearing pinnedMap back to its baseline
+    // automatically drops any UNPIN entries that were queued.
+    const pinnedRestore = {};
+    Object.keys(originalPinnedMap).forEach((k) => {
+      pinnedRestore[k] = new Set(originalPinnedMap[k]);
+    });
+    setPinnedMap(pinnedRestore);
     setPendingChanges([]);
     setChangeHighlights({});
     setHighlighted({});
@@ -1016,6 +1127,13 @@ export default function ViewSchedules() {
   const handleSaveComplete = (versionData) => {
     setCurrentVersion(versionData.version);
     setOriginalAssignmentMap(JSON.parse(JSON.stringify(assignmentMap)));
+    // Reset the pin baseline too so a freshly-saved state doesn't keep
+    // showing UNPIN entries as still-pending.
+    const pinnedSnapshot = {};
+    Object.keys(pinnedMap || {}).forEach((k) => {
+      pinnedSnapshot[k] = new Set(pinnedMap[k]);
+    });
+    setOriginalPinnedMap(pinnedSnapshot);
     setPendingChanges([]);
     setChangeHighlights({});
     clearBackendConflicts();
@@ -1299,6 +1417,7 @@ export default function ViewSchedules() {
         findHighlightedEmpId={findHighlightedEmpId}
         onToggleFindHighlight={handleToggleFindHighlight}
         onClearAllForEmployee={handleAskClearAll}
+        onUnpinForEmployee={handleAskUnpin}
         slotFilterInfo={slotFilterInfo}
         onClearSlotFilter={() => setSelectedSlotKey(null)}
       />
@@ -1398,6 +1517,33 @@ export default function ViewSchedules() {
           <Button onClick={() => setClearTarget(null)}>Cancel</Button>
           <Button onClick={handleConfirmClearAll} variant="contained" color="error">
             Clear All
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={!!unpinTarget}
+        onClose={() => setUnpinTarget(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Unpin all assignments?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Release the pin lock on{' '}
+            <strong>{unpinTarget?.count}</strong> currently-pinned
+            assignment{unpinTarget?.count === 1 ? '' : 's'} for{' '}
+            <strong>
+              {unpinTarget?.employee.firstName} {unpinTarget?.employee.lastName}
+            </strong>
+            ? The allocation stays — the next solve will be free to move
+            them. Changes can be discarded before saving.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setUnpinTarget(null)}>Cancel</Button>
+          <Button onClick={handleConfirmUnpin} variant="contained" color="warning">
+            Unpin
           </Button>
         </DialogActions>
       </Dialog>

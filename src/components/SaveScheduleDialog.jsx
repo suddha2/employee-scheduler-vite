@@ -59,6 +59,12 @@ export default function SaveScheduleDialog({
       oldEmployeeId: change.oldEmployeeId || null,
       newEmployeeId: change.newEmployeeId || null,
       changeReason: change.changeReason || 'MANUAL_ASSIGN',
+      // The backend infers ASSIGNED/UNASSIGNED/REASSIGNED from the
+      // old/new employee ids, so most rows can ride without an explicit
+      // type. UNPIN is the exception: its old and new employee ids are
+      // identical so the server needs the type to recognise it as a
+      // pin-flag flip rather than a no-op.
+      changeType: change.changeType || null,
     }));
   };
 
