@@ -78,56 +78,62 @@ function EmployeeItem({
         sx={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center",
+          // flex-start so the shift circles stay anchored to the top while the
+          // left column (name + optional region) grows downward as needed.
+          alignItems: "flex-start",
           cursor: "grab",
         }}
       >
-        <Box sx={{ flexGrow: 1, display: "flex", alignItems: "center", minWidth: 0 }}>
-          <Typography
-            variant="body2"
-            sx={{ fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
-          >
-            {employee.firstName} {employee.lastName}
-          </Typography>
+        {/*
+          Left column stacks the name (wraps if long, never truncated) and,
+          on the Other Regions tab, the region underneath. Hours pill sits at
+          the top-right of this column so it stays close to the name on
+          single-line rows but doesn't compete with a wrapped name for space.
+        */}
+        <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", minWidth: 0, mr: 0.5 }}>
+          <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5 }}>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 500,
+                flex: "1 1 auto",
+                wordBreak: "break-word",
+                lineHeight: 1.2,
+              }}
+            >
+              {employee.firstName} {employee.lastName}
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                flexShrink: 0,
+                px: 0.6,
+                py: 0.2,
+                borderRadius: 1,
+                backgroundColor: "grey.300",
+                color: "text.primary",
+                fontSize: 11,
+                fontWeight: 500,
+              }}
+            >
+              {totalHours}
+            </Typography>
+          </Box>
           {regionChip && (
             <Typography
               variant="caption"
               title={regionChip}
               sx={{
-                ml: 0.75,
-                px: 0.5,
-                py: 0.1,
-                borderRadius: 1,
-                backgroundColor: "primary.50",
-                color: "primary.dark",
-                border: "1px solid",
-                borderColor: "primary.200",
                 fontSize: 10,
-                fontWeight: 500,
-                whiteSpace: "nowrap",
-                maxWidth: 90,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
+                color: "text.secondary",
+                mt: 0.25,
+                lineHeight: 1.1,
+                fontStyle: "italic",
               }}
             >
               {regionChip}
             </Typography>
           )}
-          <Typography
-            variant="caption"
-            sx={{
-              ml: 1,
-              px: 0.6,
-              py: 0.2,
-              borderRadius: 1,
-              backgroundColor: "grey.300",
-              color: "text.primary",
-              fontSize: 11,
-              fontWeight: 500,
-            }}
-          >
-            {totalHours}
-          </Typography>
         </Box>
 
         <Box sx={{ display: "flex" }}>
