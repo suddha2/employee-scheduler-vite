@@ -427,35 +427,12 @@ export default function FloatingEmployeeList({
             </ToggleButton>
           </ToggleButtonGroup>
 
-          <TextField
-            size="small"
-            placeholder="Search employees..."
-            fullWidth
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            sx={{ mb: 2 }}
-          />
-
-          <TextField
-            select
-            label="Contract Type"
-            size="small"
-            fullWidth
-            value={contractFilter}
-            onChange={(e) => setContractFilter(e.target.value)}
-            SelectProps={{ native: true }}
-            sx={{ mb: 2 }}
-          >
-            <option value="All">All</option>
-            {[...new Set(sourceList.map(emp => emp.contractType))].filter(Boolean).map((type) => (
-              <option key={type} value={type}>{type}</option>
-            ))}
-          </TextField>
-
           {/*
             Region filter — only shown on the Other Regions tab when employees
-            are loaded. Collapsed by default; counts next to each region reflect
-            the search + contract filters so admins don't open an empty one.
+            are loaded. Sits above the search box because it's typically the
+            first cut admins make when looking for cover from another region.
+            Counts next to each region reflect the (current) search + contract
+            filters so admins don't open an empty one.
           */}
           {isOutTab && regionCounts.length > 0 && (
             <Box sx={{ mb: 2 }}>
@@ -499,7 +476,10 @@ export default function FloatingEmployeeList({
                   <Button
                     size="small"
                     variant={regionFilter === null ? "contained" : "outlined"}
-                    onClick={() => setRegionFilter(null)}
+                    // Auto-collapse on any selection so the panel stays tight —
+                    // header still shows the active filter, so the user always
+                    // knows what's applied.
+                    onClick={() => { setRegionFilter(null); setRegionFilterOpen(false); }}
                     sx={{ justifyContent: "flex-start", fontSize: 11, py: 0.25, textTransform: "none" }}
                   >
                     All regions
@@ -509,7 +489,7 @@ export default function FloatingEmployeeList({
                       key={region}
                       size="small"
                       variant={regionFilter === region ? "contained" : "outlined"}
-                      onClick={() => setRegionFilter(region)}
+                      onClick={() => { setRegionFilter(region); setRegionFilterOpen(false); }}
                       sx={{
                         justifyContent: "space-between",
                         fontSize: 11,
@@ -527,6 +507,31 @@ export default function FloatingEmployeeList({
               </Collapse>
             </Box>
           )}
+
+          <TextField
+            size="small"
+            placeholder="Search employees..."
+            fullWidth
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+
+          <TextField
+            select
+            label="Contract Type"
+            size="small"
+            fullWidth
+            value={contractFilter}
+            onChange={(e) => setContractFilter(e.target.value)}
+            SelectProps={{ native: true }}
+            sx={{ mb: 2 }}
+          >
+            <option value="All">All</option>
+            {[...new Set(sourceList.map(emp => emp.contractType))].filter(Boolean).map((type) => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </TextField>
 
           {slotFilterInfo && (
             <Box sx={{ mb: 2 }}>
