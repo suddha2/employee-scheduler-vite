@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   Paper,
   Typography,
@@ -260,6 +260,13 @@ export default function FloatingEmployeeList({
 
   const [contractFilter, setContractFilter] = useState("All");
 
+  // Other-Regions-only: optional region filter, plus whether its expandable
+  // section is open. Filter persists when toggling tabs (so the user can
+  // pop over to "In Region" and back without losing their selection), but
+  // resets whenever the underlying list reloads (e.g. switching schedule).
+  const [regionFilter, setRegionFilter] = useState(null);
+  const [regionFilterOpen, setRegionFilterOpen] = useState(false);
+
   // Fire the lazy load the first time the out-of-region tab is opened. The
   // parent decides whether to actually fetch (dedupes if already loaded).
   const handleTabChange = (_e, next) => {
@@ -272,6 +279,33 @@ export default function FloatingEmployeeList({
 
   const isOutTab = activeTab === "outOfRegion";
   const sourceList = isOutTab ? (outOfRegionEmployees || []) : employees;
+
+  // Reset the region filter when the underlying out-of-region list reloads
+  // (parent sets it to null when navigating to a different schedule).
+  useEffect(() => {
+    setRegionFilter(null);
+  }, [outOfRegionEmployees]);
+
+  // Region counts shown next to each filter button. Counts respect the
+  // search and contract filters but NOT the region filter itself — so the
+  // number reflects "what you'd actually see if you clicked this", and a
+  // region only appears if at least one match would be visible.
+  const regionCounts = useMemo(() => {
+    if (!isOutTab || !outOfRegionEmployees) return [];
+    const counts = new Map();
+    for (const emp of outOfRegionEmployees) {
+      const matchesSearch = `${emp.firstName} ${emp.lastName}`.toLowerCase()
+        .includes(searchQuery.toLowerCase());
+      const matchesContract = contractFilter === "All" || emp.contractType === contractFilter;
+      const matchesSlot = !slotFilterInfo || !slotFilterInfo.busyIds?.has(emp.id);
+      if (!matchesSearch || !matchesContract || !matchesSlot) continue;
+      const region = emp.preferredRegion || "(no region)";
+      counts.set(region, (counts.get(region) || 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([region, count]) => ({ region, count }))
+      .sort((a, b) => a.region.localeCompare(b.region));
+  }, [isOutTab, outOfRegionEmployees, searchQuery, contractFilter, slotFilterInfo]);
   const handleMouseDown = (e) => {
     dragging.current = true;
     offset.current = {
@@ -310,7 +344,10 @@ export default function FloatingEmployeeList({
     const matchesContract = contractFilter === "All" || emp.contractType === contractFilter;
     // When a slot is selected for filtering, exclude anyone already busy on that date.
     const matchesSlotFilter = !slotFilterInfo || !slotFilterInfo.busyIds?.has(emp.id);
-    return matchesSearch && matchesContract && matchesSlotFilter;
+    // Region filter applies only on the Other Regions tab.
+    const matchesRegion = !isOutTab || !regionFilter
+      || (emp.preferredRegion || "(no region)") === regionFilter;
+    return matchesSearch && matchesContract && matchesSlotFilter && matchesRegion;
   });
 
   // Pretty-print the active slot filter for the inline chip.
@@ -414,6 +451,82 @@ export default function FloatingEmployeeList({
               <option key={type} value={type}>{type}</option>
             ))}
           </TextField>
+
+          {/*
+            Region filter — only shown on the Other Regions tab when employees
+            are loaded. Collapsed by default; counts next to each region reflect
+            the search + contract filters so admins don't open an empty one.
+          */}
+          {isOutTab && regionCounts.length > 0 && (
+            <Box sx={{ mb: 2 }}>
+              <Box
+                onClick={() => setRegionFilterOpen((v) => !v)}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  px: 1,
+                  py: 0.5,
+                  borderRadius: 1,
+                  backgroundColor: "grey.100",
+                  cursor: "pointer",
+                  "&:hover": { backgroundColor: "grey.200" },
+                }}
+              >
+                <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                  Filter by region
+                  <Typography
+                    component="span"
+                    variant="caption"
+                    sx={{ ml: 0.5, color: "text.secondary", fontWeight: 400 }}
+                  >
+                    ({regionCounts.length})
+                  </Typography>
+                  {regionFilter && (
+                    <Typography
+                      component="span"
+                      variant="caption"
+                      sx={{ ml: 0.75, color: "primary.main", fontWeight: 500 }}
+                    >
+                      · {regionFilter}
+                    </Typography>
+                  )}
+                </Typography>
+                {regionFilterOpen ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+              </Box>
+              <Collapse in={regionFilterOpen}>
+                <Stack spacing={0.5} sx={{ mt: 0.75 }}>
+                  <Button
+                    size="small"
+                    variant={regionFilter === null ? "contained" : "outlined"}
+                    onClick={() => setRegionFilter(null)}
+                    sx={{ justifyContent: "flex-start", fontSize: 11, py: 0.25, textTransform: "none" }}
+                  >
+                    All regions
+                  </Button>
+                  {regionCounts.map(({ region, count }) => (
+                    <Button
+                      key={region}
+                      size="small"
+                      variant={regionFilter === region ? "contained" : "outlined"}
+                      onClick={() => setRegionFilter(region)}
+                      sx={{
+                        justifyContent: "space-between",
+                        fontSize: 11,
+                        py: 0.25,
+                        textTransform: "none",
+                      }}
+                    >
+                      <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {region}
+                      </Box>
+                      <Box component="span" sx={{ ml: 1, opacity: 0.8 }}>{count}</Box>
+                    </Button>
+                  ))}
+                </Stack>
+              </Collapse>
+            </Box>
+          )}
 
           {slotFilterInfo && (
             <Box sx={{ mb: 2 }}>
