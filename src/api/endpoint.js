@@ -50,6 +50,7 @@ export const API_ENDPOINTS = {
   // Statistics
   serviceStats: `${API_BASE_URL}/api/stats/serviceStats`,
   empStats: `${API_BASE_URL}/api/stats/empStats`,
+  outOfRegionEmps: `${API_BASE_URL}/api/stats/outOfRegionEmps`,
 
   // Shift Requests (admin)
   shiftRequests: `${API_BASE_URL}/api/admin/shift-requests`,

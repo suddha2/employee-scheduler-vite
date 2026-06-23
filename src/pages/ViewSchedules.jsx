@@ -183,6 +183,13 @@ export default function ViewSchedules() {
   };
   const [groupedAssignments, setGroupedAssignments] = useState({});
   const [summarizedEmpList, setSummarizedEmpList] = useState([]);
+
+  // Other-regions employees for the floating panel's "Other Regions" tab.
+  // Lazily fetched on first tab open; null = not yet loaded, [] = loaded empty.
+  // Reset whenever we navigate to a different schedule (the rota id changes).
+  const [outOfRegionEmpList, setOutOfRegionEmpList] = useState(null);
+  const [outOfRegionLoading, setOutOfRegionLoading] = useState(false);
+  const [outOfRegionError, setOutOfRegionError] = useState(null);
   const [highlighted, setHighlighted] = useState({});
   const [activeDragId, setActiveDragId] = useState(null);
   const [draggedEmployee, setDraggedEmployee] = useState(null);
@@ -335,7 +342,38 @@ export default function ViewSchedules() {
   useEffect(() => {
     if (!id) return;
     loadSchedule();
+    // Reset out-of-region cache when the rota changes — the data is keyed by
+    // the current rota's paycycle period, so it's stale across schedules.
+    setOutOfRegionEmpList(null);
+    setOutOfRegionError(null);
+    setOutOfRegionLoading(false);
   }, [id]);
+
+  // Lazily fetched on first open of the "Other Regions" tab in the floating
+  // panel. Dedupes automatically — once `outOfRegionEmpList` is set the tab
+  // switch is a no-op.
+  const handleRequestOutOfRegion = async () => {
+    if (!id || outOfRegionLoading || outOfRegionEmpList != null) return;
+    setOutOfRegionLoading(true);
+    setOutOfRegionError(null);
+    try {
+      const res = await axiosInstance.get(API_ENDPOINTS.outOfRegionEmps, { params: { id } });
+      setOutOfRegionEmpList(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      setOutOfRegionError(err?.message || 'Failed to load other-region employees');
+      // Leave list null so a future tab toggle retries.
+    } finally {
+      setOutOfRegionLoading(false);
+    }
+  };
+
+  // Look up an employee by id across both lists. Used by drag/drop handlers
+  // and the highlight chip so an out-of-region drag still resolves.
+  const findEmpById = (empId) => {
+    return summarizedEmpList.find((e) => e.id === empId)
+        || (outOfRegionEmpList || []).find((e) => e.id === empId)
+        || null;
+  };
 
   // Toggle the "highlight this employee's assignments" amber chip ring.
   const handleToggleFindHighlight = (empId) => {
@@ -753,8 +791,9 @@ export default function ViewSchedules() {
     setActiveDragId(active.id);
     const [, empIdStr] = active.id.split("|");
     const empId = Number(empIdStr);
-    const emp = summarizedEmpList.find((e) => e.id === empId);
-    setDraggedEmployee(emp);
+    // findEmpById falls back to the out-of-region list — needed when the
+    // user drags a card from the "Other Regions" tab.
+    setDraggedEmployee(findEmpById(empId));
   }
 
   const checkForConflicts = (employeeId, targetDate, targetCellKey) => {
@@ -913,7 +952,7 @@ export default function ViewSchedules() {
 
     const [, empIdStr] = active.id.split("|");
     const empId = Number(empIdStr);
-    const droppedEmp = summarizedEmpList.find((e) => e.id === empId);
+    const droppedEmp = findEmpById(empId);
     if (!droppedEmp) return;
 
     const [, location, shiftType, date, shiftTime, shiftId] = over.id.split("|");
@@ -1241,7 +1280,7 @@ export default function ViewSchedules() {
           })()}
 
           {findHighlightedEmpId != null && (() => {
-            const emp = summarizedEmpList?.find((e) => e.id === findHighlightedEmpId);
+            const emp = findEmpById(findHighlightedEmpId);
             const label = emp ? `Highlighting ${emp.firstName} ${emp.lastName}` : 'Highlighting…';
             return (
               <Chip
@@ -1414,6 +1453,10 @@ export default function ViewSchedules() {
 
       <FloatingEmployeeList
         employees={summarizedEmpList || []}
+        outOfRegionEmployees={outOfRegionEmpList}
+        outOfRegionLoading={outOfRegionLoading}
+        outOfRegionError={outOfRegionError}
+        onRequestOutOfRegion={handleRequestOutOfRegion}
         findHighlightedEmpId={findHighlightedEmpId}
         onToggleFindHighlight={handleToggleFindHighlight}
         onClearAllForEmployee={handleAskClearAll}

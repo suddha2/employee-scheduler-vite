@@ -10,6 +10,9 @@ import {
   Button,
   Stack,
   Chip,
+  ToggleButtonGroup,
+  ToggleButton,
+  CircularProgress,
 } from "@mui/material";
 import {
   ExpandLess,
@@ -29,6 +32,7 @@ function EmployeeItem({
   onToggleFindHighlight,
   onClearAllForEmployee,
   onUnpinForEmployee,
+  regionChip = null,
 }) {
   const id = `emp|${employee.id}`;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id });
@@ -78,10 +82,37 @@ function EmployeeItem({
           cursor: "grab",
         }}
       >
-        <Box sx={{ flexGrow: 1, display: "flex", alignItems: "center" }}>
-          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+        <Box sx={{ flexGrow: 1, display: "flex", alignItems: "center", minWidth: 0 }}>
+          <Typography
+            variant="body2"
+            sx={{ fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+          >
             {employee.firstName} {employee.lastName}
           </Typography>
+          {regionChip && (
+            <Typography
+              variant="caption"
+              title={regionChip}
+              sx={{
+                ml: 0.75,
+                px: 0.5,
+                py: 0.1,
+                borderRadius: 1,
+                backgroundColor: "primary.50",
+                color: "primary.dark",
+                border: "1px solid",
+                borderColor: "primary.200",
+                fontSize: 10,
+                fontWeight: 500,
+                whiteSpace: "nowrap",
+                maxWidth: 90,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {regionChip}
+            </Typography>
+          )}
           <Typography
             variant="caption"
             sx={{
@@ -190,6 +221,10 @@ function EmployeeItem({
 
 export default function FloatingEmployeeList({
   employees = [],
+  outOfRegionEmployees = null,
+  outOfRegionLoading = false,
+  outOfRegionError = null,
+  onRequestOutOfRegion,
   findHighlightedEmpId = null,
   onToggleFindHighlight,
   onClearAllForEmployee,
@@ -201,6 +236,11 @@ export default function FloatingEmployeeList({
   const [activeId, setActiveId] = useState(null);
   const columnWidths = [200, 150, 150, 150, 150, 150, 150, 150];
   const [searchQuery, setSearchQuery] = useState("");
+  // 'inRegion' = current rota's employees (existing), 'outOfRegion' = staff
+  // from other regions in the same paycycle period. Tab state lives here so
+  // the parent doesn't need to track it — parent just provides the data and
+  // a lazy-load callback fired on first switch.
+  const [activeTab, setActiveTab] = useState("inRegion");
   const dragging = useRef(false);
   const offset = useRef({ x: 0, y: 0 });
   const NAVBAR_HEIGHT = 64;
@@ -211,8 +251,21 @@ export default function FloatingEmployeeList({
     top: 250,
     left: window.innerWidth - LIST_WIDTH - 30, // 30px margin from right edge
   });
-  
+
   const [contractFilter, setContractFilter] = useState("All");
+
+  // Fire the lazy load the first time the out-of-region tab is opened. The
+  // parent decides whether to actually fetch (dedupes if already loaded).
+  const handleTabChange = (_e, next) => {
+    if (!next || next === activeTab) return;
+    setActiveTab(next);
+    if (next === "outOfRegion" && outOfRegionEmployees == null && !outOfRegionLoading) {
+      onRequestOutOfRegion?.();
+    }
+  };
+
+  const isOutTab = activeTab === "outOfRegion";
+  const sourceList = isOutTab ? (outOfRegionEmployees || []) : employees;
   const handleMouseDown = (e) => {
     dragging.current = true;
     offset.current = {
@@ -244,9 +297,9 @@ export default function FloatingEmployeeList({
     document.removeEventListener("mouseup", handleMouseUp);
   };
 
-  // Filter employees by search query
-
-  const filteredEmployees = employees.filter((emp) => {
+  // Filter employees by search query. `sourceList` toggles between the
+  // in-region rota employees and the other-regions list based on the tab.
+  const filteredEmployees = sourceList.filter((emp) => {
     const matchesSearch = `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesContract = contractFilter === "All" || emp.contractType === contractFilter;
     // When a slot is selected for filtering, exclude anyone already busy on that date.
@@ -315,6 +368,22 @@ export default function FloatingEmployeeList({
       <Collapse in={open}>
         <Divider />
         <Box sx={{ p: 2, pt: 1 }}>
+          <ToggleButtonGroup
+            value={activeTab}
+            exclusive
+            onChange={handleTabChange}
+            size="small"
+            fullWidth
+            sx={{ mb: 1.5 }}
+          >
+            <ToggleButton value="inRegion" sx={{ fontSize: 11, py: 0.5 }}>
+              In Region
+            </ToggleButton>
+            <ToggleButton value="outOfRegion" sx={{ fontSize: 11, py: 0.5 }}>
+              Other Regions
+            </ToggleButton>
+          </ToggleButtonGroup>
+
           <TextField
             size="small"
             placeholder="Search employees..."
@@ -335,7 +404,7 @@ export default function FloatingEmployeeList({
             sx={{ mb: 2 }}
           >
             <option value="All">All</option>
-            {[...new Set(employees.map(emp => emp.contractType))].map((type) => (
+            {[...new Set(sourceList.map(emp => emp.contractType))].filter(Boolean).map((type) => (
               <option key={type} value={type}>{type}</option>
             ))}
           </TextField>
@@ -391,19 +460,37 @@ export default function FloatingEmployeeList({
                 ))}
               </Box>
             </Box>
-            {filteredEmployees.length > 0 ? (
+            {isOutTab && outOfRegionLoading && (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 1 }}>
+                <CircularProgress size={14} />
+                <Typography variant="body2" color="text.secondary">
+                  Loading other regions…
+                </Typography>
+              </Box>
+            )}
+            {isOutTab && outOfRegionError && !outOfRegionLoading && (
+              <Typography variant="body2" color="error" sx={{ py: 1 }}>
+                Couldn't load other-region employees. Retry by switching tabs.
+              </Typography>
+            )}
+            {!(isOutTab && outOfRegionLoading) && filteredEmployees.length > 0 && (
               filteredEmployees.map((emp) => (
                 <EmployeeItem
                   key={emp.id}
                   employee={emp}
-                  showActions={searchQuery.trim().length > 0}
+                  // Action buttons (highlight / unpin / unassign) only make sense
+                  // for employees with assignments in THIS rota — suppress them
+                  // on the Other Regions tab.
+                  showActions={!isOutTab && searchQuery.trim().length > 0}
                   isFindHighlighted={findHighlightedEmpId === emp.id}
                   onToggleFindHighlight={onToggleFindHighlight}
                   onClearAllForEmployee={onClearAllForEmployee}
                   onUnpinForEmployee={onUnpinForEmployee}
+                  regionChip={isOutTab ? emp.preferredRegion : null}
                 />
               ))
-            ) : (
+            )}
+            {!(isOutTab && outOfRegionLoading) && filteredEmployees.length === 0 && !outOfRegionError && (
               <Typography variant="body2" color="text.secondary">
                 No employees found.
               </Typography>
