@@ -61,6 +61,16 @@ export const API_ENDPOINTS = {
   publishLogForService: (rotaId, service) =>
     `${API_BASE_URL}/api/stats/publish/${rotaId}/service/${encodeURIComponent(service)}/log`,
 
+  // Live / continuous solving (P4)
+  liveStart: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/live/start`,
+  liveStop: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/live/stop`,
+  liveSnapshot: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/live/snapshot`,
+  liveStatus: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/live/status`,
+  liveAssign: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/live/assign`,
+  livePin: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/live/pin`,
+  // STOMP destination the live solver streams best solutions to
+  liveTopic: (rotaId) => `/topic/rota/${rotaId}`,
+
   // WebSocket
   websoc: `${API_BASE_URL}/ws`,
 };

@@ -25,6 +25,7 @@ import FloatingEmployeeList from "./FloatingEmployeeList";
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
+import LiveSolvePanel from '../components/LiveSolvePanel';
 import { useAuth } from '../contexts/AuthContext';
 import { calculateDuration } from '../utils/shiftCalculations';
 import { setEmpSummary, buildAssignmentMap } from '../utils/scheduleData';
@@ -1300,6 +1301,19 @@ export default function ViewSchedules() {
               sx={{ mr: 2 }}
             />
           )}
+
+          <LiveSolvePanel
+            rotaId={id}
+            canControl={canEditSchedule}
+            disabled={viewingHistoricalVersion}
+            onSnapshotSaved={(res) => {
+              setSnackbar({
+                message: `Live solution saved (${res?.assignmentsChanged ?? 0} change${(res?.assignmentsChanged ?? 0) === 1 ? '' : 's'})`,
+                opened: true,
+              });
+              handleRefresh();
+            }}
+          />
 
           <Tooltip title="Refresh schedule">
             <IconButton onClick={handleRefresh} disabled={loading}>
