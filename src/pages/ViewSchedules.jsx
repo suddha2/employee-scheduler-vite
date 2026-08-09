@@ -26,6 +26,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
 import LiveSolvePanel from '../components/LiveSolvePanel';
+import { useLiveRota } from '../hooks/useLiveRota';
 import { useAuth } from '../contexts/AuthContext';
 import { calculateDuration } from '../utils/shiftCalculations';
 import { setEmpSummary, buildAssignmentMap } from '../utils/scheduleData';
@@ -229,6 +230,75 @@ export default function ViewSchedules() {
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
   const parentRef = useRef(null);
+
+  // ── Live / continuous solving (P4 / P4b) ──────────────────────────────
+  // Single live session for this rota; drives both the toolbar panel and the
+  // grid reflection + live edits below. Everything keys off `live`, so when
+  // it's false the editor behaves exactly as before.
+  const liveRota = useLiveRota(id);
+  const live = liveRota.live;
+
+  // Stable lookups from the loaded rota: assignment DB id -> cellKey, and
+  // employees by id. Shift structure is fixed for a live session; only
+  // who-sits-where changes (delivered by frames), so these stay valid.
+  const { assignmentIdToCellKey, employeeById } = useMemo(() => {
+    const a2c = {};
+    const empById = {};
+    (rotaData?.shiftAssignmentList || []).forEach((sa) => {
+      const t = sa.shift?.shiftTemplate;
+      if (!t) return;
+      a2c[sa.id] = `${t.location}|${t.shiftType}|${sa.shift.shiftStart}|${t.startTime}|${sa.shift.id}`;
+    });
+    (rotaData?.employeeList || []).forEach((e) => { empById[e.id] = e; });
+    return { assignmentIdToCellKey: a2c, employeeById: empById };
+  }, [rotaData]);
+
+  // Reflect each streamed best solution into the grid while live.
+  useEffect(() => {
+    if (!live || !liveRota.frame) return;
+    const map = {};
+    const pinned = {};
+    // Ensure every known cell exists so all-unassigned cells still render.
+    Object.values(assignmentIdToCellKey).forEach((cellKey) => { if (!map[cellKey]) map[cellKey] = []; });
+    (liveRota.frame.slots || []).forEach((slot) => {
+      const cellKey = assignmentIdToCellKey[slot.assignmentId];
+      if (!cellKey) return;
+      if (!map[cellKey]) map[cellKey] = [];
+      if (slot.employeeId != null) {
+        const emp = employeeById[slot.employeeId]
+          || { id: slot.employeeId, firstName: slot.employeeName || 'Unknown', lastName: '' };
+        if (!map[cellKey].some((e) => e.id === emp.id)) map[cellKey].push(emp);
+        if (slot.pinned) {
+          if (!pinned[cellKey]) pinned[cellKey] = new Set();
+          pinned[cellKey].add(emp.id);
+        }
+      }
+    });
+    setAssignmentMap(map);
+    setPinnedMap(pinned);
+  }, [live, liveRota.frame, assignmentIdToCellKey, employeeById]);
+
+  // From the latest frame, the assignment slots belonging to a cell.
+  const liveSlotsForCell = (cellKey) =>
+    (liveRota.frame?.slots || []).filter((s) => assignmentIdToCellKey[s.assignmentId] === cellKey);
+
+  // Live drag-assign: place emp in the first free slot of the cell (else the
+  // first slot), pinned so the solver keeps it and optimises the rest.
+  const liveAssignToCell = (cellKey, empId) => {
+    const slots = liveSlotsForCell(cellKey);
+    if (slots.length === 0) return false;
+    const target = slots.find((s) => s.employeeId == null) || slots[0];
+    liveRota.assign(target.assignmentId, empId, true);
+    return true;
+  };
+
+  // Live remove: clear + unpin the slot in this cell currently holding emp.
+  const liveRemoveFromCell = (cellKey, empId) => {
+    const slot = liveSlotsForCell(cellKey).find((s) => s.employeeId === empId);
+    if (!slot) return false;
+    liveRota.assign(slot.assignmentId, null, false);
+    return true;
+  };
 
   const handleBack = () => navigate('/paycycleSchedule');
 
@@ -585,6 +655,9 @@ export default function ViewSchedules() {
   useEffect(() => {
     if (Object.keys(originalAssignmentMap).length === 0) return;
     if (viewingHistoricalVersion) return;
+    // While live, the solver is the source of truth and the grid is driven by
+    // frames — don't treat streamed updates as manual pending changes.
+    if (live) return;
 
     const changes = [];
     const highlights = {};
@@ -740,6 +813,12 @@ export default function ViewSchedules() {
   };
 
   const handleRemove = (cellKey, emp) => {
+
+    // Live mode: route the removal to the solver; the next frame updates the grid.
+    if (live) {
+      liveRemoveFromCell(cellKey, emp.id);
+      return;
+    }
 
     const [location, shiftType, date, shiftTime, shiftId] = cellKey.split("|");
 
@@ -958,6 +1037,14 @@ export default function ViewSchedules() {
 
     const [, location, shiftType, date, shiftTime, shiftId] = over.id.split("|");
     const cellKey = `${location}|${shiftType}|${date}|${shiftTime}|${shiftId}`;
+
+    // Live mode: feed the assignment to the running solver (pinned) and let it
+    // re-optimise; the next frame reflects the result. Skip the bulk modal /
+    // FE conflict flow — the solver's constraints score any clash.
+    if (live) {
+      liveAssignToCell(cellKey, empId);
+      return;
+    }
 
     // ✅ CHECK FOR CONFLICTS BEFORE OPENING MODAL
     const conflicts = checkForConflicts(empId, date, cellKey);
@@ -1304,6 +1391,14 @@ export default function ViewSchedules() {
 
           <LiveSolvePanel
             rotaId={id}
+            live={liveRota.live}
+            connected={liveRota.connected}
+            frame={liveRota.frame}
+            busy={liveRota.busy}
+            error={liveRota.error}
+            start={liveRota.start}
+            stop={liveRota.stop}
+            snapshot={liveRota.snapshot}
             canControl={canEditSchedule}
             disabled={viewingHistoricalVersion}
             onSnapshotSaved={(res) => {
@@ -1313,6 +1408,7 @@ export default function ViewSchedules() {
               });
               handleRefresh();
             }}
+            onStopped={() => handleRefresh()}
           />
 
           <Tooltip title="Refresh schedule">

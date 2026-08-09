@@ -2,23 +2,33 @@ import { Box, Button, Chip, CircularProgress, Tooltip } from '@mui/material';
 import BoltIcon from '@mui/icons-material/Bolt';
 import SaveIcon from '@mui/icons-material/Save';
 import StopIcon from '@mui/icons-material/Stop';
-import { useLiveRota } from '../hooks/useLiveRota';
 
 /**
  * Toolbar control for continuous / live solving of the currently-viewed rota (P4).
  *
- * "Go Live" starts a daemon solver on the server; while running, best solutions
- * stream in and this panel shows the live score + assigned/total, updating in
- * real time. "Save" snapshots the current live solution back to the DB (then the
- * parent reloads the grid); "Stop" terminates the solver.
+ * Controlled component: the parent (ViewSchedules) owns the single useLiveRota
+ * instance and passes its state/actions down, so the same live session also
+ * drives the grid reflection and live edits (P4b).
  *
- * Read-only for now: the streamed solution is summarised here rather than
- * re-rendered cell-by-cell into the editable grid (that + live drag/pin edits via
- * assign()/pin() is the next increment).
+ * "Go Live" starts a daemon solver; while running the grid updates in real time
+ * from streamed best solutions. "Save" snapshots the current solution to the DB
+ * (parent reloads the grid); "Stop" terminates the solver.
  */
-export default function LiveSolvePanel({ rotaId, disabled = false, canControl = true, onSnapshotSaved }) {
-  const { live, connected, frame, busy, error, start, stop, snapshot } = useLiveRota(rotaId);
-
+export default function LiveSolvePanel({
+  rotaId,
+  live,
+  connected,
+  frame,
+  busy,
+  error,
+  start,
+  stop,
+  snapshot,
+  disabled = false,
+  canControl = true,
+  onSnapshotSaved,
+  onStopped,
+}) {
   if (!canControl) return null;
 
   const handleSnapshot = async () => {
@@ -28,6 +38,11 @@ export default function LiveSolvePanel({ rotaId, disabled = false, canControl = 
     } catch {
       /* error surfaced via hook state below */
     }
+  };
+
+  const handleStop = async () => {
+    await stop();
+    onStopped?.();
   };
 
   if (!live) {
@@ -82,7 +97,7 @@ export default function LiveSolvePanel({ rotaId, disabled = false, canControl = 
             variant="outlined"
             color="error"
             startIcon={<StopIcon />}
-            onClick={stop}
+            onClick={handleStop}
             disabled={busy}
           >
             Stop
