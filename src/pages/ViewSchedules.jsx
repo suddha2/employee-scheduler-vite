@@ -539,6 +539,25 @@ export default function ViewSchedules() {
   const handleConfirmUnpin = () => {
     if (!unpinTarget) return;
     const { employee, count } = unpinTarget;
+
+    // Live mode: unpin each of this employee's pinned slots via the solver
+    // (SetPinProblemChange). The next frame reflects the new pin state.
+    if (live) {
+      let unpinned = 0;
+      (liveRota.frame?.slots || []).forEach((s) => {
+        if (s.employeeId === employee.id && s.pinned) {
+          liveRota.pin(s.assignmentId, false);
+          unpinned += 1;
+        }
+      });
+      setUnpinTarget(null);
+      setSnackbar({
+        message: `Unpinned ${unpinned} live assignment${unpinned === 1 ? '' : 's'} for ${employee.firstName} ${employee.lastName}.`,
+        opened: true,
+      });
+      return;
+    }
+
     setPinnedMap((prev) => {
       const next = {};
       Object.keys(prev).forEach((cellKey) => {
