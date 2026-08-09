@@ -70,6 +70,8 @@ export const API_ENDPOINTS = {
   livePin: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/live/pin`,
   // STOMP destination the live solver streams best solutions to
   liveTopic: (rotaId) => `/topic/rota/${rotaId}`,
+  // STOMP destination for lifecycle control events (started/stopped/snapshot)
+  liveControlTopic: (rotaId) => `/topic/rota/${rotaId}/control`,
 
   // WebSocket
   websoc: `${API_BASE_URL}/ws`,

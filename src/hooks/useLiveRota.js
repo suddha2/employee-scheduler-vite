@@ -32,8 +32,9 @@ export function useLiveRota(rotaId) {
       webSocketFactory: () => new SockJS(API_ENDPOINTS.websoc),
       connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: 5000,
-      onConnect: () => {
+      onConnect: async () => {
         setConnected(true);
+        // Streamed best solutions.
         client.subscribe(API_ENDPOINTS.liveTopic(rotaId), (message) => {
           try {
             setFrame(JSON.parse(message.body));
@@ -42,6 +43,28 @@ export function useLiveRota(rotaId) {
             if (import.meta.env.DEV) console.error('Bad live frame:', err);
           }
         });
+        // Lifecycle control events — drop out of live mode if the shared session
+        // is stopped by another editor or evicted server-side.
+        client.subscribe(API_ENDPOINTS.liveControlTopic(rotaId), (message) => {
+          try {
+            const evt = JSON.parse(message.body);
+            if (evt?.type === 'STOPPED') {
+              setLive(false);
+              setFrame(null);
+              setUpdatedAt(null);
+            }
+          } catch (err) {
+            if (import.meta.env.DEV) console.error('Bad control event:', err);
+          }
+        });
+        // Rehydrate after a server restart: if we still intend to be live but the
+        // server has no session for this rota, restart it (reloads from DB).
+        try {
+          const st = await liveSolveApi.status(rotaId);
+          if (!st?.tracked) await liveSolveApi.start(rotaId);
+        } catch (err) {
+          if (import.meta.env.DEV) console.error('Live rehydrate check failed:', err);
+        }
       },
       onWebSocketClose: () => setConnected(false),
       onStompError: (f) => setError(f.headers?.message || 'STOMP error'),
