@@ -130,8 +130,13 @@ export function useLiveRota(rotaId) {
     (assignmentId, pinned) => liveSolveApi.pin(rotaId, assignmentId, pinned),
     [rotaId],
   );
+  const addEmployee = useCallback((employeeId) => liveSolveApi.addEmployee(rotaId, employeeId), [rotaId]);
+  const removeEmployee = useCallback((employeeId) => liveSolveApi.removeEmployee(rotaId, employeeId), [rotaId]);
 
-  return { live, connected, frame, updatedAt, busy, error, start, stop, snapshot, assign, pin };
+  return {
+    live, connected, frame, updatedAt, busy, error,
+    start, stop, snapshot, assign, pin, addEmployee, removeEmployee,
+  };
 }
 
 export default useLiveRota;

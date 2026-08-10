@@ -16,6 +16,12 @@ export const liveSolveApi = {
       .then((r) => r.data),
   pin: (rotaId, assignmentId, pinned) =>
     axiosInstance.post(API_ENDPOINTS.livePin(rotaId), { assignmentId, pinned }).then((r) => r.data),
+
+  // Structural edits — adjust the live value range (carer pool).
+  addEmployee: (rotaId, employeeId) =>
+    axiosInstance.post(API_ENDPOINTS.liveEmployeeAdd(rotaId), { employeeId }).then((r) => r.data),
+  removeEmployee: (rotaId, employeeId) =>
+    axiosInstance.post(API_ENDPOINTS.liveEmployeeRemove(rotaId), { employeeId }).then((r) => r.data),
 };
 
 export default liveSolveApi;

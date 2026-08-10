@@ -68,6 +68,8 @@ export const API_ENDPOINTS = {
   liveStatus: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/live/status`,
   liveAssign: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/live/assign`,
   livePin: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/live/pin`,
+  liveEmployeeAdd: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/live/employee/add`,
+  liveEmployeeRemove: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/live/employee/remove`,
   // STOMP destination the live solver streams best solutions to
   liveTopic: (rotaId) => `/topic/rota/${rotaId}`,
   // STOMP destination for lifecycle control events (started/stopped/snapshot)
