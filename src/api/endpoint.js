@@ -27,8 +27,9 @@ export const API_ENDPOINTS = {
   shiftTemplates: `${API_BASE_URL}/api/shift-templates`,
   shiftTemplateById: (id) => `${API_BASE_URL}/api/shift-templates/${id}`,
 
-  // Data-driven shift types (dropdown source; new types = DB rows, no deploy)
+  // Data-driven shift types (dropdown source + admin CRUD; new types = DB rows, no deploy)
   shiftTypes: `${API_BASE_URL}/api/shift-types`,
+  shiftTypeByCode: (code) => `${API_BASE_URL}/api/shift-types/${encodeURIComponent(code)}`,
   shiftTemplatesByLocation: (loc) => `${API_BASE_URL}/api/shift-templates/by-location/${encodeURIComponent(loc)}`,
   shiftTemplatesBulk: `${API_BASE_URL}/api/shift-templates/bulk`,
 

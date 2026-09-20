@@ -22,6 +22,7 @@ import ShiftRequestsPage from './pages/ShiftRequestsPage';
 import ShiftTemplatesList from './pages/ShiftTemplatesList';
 import ShiftTemplateForm from './pages/ShiftTemplateForm';
 import ShiftTemplateBuilder from './pages/ShiftTemplateBuilder';
+import ManageShiftTypes from './pages/ManageShiftTypes';
 import UsersAdminPage from './pages/UsersAdminPage';
 import { AxiosInterceptorSetup } from './components/AxiosInterceptorSetup';
 
@@ -96,6 +97,9 @@ export default function App() {
                   </ProtectedRoute>} />
               <Route path="/shift-templates/builder" element={<ProtectedRoute>
                     <Layout><ShiftTemplateBuilder /></Layout>
+                  </ProtectedRoute>} />
+              <Route path="/shift-types" element={<ProtectedRoute>
+                    <Layout><ManageShiftTypes /></Layout>
                   </ProtectedRoute>} />
               <Route path="/shift-templates/edit/:id" element={<ProtectedRoute>
                     <Layout><ShiftTemplateForm /></Layout>

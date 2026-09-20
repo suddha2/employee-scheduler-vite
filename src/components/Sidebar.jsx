@@ -29,7 +29,8 @@ import {
     Menu as MenuIcon,
     Archive as ArchiveIcon,
     Inbox as InboxIcon,
-    ManageAccounts as ManageAccountsIcon
+    ManageAccounts as ManageAccountsIcon,
+    Category as CategoryIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useShiftRequestsNotifications } from '../contexts/ShiftRequestsContext';
@@ -44,7 +45,7 @@ export default function Sidebar({ open, onClose, onToggle }) {
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const [statsOpen, setStatsOpen] = useState(false);
     const { newCount: newShiftRequestCount } = useShiftRequestsNotifications();
-    const { canManageUsers, roles, username } = useAuth();
+    const { canManageUsers, canManagePeople, roles, username } = useAuth();
 
     // Display: highest role first, friendlier label.
     const ROLE_LABELS = {
@@ -83,6 +84,15 @@ export default function Sidebar({ open, onClose, onToggle }) {
             icon: <PeopleIcon />,
             path: '/shift-templates'
         },
+        // Shift-type config (rates, caps, behaviour) — people-managers only.
+        ...(canManagePeople
+            ? [{
+                title: 'Shift Types',
+                icon: <CategoryIcon />,
+                path: '/shift-types',
+                subItem: true,
+            }]
+            : []),
         {
             title: 'Pay Cycle Schedule',
             icon: <CalendarIcon />,
