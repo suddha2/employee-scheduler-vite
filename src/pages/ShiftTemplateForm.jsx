@@ -62,7 +62,9 @@ const ShiftTemplateForm = () => {
     const [regions, setRegions] = useState([]);
     const [locations, setLocations] = useState([]);
 
-    const shiftTypes = ['LONG_DAY', 'DAY', 'SLEEP_IN', 'WAKING_NIGHT', 'FLOATING', 'CARE_CALL'];
+    // Data-driven: loaded from GET /api/shift-types so new types (shift-lead, complex…)
+    // appear without a code change. Each item: { code, displayName }.
+    const [shiftTypes, setShiftTypes] = useState([]);
     const daysOfWeek = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
     const genders = ['ANY', 'MALE', 'FEMALE'];
     const skillOptions = ['BUCCAL', 'DRIVING'];
@@ -81,13 +83,23 @@ const ShiftTemplateForm = () => {
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
     const [originalFormData, setOriginalFormData] = useState(null);
 
-    // Fetch regions on mount
+    // Fetch regions + data-driven shift types on mount
     useEffect(() => {
         fetchRegions();
+        fetchShiftTypes();
         if (isEditMode) {
             fetchShiftTemplate();
         }
     }, [id]);
+
+    const fetchShiftTypes = async () => {
+        try {
+            const response = await axiosInstance.get(API_ENDPOINTS.shiftTypes, { params: { active: true } });
+            setShiftTypes(response.data || []);
+        } catch (err) {
+            console.error('Failed to fetch shift types:', err);
+        }
+    };
 
     // Fetch locations when region changes
     useEffect(() => {
@@ -476,9 +488,9 @@ const ShiftTemplateForm = () => {
                                     label="Shift Type"
                                     disabled={bulkEditMode}
                                 >
-                                    {shiftTypes.map((type) => (
-                                        <MenuItem key={type} value={type}>
-                                            {type.replace('_', ' ')}
+                                    {shiftTypes.map((t) => (
+                                        <MenuItem key={t.code} value={t.code}>
+                                            {t.displayName || t.code}
                                         </MenuItem>
                                     ))}
                                 </Select>

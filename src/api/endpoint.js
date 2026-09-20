@@ -23,9 +23,12 @@ export const API_ENDPOINTS = {
   employees: `${API_BASE_URL}/api/employees`,
   employeeById: (id) => `${API_BASE_URL}/api/employees/${id}`,
 
-  // Shift Templates Management  
+  // Shift Templates Management
   shiftTemplates: `${API_BASE_URL}/api/shift-templates`,
   shiftTemplateById: (id) => `${API_BASE_URL}/api/shift-templates/${id}`,
+
+  // Data-driven shift types (dropdown source; new types = DB rows, no deploy)
+  shiftTypes: `${API_BASE_URL}/api/shift-types`,
 
   // ✅ FIXED: Add base URL to scheduleVersions
   scheduleVersions: `${API_BASE_URL}/api/schedules`,
@@ -70,6 +73,8 @@ export const API_ENDPOINTS = {
   livePin: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/live/pin`,
   liveEmployeeAdd: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/live/employee/add`,
   liveEmployeeRemove: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/live/employee/remove`,
+  // Score / constraint explanation for a persisted rota (which slots break which rule)
+  rotaViolations: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/violations`,
   // STOMP destination the live solver streams best solutions to
   liveTopic: (rotaId) => `/topic/rota/${rotaId}`,
   // STOMP destination for lifecycle control events (started/stopped/snapshot)

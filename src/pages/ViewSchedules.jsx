@@ -17,6 +17,7 @@ import {
   DeleteSweep as ClearAllIcon,
   Campaign as CampaignIcon,
   WarningAmber as WarningAmberIcon,
+  FactCheck as FactCheckIcon,
 } from "@mui/icons-material";
 import { format } from "date-fns";
 import { DndContext, DragOverlay, pointerWithin } from "@dnd-kit/core";
@@ -36,6 +37,7 @@ import { publishUnallocatedShifts } from '../api/stats';
 import { DroppableCell } from "../components/droppableCell";
 import ScheduleRow from "../components/ScheduleRow";
 import ConflictsDrawer from "../components/ConflictsDrawer";
+import ViolationsDrawer from "../components/ViolationsDrawer";
 
 // Import versioning components
 import VersionHistorySidebar from '../components/Versionhistorysidebar';
@@ -87,6 +89,10 @@ export default function ViewSchedules() {
   const [backendConflictShiftIds, setBackendConflictShiftIds] = useState(new Set());
   const [backendConflictMessages, setBackendConflictMessages] = useState(new Map());
   const [conflictsDrawerOpen, setConflictsDrawerOpen] = useState(false);
+  const [violationsOpen, setViolationsOpen] = useState(false);
+  const [violationsData, setViolationsData] = useState(null);
+  const [violationsLoading, setViolationsLoading] = useState(false);
+  const [violationsError, setViolationsError] = useState(null);
   // findHighlightedEmpId: when set, every chip for this employee renders
   // with an amber outline so the admin can scan their assignments. The
   // floating Employees list also gets a search-driven UI to set/clear it.
@@ -229,6 +235,23 @@ export default function ViewSchedules() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
+
+  // Fetch OptaPlanner's score/constraint breakdown for this persisted rota and
+  // open the feasibility drawer (which slots break which hard rule).
+  const handleCheckFeasibility = async () => {
+    if (!id) return;
+    setViolationsOpen(true);
+    setViolationsLoading(true);
+    setViolationsError(null);
+    try {
+      const { data } = await axiosInstance.get(API_ENDPOINTS.rotaViolations(id));
+      setViolationsData(data);
+    } catch (e) {
+      setViolationsError(e.response?.data?.error || e.message || 'Failed to load score breakdown');
+    } finally {
+      setViolationsLoading(false);
+    }
+  };
   const parentRef = useRef(null);
 
   // ── Live / continuous solving (P4 / P4b) ──────────────────────────────
@@ -1430,6 +1453,12 @@ export default function ViewSchedules() {
             onStopped={() => handleRefresh()}
           />
 
+          <Tooltip title="Check feasibility — score & which slots break which rule">
+            <IconButton onClick={handleCheckFeasibility}>
+              <FactCheckIcon />
+            </IconButton>
+          </Tooltip>
+
           <Tooltip title="Refresh schedule">
             <IconButton onClick={handleRefresh} disabled={loading}>
               <RefreshIcon />
@@ -1635,6 +1664,13 @@ export default function ViewSchedules() {
         conflictCells={conflictCells}
         conflictCellInfo={conflictCellInfo}
         onNavigate={handleNavigateToConflict}
+      />
+      <ViolationsDrawer
+        open={violationsOpen}
+        onClose={() => setViolationsOpen(false)}
+        loading={violationsLoading}
+        error={violationsError}
+        data={violationsData}
       />
       {/* ✅ Add Conflict Dialog */}
       <ConflictDialog
