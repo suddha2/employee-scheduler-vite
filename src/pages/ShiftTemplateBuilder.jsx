@@ -168,7 +168,12 @@ export default function ShiftTemplateBuilder() {
                   const active = r.days.size > 0;
                   return (
                     <TableRow key={t.code} hover>
-                      <TableCell><strong>{t.displayName || t.code}</strong></TableCell>
+                      <TableCell>
+                        <strong>{t.displayName || t.code}</strong>
+                        {t.requiredSkill && (
+                          <Typography variant="caption" color="text.secondary" display="block">needs: {t.requiredSkill}</Typography>
+                        )}
+                      </TableCell>
                       {DAYS.map(([d]) => (
                         <TableCell key={d} align="center" sx={{ px: 0.5 }}>
                           <Checkbox size="small" checked={r.days.has(d)} onChange={() => toggleDay(t.code, d)} />
