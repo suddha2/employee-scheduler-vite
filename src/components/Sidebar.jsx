@@ -30,7 +30,8 @@ import {
     Archive as ArchiveIcon,
     Inbox as InboxIcon,
     ManageAccounts as ManageAccountsIcon,
-    Category as CategoryIcon
+    Category as CategoryIcon,
+    Tune as TuneIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useShiftRequestsNotifications } from '../contexts/ShiftRequestsContext';
@@ -90,6 +91,11 @@ export default function Sidebar({ open, onClose, onToggle }) {
                 title: 'Shift Types',
                 icon: <CategoryIcon />,
                 path: '/shift-types',
+                subItem: true,
+            }, {
+                title: 'Solver Settings',
+                icon: <TuneIcon />,
+                path: '/solver-settings',
                 subItem: true,
             }]
             : []),

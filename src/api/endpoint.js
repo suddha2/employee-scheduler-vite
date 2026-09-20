@@ -30,6 +30,12 @@ export const API_ENDPOINTS = {
   // Data-driven shift types (dropdown source + admin CRUD; new types = DB rows, no deploy)
   shiftTypes: `${API_BASE_URL}/api/shift-types`,
   shiftTypeByCode: (code) => `${API_BASE_URL}/api/shift-types/${encodeURIComponent(code)}`,
+
+  // Solver levers + tuning (constraint weights/severity/enable + numeric thresholds)
+  solverConstraints: `${API_BASE_URL}/api/solver-settings/constraints`,
+  solverConstraintByName: (name) => `${API_BASE_URL}/api/solver-settings/constraints/${encodeURIComponent(name)}`,
+  solverTuning: `${API_BASE_URL}/api/solver-settings/tuning`,
+  solverTuningByKey: (key) => `${API_BASE_URL}/api/solver-settings/tuning/${encodeURIComponent(key)}`,
   shiftTemplatesByLocation: (loc) => `${API_BASE_URL}/api/shift-templates/by-location/${encodeURIComponent(loc)}`,
   shiftTemplatesBulk: `${API_BASE_URL}/api/shift-templates/bulk`,
 
