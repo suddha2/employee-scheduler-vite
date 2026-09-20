@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react';
 import {
   Box, Paper, Typography, Grid, FormControl, InputLabel, Select, MenuItem,
   Table, TableHead, TableBody, TableRow, TableCell, TableContainer,
-  TextField, IconButton, Button, ToggleButton, ToggleButtonGroup, Alert,
-  CircularProgress, Tooltip, Divider,
+  TextField, IconButton, Button, Checkbox, Alert, CircularProgress, Divider, Tooltip,
 } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon, Save as SaveIcon, ArrowBack as ArrowBackIcon } from '@mui/icons-material';
+import { Save as SaveIcon, ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../components/axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
@@ -15,99 +14,118 @@ const DAYS = [
   ['FRIDAY', 'Fri'], ['SATURDAY', 'Sat'], ['SUNDAY', 'Sun'],
 ];
 const WEEKDAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'];
+const hhmm = (t) => (t ? String(t).slice(0, 5) : '');
 
-const newRow = () => ({
-  shiftType: '', days: [], startTime: '', endTime: '', empCount: 1, rate: '',
-});
-
-// Bulk builder: pick a service, then add one row per shift type (its own days,
-// times, headcount and optional rate override). Submitting fans each row out to
-// the create endpoint, which itself expands the selected days into templates.
+// Grid builder: rows = every active shift type, columns = Mon–Sun tick boxes, plus
+// per-row start/end/headcount. Loads the service's current templates so ticks reflect
+// what exists; saving reconciles (create ticked, update, deactivate unticked). Rate is
+// the type's own tag, so it isn't set here; pairing (LONG_DAY + SLEEP_IN) is implicit —
+// tick both on the same days.
 export default function ShiftTemplateBuilder() {
   const navigate = useNavigate();
 
   const [regions, setRegions] = useState([]);
   const [locations, setLocations] = useState([]);
   const [shiftTypes, setShiftTypes] = useState([]);
-
   const [region, setRegion] = useState('');
   const [location, setLocation] = useState('');
-  const [rows, setRows] = useState([newRow()]);
 
-  const [submitting, setSubmitting] = useState(false);
+  // grid: { [code]: { days:Set<string>, startTime, endTime, empCount } }
+  const [grid, setGrid] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-  const [results, setResults] = useState(null); // [{label, created, conflicts, error}]
 
   useEffect(() => {
-    axiosInstance.get(`${API_ENDPOINTS.shiftTemplates}/regions`)
-      .then((r) => setRegions(r.data || [])).catch(() => {});
-    axiosInstance.get(API_ENDPOINTS.shiftTypes, { params: { active: true } })
-      .then((r) => setShiftTypes(r.data || [])).catch(() => {});
+    axiosInstance.get(`${API_ENDPOINTS.shiftTemplates}/regions`).then((r) => setRegions(r.data || [])).catch(() => {});
+    axiosInstance.get(API_ENDPOINTS.shiftTypes, { params: { active: true } }).then((r) => setShiftTypes(r.data || [])).catch(() => {});
   }, []);
 
   useEffect(() => {
     setLocation('');
+    setGrid({});
+    setResult(null);
     if (!region) { setLocations([]); return; }
     axiosInstance.get(`${API_ENDPOINTS.shiftTemplates}/regions/${region}/locations`)
       .then((r) => setLocations(r.data || [])).catch(() => setLocations([]));
   }, [region]);
 
-  const updateRow = (i, field, value) =>
-    setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, [field]: value } : r)));
-  const toggleDays = (i, days) => updateRow(i, 'days', days);
-  const setWeekdays = (i) => updateRow(i, 'days', [...WEEKDAYS]);
-  const addRow = () => setRows((rs) => [...rs, newRow()]);
-  const removeRow = (i) => setRows((rs) => (rs.length === 1 ? rs : rs.filter((_, idx) => idx !== i)));
+  // Build the grid for a location from its existing (active) templates.
+  useEffect(() => {
+    setResult(null);
+    const empty = {};
+    shiftTypes.forEach((t) => { empty[t.code] = { days: new Set(), startTime: '', endTime: '', empCount: 1 }; });
+    if (!location) { setGrid(empty); return; }
+    setLoading(true);
+    axiosInstance.get(API_ENDPOINTS.shiftTemplatesByLocation(location), { params: { active: true } })
+      .then((r) => {
+        const g = empty;
+        (r.data || []).forEach((tpl) => {
+          const code = tpl.shiftType; // JSON key is the code
+          if (!g[code]) g[code] = { days: new Set(), startTime: '', endTime: '', empCount: 1 };
+          if (tpl.dayOfWeek) g[code].days.add(tpl.dayOfWeek);
+          if (!g[code].startTime && tpl.startTime) g[code].startTime = hhmm(tpl.startTime);
+          if (!g[code].endTime && tpl.endTime) g[code].endTime = hhmm(tpl.endTime);
+          if (tpl.empCount) g[code].empCount = tpl.empCount;
+        });
+        setGrid({ ...g });
+      })
+      .catch(() => setError('Failed to load existing templates for this service'))
+      .finally(() => setLoading(false));
+  }, [location, shiftTypes]);
 
-  const rowValid = (r) => r.shiftType && r.days.length > 0 && r.startTime && r.endTime && Number(r.empCount) > 0;
-  const canSubmit = region && location && rows.every(rowValid) && !submitting;
+  const toggleDay = (code, day) => setGrid((g) => {
+    const row = { ...g[code], days: new Set(g[code].days) };
+    if (row.days.has(day)) row.days.delete(day); else row.days.add(day);
+    return { ...g, [code]: row };
+  });
+  const setWeekdays = (code) => setGrid((g) => ({ ...g, [code]: { ...g[code], days: new Set(WEEKDAYS) } }));
+  const setField = (code, field, val) => setGrid((g) => ({ ...g, [code]: { ...g[code], [field]: val } }));
 
-  const submit = async () => {
-    setSubmitting(true);
-    setError(null);
-    setResults(null);
-    const out = [];
-    for (const r of rows) {
-      const label = `${(shiftTypes.find((t) => t.code === r.shiftType)?.displayName) || r.shiftType} · ${r.days.length} day(s)`;
-      try {
-        const body = {
-          location, region,
-          shiftType: r.shiftType,           // raw code (data-driven type)
-          daysOfWeek: r.days,
-          startTime: r.startTime,
-          endTime: r.endTime,
-          empCount: Number(r.empCount),
-          rate: r.rate === '' ? null : Number(r.rate),
-          active: true,
+  // A row with ticked days must have times; rows with no ticked days are fine (they clear that type).
+  const invalidRow = (code) => {
+    const r = grid[code]; if (!r) return false;
+    return r.days.size > 0 && (!r.startTime || !r.endTime || Number(r.empCount) < 1);
+  };
+  const anyInvalid = shiftTypes.some((t) => invalidRow(t.code));
+  const canSave = region && location && !anyInvalid && !saving && !loading;
+
+  const save = async () => {
+    setSaving(true); setError(null); setResult(null);
+    try {
+      const rows = shiftTypes.map((t) => {
+        const r = grid[t.code] || { days: new Set() };
+        return {
+          shiftType: t.code,
+          days: [...r.days],
+          startTime: r.startTime || null,
+          endTime: r.endTime || null,
+          empCount: Number(r.empCount) || 1,
         };
-        const res = await axiosInstance.post(API_ENDPOINTS.shiftTemplates, body);
-        out.push({ label, created: Array.isArray(res.data) ? res.data.length : 0 });
-      } catch (e) {
-        if (e.response?.status === 409) {
-          out.push({ label, conflicts: e.response.data?.conflicts?.length || 0 });
-        } else {
-          out.push({ label, error: e.response?.data?.error || e.message || 'Failed' });
-        }
-      }
+      });
+      const res = await axiosInstance.post(API_ENDPOINTS.shiftTemplatesBulk, { location, region, rows });
+      setResult(res.data);
+    } catch (e) {
+      setError(e.response?.data?.error || e.message || 'Save failed');
+    } finally {
+      setSaving(false);
     }
-    setResults(out);
-    setSubmitting(false);
   };
 
   return (
     <Box sx={{ p: 3 }}>
-      <Paper sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+      <Paper sx={{ p: 3, maxWidth: 1250, mx: 'auto' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
           <IconButton onClick={() => navigate('/shift-templates')}><ArrowBackIcon /></IconButton>
-          <Typography variant="h5" sx={{ flexGrow: 1 }}>Bulk create shift templates</Typography>
+          <Typography variant="h5" sx={{ flexGrow: 1 }}>Service templates — grid</Typography>
         </Box>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Pick a service, then add a row per shift type — its days, times, headcount and (optional) rate override.
-          Each row is expanded into one template per selected day.
+          Pick a service, then tick the days each shift type runs and set its times/headcount. Ticks reflect what
+          already exists; saving creates ticked cells, updates changed ones and removes unticked ones. Rate comes from
+          the shift type; pairing is automatic — tick LONG_DAY and SLEEP_IN on the same days.
         </Typography>
 
-        {/* Step 1: service */}
-        <Typography variant="subtitle1" gutterBottom>1. Service</Typography>
         <Grid container spacing={2} sx={{ mb: 2 }}>
           <Grid item xs={12} md={4}>
             <FormControl fullWidth size="small">
@@ -127,77 +145,63 @@ export default function ShiftTemplateBuilder() {
           </Grid>
         </Grid>
 
-        <Divider sx={{ my: 2 }} />
+        <Divider sx={{ mb: 1 }} />
 
-        {/* Step 2: rows */}
-        <Typography variant="subtitle1" gutterBottom>2. Shift types</Typography>
-        <TableContainer sx={{ overflowX: 'auto' }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ minWidth: 160 }}>Shift type</TableCell>
-                <TableCell sx={{ minWidth: 260 }}>Days</TableCell>
-                <TableCell>Start</TableCell>
-                <TableCell>End</TableCell>
-                <TableCell sx={{ width: 90 }}>Count</TableCell>
-                <TableCell sx={{ width: 110 }}>Rate (£/none)</TableCell>
-                <TableCell />
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {rows.map((r, i) => (
-                <TableRow key={i}>
-                  <TableCell>
-                    <FormControl fullWidth size="small">
-                      <Select value={r.shiftType} displayEmpty onChange={(e) => updateRow(i, 'shiftType', e.target.value)}>
-                        <MenuItem value="" disabled><em>Select type</em></MenuItem>
-                        {shiftTypes.map((t) => <MenuItem key={t.code} value={t.code}>{t.displayName || t.code}</MenuItem>)}
-                      </Select>
-                    </FormControl>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
-                      <ToggleButtonGroup size="small" value={r.days} onChange={(e, v) => toggleDays(i, v)}>
-                        {DAYS.map(([code, label]) => (
-                          <ToggleButton key={code} value={code} sx={{ px: 1 }}>{label}</ToggleButton>
-                        ))}
-                      </ToggleButtonGroup>
-                      <Tooltip title="Mon–Fri"><Button size="small" onClick={() => setWeekdays(i)}>M–F</Button></Tooltip>
-                    </Box>
-                  </TableCell>
-                  <TableCell><TextField type="time" size="small" value={r.startTime} onChange={(e) => updateRow(i, 'startTime', e.target.value)} /></TableCell>
-                  <TableCell><TextField type="time" size="small" value={r.endTime} onChange={(e) => updateRow(i, 'endTime', e.target.value)} /></TableCell>
-                  <TableCell><TextField type="number" size="small" value={r.empCount} onChange={(e) => updateRow(i, 'empCount', e.target.value)} inputProps={{ min: 1, style: { width: 60 } }} /></TableCell>
-                  <TableCell><TextField type="number" size="small" placeholder="card" value={r.rate} onChange={(e) => updateRow(i, 'rate', e.target.value)} inputProps={{ min: 0, step: '0.01', style: { width: 80 } }} /></TableCell>
-                  <TableCell>
-                    <IconButton size="small" color="error" disabled={rows.length === 1} onClick={() => removeRow(i)}><DeleteIcon fontSize="small" /></IconButton>
-                  </TableCell>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
+        ) : location ? (
+          <TableContainer sx={{ overflowX: 'auto' }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ minWidth: 150 }}>Shift type</TableCell>
+                  {DAYS.map(([code, label]) => <TableCell key={code} align="center" sx={{ px: 0.5 }}>{label}</TableCell>)}
+                  <TableCell />
+                  <TableCell>Start</TableCell>
+                  <TableCell>End</TableCell>
+                  <TableCell sx={{ width: 80 }}>Count</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        <Button startIcon={<AddIcon />} onClick={addRow} sx={{ mt: 1 }}>Add shift type</Button>
+              </TableHead>
+              <TableBody>
+                {shiftTypes.map((t) => {
+                  const r = grid[t.code] || { days: new Set(), startTime: '', endTime: '', empCount: 1 };
+                  const active = r.days.size > 0;
+                  return (
+                    <TableRow key={t.code} hover>
+                      <TableCell><strong>{t.displayName || t.code}</strong></TableCell>
+                      {DAYS.map(([d]) => (
+                        <TableCell key={d} align="center" sx={{ px: 0.5 }}>
+                          <Checkbox size="small" checked={r.days.has(d)} onChange={() => toggleDay(t.code, d)} />
+                        </TableCell>
+                      ))}
+                      <TableCell><Tooltip title="Mon–Fri"><Button size="small" onClick={() => setWeekdays(t.code)}>M–F</Button></Tooltip></TableCell>
+                      <TableCell><TextField type="time" size="small" value={r.startTime} disabled={!active}
+                        error={active && !r.startTime} onChange={(e) => setField(t.code, 'startTime', e.target.value)} /></TableCell>
+                      <TableCell><TextField type="time" size="small" value={r.endTime} disabled={!active}
+                        error={active && !r.endTime} onChange={(e) => setField(t.code, 'endTime', e.target.value)} /></TableCell>
+                      <TableCell><TextField type="number" size="small" value={r.empCount} disabled={!active}
+                        inputProps={{ min: 1, style: { width: 56 } }} onChange={(e) => setField(t.code, 'empCount', e.target.value)} /></TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        ) : (
+          <Alert severity="info">Select a region and service to edit its templates.</Alert>
+        )}
 
         {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
-
-        {results && (
-          <Alert severity={results.some((x) => x.error || x.conflicts) ? 'warning' : 'success'} sx={{ mt: 2 }}>
-            <Typography variant="subtitle2">Results</Typography>
-            {results.map((x, i) => (
-              <div key={i}>
-                {x.label}: {x.created != null ? `${x.created} template(s) created` : x.conflicts != null ? `${x.conflicts} conflict(s) — already exist` : `error: ${x.error}`}
-              </div>
-            ))}
+        {result && (
+          <Alert severity="success" sx={{ mt: 2 }}>
+            Saved — {result.created} created, {result.updated} updated, {result.deactivated} removed.
           </Alert>
         )}
 
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>
           <Button variant="outlined" onClick={() => navigate('/shift-templates')}>Done</Button>
-          <Button variant="contained" startIcon={submitting ? <CircularProgress size={18} /> : <SaveIcon />}
-            disabled={!canSubmit} onClick={submit}>
-            {submitting ? 'Creating…' : 'Create all'}
-          </Button>
+          <Button variant="contained" startIcon={saving ? <CircularProgress size={18} /> : <SaveIcon />}
+            disabled={!canSave} onClick={save}>{saving ? 'Saving…' : 'Save templates'}</Button>
         </Box>
       </Paper>
     </Box>

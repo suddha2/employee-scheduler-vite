@@ -29,6 +29,8 @@ export const API_ENDPOINTS = {
 
   // Data-driven shift types (dropdown source; new types = DB rows, no deploy)
   shiftTypes: `${API_BASE_URL}/api/shift-types`,
+  shiftTemplatesByLocation: (loc) => `${API_BASE_URL}/api/shift-templates/by-location/${encodeURIComponent(loc)}`,
+  shiftTemplatesBulk: `${API_BASE_URL}/api/shift-templates/bulk`,
 
   // ✅ FIXED: Add base URL to scheduleVersions
   scheduleVersions: `${API_BASE_URL}/api/schedules`,
