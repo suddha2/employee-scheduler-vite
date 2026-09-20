@@ -220,6 +220,14 @@ const ShiftTemplatesList = () => {
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                     <Typography variant="h5">Shift Templates</Typography>
                     {canManagePeople && (
+                    <Box sx={{ display: 'inline-flex', gap: 1 }}>
+                    <Button
+                        variant="outlined"
+                        startIcon={<AddIcon />}
+                        onClick={() => navigate('/shift-templates/builder')}
+                    >
+                        Bulk Create
+                    </Button>
                     <Button
                         variant="contained"
                         startIcon={<AddIcon />}
@@ -227,6 +235,7 @@ const ShiftTemplatesList = () => {
                     >
                         Create Template
                     </Button>
+                    </Box>
                     )}
                 </Box>
 
