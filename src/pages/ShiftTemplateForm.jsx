@@ -79,7 +79,9 @@ const ShiftTemplateForm = () => {
 
     // Grid mode: swap this single-template form for the type × weekday grid
     // (all shift types for the whole service at once). Available on create + edit.
-    const [gridMode, setGridMode] = useState(false);
+    // Grid is the default (and only) editor for templates now — the single-template
+    // form path is kept in code but no longer surfaced.
+    const [gridMode] = useState(true);
 
     // ✅ NEW: Bulk edit state
     const [bulkEditMode, setBulkEditMode] = useState(false);
@@ -342,37 +344,6 @@ const ShiftTemplateForm = () => {
                     {isEditMode ? 'Edit Shift Template' : 'Create Shift Template'}
                 </Typography>
                 <Divider sx={{ mb: 3 }} />
-
-                {/* Grid-mode toggle: single template vs the whole-service type × weekday grid */}
-                <Paper
-                    elevation={0}
-                    sx={{
-                        mb: 3,
-                        p: 2,
-                        bgcolor: gridMode ? 'primary.light' : 'grey.100',
-                        border: 1,
-                        borderColor: gridMode ? 'primary.main' : 'divider',
-                    }}
-                >
-                    <FormControlLabel
-                        control={
-                            <Switch
-                                checked={gridMode}
-                                onChange={(e) => { setGridMode(e.target.checked); if (e.target.checked) setBulkEditMode(false); }}
-                            />
-                        }
-                        label={
-                            <Box>
-                                <Typography variant="body1" fontWeight="medium">
-                                    {gridMode ? 'Grid mode — all shift types × days' : 'Switch to grid mode'}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                    Tick each shift type against the days it runs for a whole service, instead of adding one template at a time.
-                                </Typography>
-                            </Box>
-                        }
-                    />
-                </Paper>
 
                 {gridMode ? (
                     <ShiftTemplateGrid
