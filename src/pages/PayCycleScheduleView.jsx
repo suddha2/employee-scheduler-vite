@@ -11,7 +11,8 @@ import {
     Grid,
     CircularProgress,
     Alert,
-    Autocomplete, TextField, Button, LinearProgress
+    Autocomplete, TextField, Button, LinearProgress,
+    ToggleButton, ToggleButtonGroup, Tooltip
 
 } from '@mui/material';
 import { Autorenew as RegenerateIcon, Psychology as LearnIcon ,Home  , People,FileDownload } from '@mui/icons-material';
@@ -40,6 +41,8 @@ export default function PayCycleSchedule() {
 
     const [regenerateLoading, setRegenerateLoading] = useState(false);
     const [learnLoading, setLearnLoading] = useState(false);
+    // Solve objective for Generate / Re-Generate: SPREAD (even hours) or CONTINUITY (stable/matching).
+    const [profile, setProfile] = usePersistedState('paycycle_solve_profile', 'SPREAD');
 
     const updateRequestStatus = (periodUpdateList) => {
         if (!Array.isArray(periodUpdateList) || periodUpdateList.length === 0) return;
@@ -307,7 +310,8 @@ export default function PayCycleSchedule() {
             const payload = {
                 location: location.label,
                 startDate,
-                endDate
+                endDate,
+                profile
             };
 
             const response = await fetch(API_ENDPOINTS.enqueueRequest, {
@@ -371,7 +375,8 @@ export default function PayCycleSchedule() {
             const payload = {
                 location: location.label,
                 startDate,
-                endDate
+                endDate,
+                profile
             };
 
             const response = await fetch(`${API_ENDPOINTS.regenerateSchedule}`, {
@@ -501,6 +506,26 @@ export default function PayCycleSchedule() {
                             />
                         )}
                     />
+
+                    {/* Objective for Generate / Re-Generate */}
+                    <Box sx={{ mt: 2 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                            Solve mode (applies to Generate / Re-Generate)
+                        </Typography>
+                        <ToggleButtonGroup
+                            value={profile}
+                            exclusive
+                            size="small"
+                            onChange={(e, val) => { if (val) setProfile(val); }}
+                        >
+                            <Tooltip title="Even hours across the whole team; avoids overloading. Lower week-to-week continuity.">
+                                <ToggleButton value="SPREAD">Spread</ToggleButton>
+                            </Tooltip>
+                            <Tooltip title="Keeps carers in their prior-period slots / stable weekly pattern. Uses fewer carers; some may fall below minimum hours.">
+                                <ToggleButton value="CONTINUITY">Continuity</ToggleButton>
+                            </Tooltip>
+                        </ToggleButtonGroup>
+                    </Box>
                 </Box>
             )}
 
