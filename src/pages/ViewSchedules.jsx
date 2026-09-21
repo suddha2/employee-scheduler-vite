@@ -3,7 +3,8 @@ import {
   Table, TableHead, TableBody, TableRow, TableCell,
   TableContainer, Paper, Typography, Box, Tooltip, Button, CircularProgress,
   Badge, IconButton, AppBar, Toolbar, Chip, Snackbar, Alert,
-  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions
+  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
+  ToggleButton, ToggleButtonGroup
 } from "@mui/material";
 import {
   Save as SaveIcon,
@@ -246,6 +247,40 @@ export default function ViewSchedules() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
+
+  // Fresh custom-period view: no rota id yet, but a region + date range to solve.
+  const freshRegion = searchParams.get('region');
+  const freshStart = searchParams.get('startDate');
+  const freshEnd = searchParams.get('endDate');
+  const isFreshCustom = !id && !!freshRegion && !!freshStart && !!freshEnd;
+  const [autoProfile, setAutoProfile] = useState('SPREAD');
+  const [autoGenerating, setAutoGenerating] = useState(false);
+  const [autoError, setAutoError] = useState(null);
+
+  // Auto mode: enqueue a solve for this region+period, then poll until the rota
+  // exists and open it. The @Scheduled/async solver produces it in a few minutes.
+  const startAutoSolve = async () => {
+    setAutoGenerating(true);
+    setAutoError(null);
+    try {
+      await axiosInstance.post(API_ENDPOINTS.enqueueRequest, {
+        location: freshRegion, startDate: freshStart, endDate: freshEnd, profile: autoProfile,
+      });
+      const deadline = Date.now() + 10 * 60 * 1000; // give the solver up to 10 min
+      const poll = async () => {
+        try {
+          const f = await axiosInstance.get(API_ENDPOINTS.rotaFind(freshRegion, freshStart, freshEnd));
+          if (f.data?.rotaId) { navigate(`/schedules?id=${f.data.rotaId}`); return; }
+        } catch { /* keep polling */ }
+        if (Date.now() < deadline) setTimeout(poll, 5000);
+        else { setAutoGenerating(false); setAutoError('Still solving — reopen this period shortly.'); }
+      };
+      setTimeout(poll, 5000);
+    } catch (e) {
+      setAutoGenerating(false);
+      setAutoError(e.response?.data?.error || 'Failed to start the solve');
+    }
+  };
 
   // Fetch OptaPlanner's score/constraint breakdown for this persisted rota and
   // open the feasibility drawer (which slots break which hard rule).
@@ -1349,6 +1384,41 @@ export default function ViewSchedules() {
       loadSchedule();
     }
   };
+  if (isFreshCustom) {
+    return (
+      <Box sx={{ p: 4, maxWidth: 640, mx: 'auto' }}>
+        <Paper sx={{ p: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <IconButton onClick={() => navigate('/paycycleSchedule')}><ArrowBackIcon /></IconButton>
+            <Typography variant="h6">No schedule yet</Typography>
+          </Box>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>
+            {freshRegion} · {freshStart} → {freshEnd}
+          </Typography>
+          <Typography sx={{ mb: 2 }}>
+            This period hasn’t been solved. Generate it (auto mode) — the solver runs in the
+            background and this page will open the result when it’s ready.
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+            Solve mode
+          </Typography>
+          <ToggleButtonGroup value={autoProfile} exclusive size="small"
+            onChange={(e, v) => { if (v) setAutoProfile(v); }} disabled={autoGenerating}>
+            <ToggleButton value="SPREAD">Spread</ToggleButton>
+            <ToggleButton value="CONTINUITY">Continuity</ToggleButton>
+          </ToggleButtonGroup>
+          {autoError && <Alert severity="warning" sx={{ mt: 2 }}>{autoError}</Alert>}
+          <Box sx={{ mt: 3 }}>
+            <Button variant="contained" onClick={startAutoSolve} disabled={autoGenerating}
+              startIcon={autoGenerating ? <CircularProgress size={18} /> : null}>
+              {autoGenerating ? 'Solving… (a few minutes)' : 'Generate (auto)'}
+            </Button>
+          </Box>
+        </Paper>
+      </Box>
+    );
+  }
+
   if (loading) {
     return <LoadingSpinner />
   }

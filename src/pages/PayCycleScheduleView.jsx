@@ -56,41 +56,31 @@ export default function PayCycleSchedule() {
         closeModeDialog();
         if (action === 'generate') handleCardSubmit(period, profile);
         else if (action === 'regenerate') handleRegenerate(period, profile);
-        else if (action === 'custom') handleCustomSolve(period.startDate, period.endDate, profile);
     };
 
-    // Custom (ad-hoc) date range solve.
+    // Custom (ad-hoc) date range — VIEW: open the schedule for this region+period.
+    // If it's already solved, the view shows it (edit/save as usual); if it's a fresh
+    // period, the view opens in an unsolved state where the user runs auto mode.
     const [customStart, setCustomStart] = useState(null);
     const [customEnd, setCustomEnd] = useState(null);
 
-    const openCustom = () => {
+    const handleCustomView = async () => {
         if (!location) { setError('Pick a location first'); return; }
         if (!customStart || !customEnd) return;
         const days = dayjs(customEnd).diff(dayjs(customStart), 'day');
         if (days < 1 || days > 30) { setError('Custom range must be 1–30 days'); return; }
         setError(null);
-        openModeDialog({
-            startDate: dayjs(customStart).format('YYYY-MM-DD'),
-            endDate: dayjs(customEnd).format('YYYY-MM-DD'),
-        }, 'custom');
-    };
-
-    const handleCustomSolve = async (startDate, endDate, profile) => {
+        const s = dayjs(customStart).format('YYYY-MM-DD');
+        const e = dayjs(customEnd).format('YYYY-MM-DD');
         try {
-            const payload = { location: location.label, startDate, endDate, profile };
-            const response = await fetch(API_ENDPOINTS.enqueueRequest, {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${safeStorage.get('token')}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-            });
-            if (!response.ok) throw new Error('Custom solve failed');
-            setError(null);
-            if (location) loadCardData(location); // refresh period list
-        } catch (e) {
-            setError('Custom solve failed');
+            const r = await axiosInstance.get(API_ENDPOINTS.rotaFind(location.label, s, e));
+            if (r.data?.rotaId) {
+                navigate(`/schedules?id=${r.data.rotaId}`);
+            } else {
+                navigate(`/schedules?region=${encodeURIComponent(location.label)}&startDate=${s}&endDate=${e}`);
+            }
+        } catch {
+            navigate(`/schedules?region=${encodeURIComponent(location.label)}&startDate=${s}&endDate=${e}`);
         }
     };
 
@@ -549,15 +539,16 @@ export default function PayCycleSchedule() {
                             <CardContent>
                                 <Typography variant="subtitle1" gutterBottom>Custom period</Typography>
                                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-                                    Solve an ad-hoc date range (1–30 days) instead of a fixed pay cycle.
+                                    View an ad-hoc date range (1–30 days). If it hasn’t been solved yet, you can
+                                    generate it (auto mode) from the schedule screen.
                                 </Typography>
                                 <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
                                     <DatePicker label="Start" value={customStart} onChange={setCustomStart} format="dd/MM/yyyy"
                                         slotProps={{ textField: { size: 'small' } }} />
                                     <DatePicker label="End" value={customEnd} onChange={setCustomEnd} format="dd/MM/yyyy"
                                         slotProps={{ textField: { size: 'small' } }} />
-                                    <Button variant="contained" disabled={!customStart || !customEnd} onClick={openCustom}>
-                                        Solve…
+                                    <Button variant="contained" disabled={!customStart || !customEnd} onClick={handleCustomView}>
+                                        View
                                     </Button>
                                 </Box>
                             </CardContent>

@@ -89,6 +89,9 @@ export const API_ENDPOINTS = {
   rotaConflicts: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/conflicts`,
   // Side-by-side stats for two rotas (e.g. the same period solved Spread vs Continuity)
   rotaCompare: (a, b) => `${API_BASE_URL}/api/rota/compare?a=${a}&b=${b}`,
+  // Find the solved rota id for a region + exact date range (custom-period View)
+  rotaFind: (region, startDate, endDate) =>
+    `${API_BASE_URL}/api/rota/find?region=${encodeURIComponent(region)}&startDate=${startDate}&endDate=${endDate}`,
   // STOMP destination the live solver streams best solutions to
   liveTopic: (rotaId) => `/topic/rota/${rotaId}`,
   // STOMP destination for lifecycle control events (started/stopped/snapshot)
