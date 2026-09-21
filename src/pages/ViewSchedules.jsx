@@ -1379,6 +1379,18 @@ export default function ViewSchedules() {
                 color={currentVersion.isCurrent ? 'success' : 'default'}
               />
             )}
+            {rotaData?.profile && (
+              <Tooltip title={rotaData.profile === 'CONTINUITY'
+                ? 'Solved for Continuity: carers kept in prior-period slots / stable weekly pattern'
+                : 'Solved for Spread: even hours across the team'}>
+                <Chip
+                  label={`Mode: ${rotaData.profile === 'CONTINUITY' ? 'Continuity' : 'Spread'}`}
+                  size="small"
+                  sx={{ ml: 1 }}
+                  color={rotaData.profile === 'CONTINUITY' ? 'secondary' : 'info'}
+                />
+              </Tooltip>
+            )}
           </Typography>
 
           {viewingHistoricalVersion && (

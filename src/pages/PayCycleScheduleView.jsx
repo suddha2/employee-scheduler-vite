@@ -12,7 +12,8 @@ import {
     CircularProgress,
     Alert,
     Autocomplete, TextField, Button, LinearProgress,
-    ToggleButton, ToggleButtonGroup, Tooltip
+    ToggleButton, ToggleButtonGroup, Tooltip,
+    Dialog, DialogTitle, DialogContent, DialogActions
 
 } from '@mui/material';
 import { Autorenew as RegenerateIcon, Psychology as LearnIcon ,Home  , People,FileDownload } from '@mui/icons-material';
@@ -41,8 +42,19 @@ export default function PayCycleSchedule() {
 
     const [regenerateLoading, setRegenerateLoading] = useState(false);
     const [learnLoading, setLearnLoading] = useState(false);
-    // Solve objective for Generate / Re-Generate: SPREAD (even hours) or CONTINUITY (stable/matching).
-    const [profile, setProfile] = usePersistedState('paycycle_solve_profile', 'SPREAD');
+    // Solve-mode picker shown AFTER clicking Generate / Re-Generate.
+    // { open, period, action: 'generate'|'regenerate', profile }
+    const [modeDialog, setModeDialog] = useState({ open: false, period: null, action: null, profile: 'SPREAD' });
+
+    const openModeDialog = (period, action) =>
+        setModeDialog({ open: true, period, action, profile: 'SPREAD' });
+    const closeModeDialog = () => setModeDialog((d) => ({ ...d, open: false }));
+    const confirmModeDialog = () => {
+        const { period, action, profile } = modeDialog;
+        closeModeDialog();
+        if (action === 'generate') handleCardSubmit(period, profile);
+        else if (action === 'regenerate') handleRegenerate(period, profile);
+    };
 
     const updateRequestStatus = (periodUpdateList) => {
         if (!Array.isArray(periodUpdateList) || periodUpdateList.length === 0) return;
@@ -298,7 +310,7 @@ export default function PayCycleSchedule() {
         }
     };
 
-    const handleCardSubmit = async (period) => {
+    const handleCardSubmit = async (period, profile = 'SPREAD') => {
         const { startDate, endDate } = period;
 
         setSubmissionStatus(prev => ({
@@ -350,21 +362,8 @@ export default function PayCycleSchedule() {
             }));
         }
     };
-    const handleRegenerate = async (period) => {
+    const handleRegenerate = async (period, profile = 'SPREAD') => {
         const { startDate, endDate } = period;
-
-        // Confirmation dialog
-        const confirmed = window.confirm(
-            '⚠️ Re-generate Schedule?\n\n' +
-            'This will:\n' +
-            '• Reset the schedule generation request\n' +
-            '• Queue it for the solver to process again\n' +
-            '• May take several minutes to complete\n\n' +
-            'Current assignments will remain until new solution is ready.\n\n' +
-            'Continue?'
-        );
-
-        if (!confirmed) return;
 
         setSubmissionStatus(prev => ({
             ...prev,
@@ -506,26 +505,6 @@ export default function PayCycleSchedule() {
                             />
                         )}
                     />
-
-                    {/* Objective for Generate / Re-Generate */}
-                    <Box sx={{ mt: 2 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                            Solve mode (applies to Generate / Re-Generate)
-                        </Typography>
-                        <ToggleButtonGroup
-                            value={profile}
-                            exclusive
-                            size="small"
-                            onChange={(e, val) => { if (val) setProfile(val); }}
-                        >
-                            <Tooltip title="Even hours across the whole team; avoids overloading. Lower week-to-week continuity.">
-                                <ToggleButton value="SPREAD">Spread</ToggleButton>
-                            </Tooltip>
-                            <Tooltip title="Keeps carers in their prior-period slots / stable weekly pattern. Uses fewer carers; some may fall below minimum hours.">
-                                <ToggleButton value="CONTINUITY">Continuity</ToggleButton>
-                            </Tooltip>
-                        </ToggleButtonGroup>
-                    </Box>
                 </Box>
             )}
 
@@ -678,7 +657,7 @@ export default function PayCycleSchedule() {
                                                             size="small"
                                                             startIcon={<RegenerateIcon />}
                                                             sx={{ px: 2, py: 0.5 }}
-                                                            onClick={() => handleRegenerate(period)}
+                                                            onClick={() => openModeDialog(period, 'regenerate')}
                                                         >
                                                             Re-Generate
                                                         </Button>
@@ -694,7 +673,7 @@ export default function PayCycleSchedule() {
                                                         </Button>
                                                     </Box>
                                                 ) : (
-                                                    <Button variant="contained" color="primary" onClick={() => handleCardSubmit(period)}>
+                                                    <Button variant="contained" color="primary" onClick={() => openModeDialog(period, 'generate')}>
                                                         Generate
                                                     </Button>
                                                 )}
@@ -807,6 +786,41 @@ export default function PayCycleSchedule() {
                 </Grid>
 
             )}
+
+            {/* Solve-mode picker shown after clicking Generate / Re-Generate */}
+            <Dialog open={modeDialog.open} onClose={closeModeDialog} maxWidth="xs" fullWidth>
+                <DialogTitle>{modeDialog.action === 'regenerate' ? 'Re-Generate' : 'Generate'} — choose solve mode</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Which objective should the solver optimise for this run?
+                    </Typography>
+                    <ToggleButtonGroup
+                        value={modeDialog.profile}
+                        exclusive
+                        fullWidth
+                        onChange={(e, val) => { if (val) setModeDialog((d) => ({ ...d, profile: val })); }}
+                    >
+                        <ToggleButton value="SPREAD">Spread</ToggleButton>
+                        <ToggleButton value="CONTINUITY">Continuity</ToggleButton>
+                    </ToggleButtonGroup>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
+                        {modeDialog.profile === 'CONTINUITY'
+                            ? 'Continuity: keeps carers in their prior-period slots / stable weekly pattern. Uses fewer carers; some may fall below minimum hours.'
+                            : 'Spread: even hours across the whole team; avoids overloading. Lower week-to-week continuity.'}
+                    </Typography>
+                    {modeDialog.action === 'regenerate' && (
+                        <Alert severity="warning" sx={{ mt: 2 }}>
+                            Re-queues the solve (several minutes). Current assignments stay until the new solution is ready.
+                        </Alert>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeModeDialog}>Cancel</Button>
+                    <Button variant="contained" onClick={confirmModeDialog}>
+                        {modeDialog.action === 'regenerate' ? 'Re-Generate' : 'Generate'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 }
