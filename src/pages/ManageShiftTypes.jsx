@@ -27,6 +27,7 @@ const blankType = () => ({
   maxPerWeek: '',
   defaultIsFollower: false,
   defaultPairsWith: '',
+  lastResort: false,
   countsAsWork: true,
   countsTowardWeeklyCap: true,
   countsAsLocationCoverage: true,
@@ -41,6 +42,7 @@ const FLAGS = [
   ['countsAsLocationCoverage', 'Provides location coverage', 'Fills a service’s cover requirement.'],
   ['paidHours', 'Paid hours', 'Included in projected pay hours.'],
   ['mineable', 'Mineable', 'Used when learning patterns from history.'],
+  ['lastResort', 'Last resort (assign last)', 'Least favourable to assign — the solver fills other types first and only uses this one when nothing better is available (e.g. FLOATING). Tune the strength in Solver Settings.'],
 ];
 
 const money = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
@@ -97,6 +99,7 @@ export default function ManageShiftTypes() {
       maxPerWeek: t.maxPerWeek ?? '',
       defaultIsFollower: !!t.defaultIsFollower,
       defaultPairsWith: t.defaultPairsWith ?? '',
+      lastResort: !!t.lastResort,
       countsAsWork: !!t.countsAsWork,
       countsTowardWeeklyCap: !!t.countsTowardWeeklyCap,
       countsAsLocationCoverage: !!t.countsAsLocationCoverage,
@@ -134,6 +137,7 @@ export default function ManageShiftTypes() {
       maxPerWeek: num(form.maxPerWeek),
       defaultIsFollower: form.defaultIsFollower,
       defaultPairsWith: form.defaultPairsWith?.trim() || null,
+      lastResort: form.lastResort,
       countsAsWork: form.countsAsWork,
       countsTowardWeeklyCap: form.countsTowardWeeklyCap,
       countsAsLocationCoverage: form.countsAsLocationCoverage,
@@ -260,6 +264,7 @@ export default function ManageShiftTypes() {
                         {!t.countsAsLocationCoverage && <Chip size="small" label="no-cover" />}
                         {!t.paidHours && <Chip size="small" label="unpaid" />}
                         {!t.mineable && <Chip size="small" label="no-mine" />}
+                        {t.lastResort && <Chip size="small" color="warning" label="last-resort" />}
                       </Stack>
                     </TableCell>
                     <TableCell>
