@@ -18,6 +18,8 @@ import {
 } from '@mui/material';
 import { Autorenew as RegenerateIcon, Psychology as LearnIcon ,Home  , People,FileDownload } from '@mui/icons-material';
 
+import { DatePicker } from '@mui/x-date-pickers';
+import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { useRequestUpdates } from '../components/useRequestUpdates';
 import { usePersistedState } from '../hooks/usePersistedState';
@@ -54,6 +56,42 @@ export default function PayCycleSchedule() {
         closeModeDialog();
         if (action === 'generate') handleCardSubmit(period, profile);
         else if (action === 'regenerate') handleRegenerate(period, profile);
+        else if (action === 'custom') handleCustomSolve(period.startDate, period.endDate, profile);
+    };
+
+    // Custom (ad-hoc) date range solve.
+    const [customStart, setCustomStart] = useState(null);
+    const [customEnd, setCustomEnd] = useState(null);
+
+    const openCustom = () => {
+        if (!location) { setError('Pick a location first'); return; }
+        if (!customStart || !customEnd) return;
+        const days = dayjs(customEnd).diff(dayjs(customStart), 'day');
+        if (days < 1 || days > 30) { setError('Custom range must be 1–30 days'); return; }
+        setError(null);
+        openModeDialog({
+            startDate: dayjs(customStart).format('YYYY-MM-DD'),
+            endDate: dayjs(customEnd).format('YYYY-MM-DD'),
+        }, 'custom');
+    };
+
+    const handleCustomSolve = async (startDate, endDate, profile) => {
+        try {
+            const payload = { location: location.label, startDate, endDate, profile };
+            const response = await fetch(API_ENDPOINTS.enqueueRequest, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${safeStorage.get('token')}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+            if (!response.ok) throw new Error('Custom solve failed');
+            setError(null);
+            if (location) loadCardData(location); // refresh period list
+        } catch (e) {
+            setError('Custom solve failed');
+        }
     };
 
     const updateRequestStatus = (periodUpdateList) => {
@@ -505,6 +543,26 @@ export default function PayCycleSchedule() {
                             />
                         )}
                     />
+
+                    {location && (
+                        <Card variant="outlined" sx={{ mt: 2 }}>
+                            <CardContent>
+                                <Typography variant="subtitle1" gutterBottom>Custom period</Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                                    Solve an ad-hoc date range (1–30 days) instead of a fixed pay cycle.
+                                </Typography>
+                                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                                    <DatePicker label="Start" value={customStart} onChange={setCustomStart} format="dd/MM/yyyy"
+                                        slotProps={{ textField: { size: 'small' } }} />
+                                    <DatePicker label="End" value={customEnd} onChange={setCustomEnd} format="dd/MM/yyyy"
+                                        slotProps={{ textField: { size: 'small' } }} />
+                                    <Button variant="contained" disabled={!customStart || !customEnd} onClick={openCustom}>
+                                        Solve…
+                                    </Button>
+                                </Box>
+                            </CardContent>
+                        </Card>
+                    )}
                 </Box>
             )}
 
@@ -789,8 +847,15 @@ export default function PayCycleSchedule() {
 
             {/* Solve-mode picker shown after clicking Generate / Re-Generate */}
             <Dialog open={modeDialog.open} onClose={closeModeDialog} maxWidth="xs" fullWidth>
-                <DialogTitle>{modeDialog.action === 'regenerate' ? 'Re-Generate' : 'Generate'} — choose solve mode</DialogTitle>
+                <DialogTitle>
+                    {modeDialog.action === 'regenerate' ? 'Re-Generate' : modeDialog.action === 'custom' ? 'Custom period' : 'Generate'} — choose solve mode
+                </DialogTitle>
                 <DialogContent>
+                    {modeDialog.action === 'custom' && modeDialog.period && (
+                        <Typography variant="body2" sx={{ mb: 1 }}>
+                            {modeDialog.period.startDate} → {modeDialog.period.endDate}
+                        </Typography>
+                    )}
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                         Which objective should the solver optimise for this run?
                     </Typography>
