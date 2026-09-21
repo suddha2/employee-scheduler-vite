@@ -74,12 +74,23 @@ export default function ViewSchedules() {
   const [pinnedMap, setPinnedMap] = useState({});
   // Locally-detected conflicts (same-employee double-bookings under
   // invalid same-day rules). Recomputed on every assignmentMap change.
+  // shiftId -> { startTime, endTime } from the loaded rota, so the same-day
+  // conflict check has real end times (cellKeys only carry the start time).
+  const shiftInfoById = useMemo(() => {
+    const m = {};
+    (rotaData?.shiftAssignmentList || []).forEach((sa) => {
+      const t = sa.shift?.shiftTemplate;
+      if (sa.shift?.id != null && t) m[sa.shift.id] = { startTime: t.startTime, endTime: t.endTime };
+    });
+    return m;
+  }, [rotaData]);
+
   const localConflicts = useMemo(
     () => {
-      const { conflictCells, cellInfo } = findConflictCells(assignmentMap);
+      const { conflictCells, cellInfo } = findConflictCells(assignmentMap, shiftInfoById);
       return { conflictCells, conflictCellInfo: cellInfo };
     },
-    [assignmentMap]
+    [assignmentMap, shiftInfoById]
   );
 
   // Backend-reported conflicts after a failed save (409). Stored as a Set
@@ -944,7 +955,7 @@ export default function ViewSchedules() {
       const isAssigned = employees.some(emp => emp.id === employeeId);
       if (!isAssigned) return; // Employee not assigned
 
-      shiftsOnDay.push({ location, shiftType, date, startTime, shiftId });
+      shiftsOnDay.push({ location, shiftType, date, startTime, endTime: shiftInfoById[shiftId]?.endTime || '', shiftId });
     });
 
     // Add the target shift we're trying to assign
@@ -953,6 +964,7 @@ export default function ViewSchedules() {
       shiftType: targetShiftType,
       date: targetDate,
       startTime: targetParts[3],
+      endTime: shiftInfoById[targetShiftId]?.endTime || '',
       shiftId: targetShiftId
     });
 
