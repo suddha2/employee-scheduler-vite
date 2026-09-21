@@ -24,6 +24,7 @@ import ShiftTemplateForm from './pages/ShiftTemplateForm';
 import ShiftTemplateBuilder from './pages/ShiftTemplateBuilder';
 import ManageShiftTypes from './pages/ManageShiftTypes';
 import SolverSettings from './pages/SolverSettings';
+import CompareRotas from './pages/CompareRotas';
 import UsersAdminPage from './pages/UsersAdminPage';
 import { AxiosInterceptorSetup } from './components/AxiosInterceptorSetup';
 
@@ -104,6 +105,9 @@ export default function App() {
                   </ProtectedRoute>} />
               <Route path="/solver-settings" element={<ProtectedRoute>
                     <Layout><SolverSettings /></Layout>
+                  </ProtectedRoute>} />
+              <Route path="/compare-rotas" element={<ProtectedRoute>
+                    <Layout><CompareRotas /></Layout>
                   </ProtectedRoute>} />
               <Route path="/shift-templates/edit/:id" element={<ProtectedRoute>
                     <Layout><ShiftTemplateForm /></Layout>

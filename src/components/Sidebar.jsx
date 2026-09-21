@@ -31,7 +31,8 @@ import {
     Inbox as InboxIcon,
     ManageAccounts as ManageAccountsIcon,
     Category as CategoryIcon,
-    Tune as TuneIcon
+    Tune as TuneIcon,
+    Compare as CompareIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useShiftRequestsNotifications } from '../contexts/ShiftRequestsContext';
@@ -96,6 +97,11 @@ export default function Sidebar({ open, onClose, onToggle }) {
                 title: 'Solver Settings',
                 icon: <TuneIcon />,
                 path: '/solver-settings',
+                subItem: true,
+            }, {
+                title: 'Compare Rotas',
+                icon: <CompareIcon />,
+                path: '/compare-rotas',
                 subItem: true,
             }]
             : []),

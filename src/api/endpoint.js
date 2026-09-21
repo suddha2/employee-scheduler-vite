@@ -87,6 +87,8 @@ export const API_ENDPOINTS = {
   // Authoritative same-day conflicts (same rule the save-time block uses) — source of
   // truth for the Conflicts drawer so the UI can't diverge from the backend.
   rotaConflicts: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/conflicts`,
+  // Side-by-side stats for two rotas (e.g. the same period solved Spread vs Continuity)
+  rotaCompare: (a, b) => `${API_BASE_URL}/api/rota/compare?a=${a}&b=${b}`,
   // STOMP destination the live solver streams best solutions to
   liveTopic: (rotaId) => `/topic/rota/${rotaId}`,
   // STOMP destination for lifecycle control events (started/stopped/snapshot)

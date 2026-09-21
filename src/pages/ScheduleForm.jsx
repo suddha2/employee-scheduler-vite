@@ -3,6 +3,10 @@ import {
     Stack,
     TextField,
     Button,
+    ToggleButtonGroup,
+    ToggleButton,
+    Typography,
+    Tooltip,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers';
 import { Autocomplete } from '@mui/material';
@@ -15,6 +19,7 @@ export default function ScheduleForm({ locations, onSubmitSuccess, setSnackbar,s
     const [startDate, setStartDate] = useState(null);
     const [endDate, setEndDate] = useState(null);
     const [location, setLocation] = useState(null);
+    const [profile, setProfile] = useState('SPREAD');
     const [errors, setErrors] = useState({});
 
     const validate = () => {
@@ -41,6 +46,7 @@ export default function ScheduleForm({ locations, onSubmitSuccess, setSnackbar,s
                 location: location.region,
                 startDate: dayjs(startDate).format('YYYY-MM-DD'),
                 endDate: dayjs(endDate).format('YYYY-MM-DD'),
+                profile,
             };
             const response = await fetch(API_ENDPOINTS.enqueueRequest, {
                 method: 'POST',
@@ -112,6 +118,25 @@ export default function ScheduleForm({ locations, onSubmitSuccess, setSnackbar,s
                     />
                 )}
             />
+            <div>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                    Solve mode
+                </Typography>
+                <ToggleButtonGroup
+                    value={profile}
+                    exclusive
+                    fullWidth
+                    size="small"
+                    onChange={(e, val) => { if (val) setProfile(val); }}
+                >
+                    <Tooltip title="Even hours across the whole team; avoids overloading. Lower week-to-week continuity.">
+                        <ToggleButton value="SPREAD">Spread</ToggleButton>
+                    </Tooltip>
+                    <Tooltip title="Keeps carers in their prior-period slots / stable weekly pattern. Uses fewer carers; some may fall below minimum hours.">
+                        <ToggleButton value="CONTINUITY">Continuity</ToggleButton>
+                    </Tooltip>
+                </ToggleButtonGroup>
+            </div>
             <Button variant="contained" color="primary" fullWidth onClick={handleSubmit}>
                 Submit
             </Button>
