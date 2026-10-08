@@ -83,7 +83,9 @@ export default function EmployeeForm() {
     const rateCodes = ['L1', 'L2', 'L3', 'ZERO_HOURS'];
     const daysOfWeek = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
     const shiftTypes = ['LONG_DAY', 'DAY', 'SLEEP_IN', 'WAKING_NIGHT', 'FLOATING', 'CARE_CALL'];
-    const skillsList = ['BUCCAL', 'DRIVING'];
+    // Offered skills (field is still freeSolo, so others can be typed). SHIFT_LEAD gates
+    // lead-shift eligibility; the rest are the care skills used on templates' required_skills.
+    const skillsList = ['SHIFT_LEAD', 'BUCCAL', 'MOVING AND HANDLING', 'DRIVING', 'DRIVER', 'PRADER-WILLI'];
 
     // Fetch regions and locations on mount
     useEffect(() => {
