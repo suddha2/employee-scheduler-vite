@@ -461,18 +461,14 @@ const ShiftTemplateForm = () => {
 
                         <Grid item xs={12} md={6}>
                             <Autocomplete
-                                freeSolo
-                                options={locations}
-                                value={formData.location}
-                                inputValue={formData.location}
+                                options={
+                                    formData.location && !locations.includes(formData.location)
+                                        ? [formData.location, ...locations]
+                                        : locations
+                                }
+                                value={formData.location || null}
                                 onChange={(e, newValue) => {
                                     setFormData({ ...formData, location: newValue || '' });
-                                    if (errors.location) {
-                                        setErrors({ ...errors, location: undefined });
-                                    }
-                                }}
-                                onInputChange={(e, newInputValue) => {
-                                    setFormData({ ...formData, location: newInputValue });
                                     if (errors.location) {
                                         setErrors({ ...errors, location: undefined });
                                     }
@@ -484,9 +480,9 @@ const ShiftTemplateForm = () => {
                                         label="Service Location"
                                         error={Boolean(errors.location)}
                                         helperText={
-                                            bulkEditMode 
+                                            bulkEditMode
                                                 ? 'Read-only in bulk edit mode'
-                                                : errors.location || 'Select existing or type new location'
+                                                : errors.location || 'Select a service location'
                                         }
                                     />
                                 )}
