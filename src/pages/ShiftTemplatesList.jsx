@@ -60,7 +60,14 @@ const ShiftTemplatesList = () => {
     });
 
     const [regions, setRegions] = useState([]);
-    const shiftTypes = ['LONG_DAY', 'DAY', 'SLEEP_IN', 'WAKING_NIGHT', 'FLOATING','CARE_CALL'];
+    // Data-driven: loaded from GET /api/shift-types (all, incl. inactive — old
+    // templates may still reference a retired type and must stay filterable).
+    const [shiftTypes, setShiftTypes] = useState([]);
+    const shiftTypeLabel = useMemo(() => {
+        const m = {};
+        shiftTypes.forEach((t) => { m[t.code] = t.displayName || t.code; });
+        return (code) => m[code] || (code || '').replace(/_/g, ' ');
+    }, [shiftTypes]);
     const daysOfWeek = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
     // Rank lookup so we can sort rows by day-of-week in calendar order
     // rather than the alphabetical default a string sort would give.
@@ -95,6 +102,7 @@ const ShiftTemplatesList = () => {
 
     useEffect(() => {
         fetchRegions();
+        fetchShiftTypes();
         fetchTemplates();
     }, []);
 
@@ -108,6 +116,15 @@ const ShiftTemplatesList = () => {
             setRegions(response.data);
         } catch (err) {
             console.error('Failed to fetch regions:', err);
+        }
+    };
+
+    const fetchShiftTypes = async () => {
+        try {
+            const response = await axiosInstance.get(API_ENDPOINTS.shiftTypes);
+            setShiftTypes(response.data || []);
+        } catch (err) {
+            console.error('Failed to fetch shift types:', err);
         }
     };
 
@@ -272,8 +289,10 @@ const ShiftTemplatesList = () => {
                             label="Shift Type"
                         >
                             <MenuItem value="">All</MenuItem>
-                            {shiftTypes.map((type) => (
-                                <MenuItem key={type} value={type}>{type.replace('_', ' ')}</MenuItem>
+                            {shiftTypes.map((t) => (
+                                <MenuItem key={t.code} value={t.code}>
+                                    {t.displayName || t.code}{t.active ? '' : ' (inactive)'}
+                                </MenuItem>
                             ))}
                         </Select>
                     </FormControl>
@@ -356,7 +375,7 @@ const ShiftTemplatesList = () => {
                                                 <TableCell>{template.dayOfWeek}</TableCell>
                                                 <TableCell>
                                                     <Chip
-                                                        label={template.shiftType.replace('_', ' ')}
+                                                        label={shiftTypeLabel(template.shiftType)}
                                                         color={getShiftTypeColor(template.shiftType)}
                                                         size="small"
                                                     />
