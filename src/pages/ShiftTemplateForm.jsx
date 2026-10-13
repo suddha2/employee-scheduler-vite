@@ -52,7 +52,9 @@ const ShiftTemplateForm = () => {
         breakStart: '',
         breakEnd: '',
         totalHours: '',
-        requiredGender: '',
+        // 'ANY' = no preference. Never blank: a blank gender used to make the solver
+        // treat every carer as a mismatch and leave the slot empty.
+        requiredGender: 'ANY',
         requiredSkills: [],
         empCount: 1,
         priority: 1,
@@ -166,7 +168,7 @@ const ShiftTemplateForm = () => {
                 breakStart: template.breakStart || '',
                 breakEnd: template.breakEnd || '',
                 totalHours: template.totalHours || '',
-                requiredGender: template.requiredGender || '',
+                requiredGender: template.requiredGender || 'ANY',
                 requiredSkills: template.requiredSkills || [],
                 empCount: template.empCount || 1,
                 priority: template.priority || 1,
@@ -267,6 +269,7 @@ const ShiftTemplateForm = () => {
         try {
             const payload = {
                 ...formData,
+                requiredGender: formData.requiredGender || 'ANY',
                 empCount: parseInt(formData.empCount),
                 priority: parseInt(formData.priority),
                 totalHours: formData.totalHours ? parseFloat(formData.totalHours) : null
