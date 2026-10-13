@@ -55,6 +55,8 @@ const ShiftTemplateForm = () => {
         // 'ANY' = no preference. Never blank: a blank gender used to make the solver
         // treat every carer as a mismatch and leave the slot empty.
         requiredGender: 'ANY',
+        // Sleep-in staffing ('' = shift type default = same carer as the long day).
+        pairingMode: '',
         requiredSkills: [],
         empCount: 1,
         priority: 1,
@@ -169,6 +171,7 @@ const ShiftTemplateForm = () => {
                 breakEnd: template.breakEnd || '',
                 totalHours: template.totalHours || '',
                 requiredGender: template.requiredGender || 'ANY',
+                pairingMode: template.pairingMode || '',
                 requiredSkills: template.requiredSkills || [],
                 empCount: template.empCount || 1,
                 priority: template.priority || 1,
@@ -232,6 +235,9 @@ const ShiftTemplateForm = () => {
         return Object.keys(newErrors).length === 0;
     };
 
+    // Follower types (sleep-in) mirror the long-day carer unless set to their own carer.
+    const isFollowerType = !!shiftTypes.find((t) => t.code === formData.shiftType)?.defaultIsFollower;
+
     const handleChange = (field) => (event) => {
         setFormData({
             ...formData,
@@ -270,6 +276,8 @@ const ShiftTemplateForm = () => {
             const payload = {
                 ...formData,
                 requiredGender: formData.requiredGender || 'ANY',
+                // Only follower types (sleep-in) carry a staffing choice; '' is not a valid enum.
+                pairingMode: isFollowerType ? (formData.pairingMode || null) : null,
                 empCount: parseInt(formData.empCount),
                 priority: parseInt(formData.priority),
                 totalHours: formData.totalHours ? parseFloat(formData.totalHours) : null
@@ -517,6 +525,28 @@ const ShiftTemplateForm = () => {
                                 )}
                             </FormControl>
                         </Grid>
+
+                        {isFollowerType && (
+                            <Grid item xs={12} md={6}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Sleep-in staffing</InputLabel>
+                                    <Select
+                                        value={formData.pairingMode}
+                                        onChange={handleChange('pairingMode')}
+                                        label="Sleep-in staffing"
+                                        disabled={bulkEditMode}
+                                    >
+                                        <MenuItem value="">Same carer as the long day (default)</MenuItem>
+                                        <MenuItem value="STANDALONE">Own carer (separate from the long day)</MenuItem>
+                                    </Select>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {bulkEditMode
+                                            ? 'Change this per template, not in bulk edit mode'
+                                            : 'Use "Own carer" when the LA package needs a different person for the sleep-in'}
+                                    </Typography>
+                                </FormControl>
+                            </Grid>
+                        )}
 
                         <Grid item xs={12} md={6}>
                             <Autocomplete

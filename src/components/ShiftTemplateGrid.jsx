@@ -83,6 +83,7 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
           if (!g[code].startTime && tpl.startTime) g[code].startTime = hhmm(tpl.startTime);
           if (!g[code].endTime && tpl.endTime) g[code].endTime = hhmm(tpl.endTime);
           if (tpl.empCount) g[code].empCount = tpl.empCount;
+          if (tpl.pairingMode === 'STANDALONE') g[code].ownCarer = true;
         });
         setGrid({ ...g });
       })
@@ -116,6 +117,8 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
           startTime: r.startTime || null,
           endTime: r.endTime || null,
           empCount: Number(r.empCount) || 1,
+          // Sleep-in staffing: own carer, or (default) the long-day carer stays on.
+          pairingMode: t.defaultIsFollower ? (r.ownCarer ? 'STANDALONE' : null) : null,
         };
       });
       const res = await axiosInstance.post(API_ENDPOINTS.shiftTemplatesBulk, { location, region, rows });
@@ -182,6 +185,15 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
                       <strong>{t.displayName || t.code}</strong>
                       {t.requiredSkill && (
                         <Typography variant="caption" color="text.secondary" display="block">needs: {t.requiredSkill}</Typography>
+                      )}
+                      {t.defaultIsFollower && (
+                        <Tooltip title="Ticked: the solver gives this shift its own carer. Unticked: the long-day carer stays on.">
+                          <Typography component="label" variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                            <Checkbox size="small" sx={{ p: 0.25 }} checked={!!r.ownCarer} disabled={!active}
+                              onChange={(e) => setField(t.code, 'ownCarer', e.target.checked)} />
+                            Own carer
+                          </Typography>
+                        </Tooltip>
                       )}
                     </TableCell>
                     {DAYS.map(([d]) => (
