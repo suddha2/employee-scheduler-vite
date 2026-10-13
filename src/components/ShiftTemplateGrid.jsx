@@ -19,8 +19,8 @@ const hhmm = (t) => (t ? String(t).slice(0, 5) : '');
  * Grid builder: rows = every active shift type, columns = Mon–Sun tick boxes, plus
  * per-row start/end/headcount. Loads the service's current templates so ticks reflect
  * what exists; saving reconciles (create ticked, update, deactivate unticked). Rate is
- * the type's own tag, so it isn't set here; pairing (LONG_DAY + SLEEP_IN) is implicit —
- * tick both on the same days.
+ * the type's own tag, so it isn't set here; leader/follower pairing (set per shift type in
+ * Manage Shift Types, e.g. LONG_DAY + SLEEP_IN) is implicit — tick both on the same days.
  *
  * Reusable: rendered standalone by the Bulk Create page and embedded (grid toggle) by
  * the create/edit form. `initialRegion`/`initialLocation` prefill the selectors (used
@@ -117,7 +117,7 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
           startTime: r.startTime || null,
           endTime: r.endTime || null,
           empCount: Number(r.empCount) || 1,
-          // Sleep-in staffing: own carer, or (default) the long-day carer stays on.
+          // Follower staffing: own carer, or (default) its leader shift's carer stays on.
           pairingMode: t.defaultIsFollower ? (r.ownCarer ? 'STANDALONE' : null) : null,
         };
       });
@@ -136,7 +136,8 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         Pick a service, then tick the days each shift type runs and set its times/headcount. Ticks reflect what
         already exists; saving creates ticked cells, updates changed ones and removes unticked ones. Rate comes from
-        the shift type; pairing is automatic — tick LONG_DAY and SLEEP_IN on the same days.
+        the shift type. A follower shift (e.g. a sleep-in) takes its leader shift's carer when both are ticked on the
+        same day — tick "Own carer" on the follower row if the package needs a different person.
       </Typography>
 
       <Grid container spacing={2} sx={{ mb: 2 }}>
@@ -187,7 +188,7 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
                         <Typography variant="caption" color="text.secondary" display="block">needs: {t.requiredSkill}</Typography>
                       )}
                       {t.defaultIsFollower && (
-                        <Tooltip title="Ticked: the solver gives this shift its own carer. Unticked: the long-day carer stays on.">
+                        <Tooltip title={`Ticked: the solver gives this shift its own carer. Unticked: the ${shiftTypes.find((x) => x.code === t.defaultPairsWith)?.displayName || t.defaultPairsWith || 'leader shift'} carer stays on.`}>
                           <Typography component="label" variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                             <Checkbox size="small" sx={{ p: 0.25 }} checked={!!r.ownCarer} disabled={!active}
                               onChange={(e) => setField(t.code, 'ownCarer', e.target.checked)} />

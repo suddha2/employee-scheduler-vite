@@ -55,7 +55,7 @@ const ShiftTemplateForm = () => {
         // 'ANY' = no preference. Never blank: a blank gender used to make the solver
         // treat every carer as a mismatch and leave the slot empty.
         requiredGender: 'ANY',
-        // Sleep-in staffing ('' = shift type default = same carer as the long day).
+        // Follower staffing ('' = shift type default = same carer as its leader shift).
         pairingMode: '',
         requiredSkills: [],
         empCount: 1,
@@ -235,8 +235,12 @@ const ShiftTemplateForm = () => {
         return Object.keys(newErrors).length === 0;
     };
 
-    // Follower types (sleep-in) mirror the long-day carer unless set to their own carer.
-    const isFollowerType = !!shiftTypes.find((t) => t.code === formData.shiftType)?.defaultIsFollower;
+    // Follower types (set in Manage Shift Types, e.g. SLEEP_IN following LONG_DAY) mirror
+    // their leader's carer unless this template gives them their own carer.
+    const selectedType = shiftTypes.find((t) => t.code === formData.shiftType);
+    const isFollowerType = !!selectedType?.defaultIsFollower;
+    const leaderType = shiftTypes.find((t) => t.code === selectedType?.defaultPairsWith);
+    const leaderName = leaderType?.displayName || selectedType?.defaultPairsWith || 'its leader shift';
 
     const handleChange = (field) => (event) => {
         setFormData({
@@ -276,7 +280,7 @@ const ShiftTemplateForm = () => {
             const payload = {
                 ...formData,
                 requiredGender: formData.requiredGender || 'ANY',
-                // Only follower types (sleep-in) carry a staffing choice; '' is not a valid enum.
+                // Only follower types carry a staffing choice; '' is not a valid enum.
                 pairingMode: isFollowerType ? (formData.pairingMode || null) : null,
                 empCount: parseInt(formData.empCount),
                 priority: parseInt(formData.priority),
@@ -529,20 +533,20 @@ const ShiftTemplateForm = () => {
                         {isFollowerType && (
                             <Grid item xs={12} md={6}>
                                 <FormControl fullWidth>
-                                    <InputLabel>Sleep-in staffing</InputLabel>
+                                    <InputLabel>Staffing</InputLabel>
                                     <Select
                                         value={formData.pairingMode}
                                         onChange={handleChange('pairingMode')}
-                                        label="Sleep-in staffing"
+                                        label="Staffing"
                                         disabled={bulkEditMode}
                                     >
-                                        <MenuItem value="">Same carer as the long day (default)</MenuItem>
-                                        <MenuItem value="STANDALONE">Own carer (separate from the long day)</MenuItem>
+                                        <MenuItem value="">Same carer as {leaderName} (default)</MenuItem>
+                                        <MenuItem value="STANDALONE">Own carer (separate from {leaderName})</MenuItem>
                                     </Select>
                                     <Typography variant="caption" color="text.secondary">
                                         {bulkEditMode
                                             ? 'Change this per template, not in bulk edit mode'
-                                            : 'Use "Own carer" when the LA package needs a different person for the sleep-in'}
+                                            : `Use "Own carer" when the LA package needs a different person from the ${leaderName} carer`}
                                     </Typography>
                                 </FormControl>
                             </Grid>
