@@ -45,6 +45,7 @@ import VersionHistorySidebar from '../components/Versionhistorysidebar';
 import SaveScheduleDialog from '../components/SaveScheduleDialog';
 import DiscardChangesDialog from '../components/DiscardChangesDialog';
 import ConflictDialog from '../components/ConflictDialog';
+import SkippedPinsDialog from '../components/SkippedPinsDialog';
 // Add to imports at top
 import BulkAssignmentModal from '../components/BulkAssignmentModal';
 
@@ -70,6 +71,9 @@ export default function ViewSchedules() {
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ message: '', opened: false });
   const [rotaData, setRotaData] = useState(null);
+  // Standing pins the solver didn't apply for this rota (see SkippedPinsDialog)
+  const [skippedPins, setSkippedPins] = useState([]);
+  const [skippedPinsOpen, setSkippedPinsOpen] = useState(false);
   const [assignmentMap, setAssignmentMap] = useState({});
   const [datesByWeekday, setDatesByWeekday] = useState(emptyDatesByWeekday);
   const [pinnedMap, setPinnedMap] = useState({});
@@ -247,6 +251,13 @@ export default function ViewSchedules() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
+
+  useEffect(() => {
+    if (!id) { setSkippedPins([]); return; }
+    axiosInstance.get(API_ENDPOINTS.rotaSkippedPins(id))
+      .then((r) => setSkippedPins(r.data || []))
+      .catch(() => setSkippedPins([])); // older rotas / no permission: just don't show it
+  }, [id]);
 
   // Fresh custom-period view: no rota id yet, but a region + date range to solve.
   const freshRegion = searchParams.get('region');
@@ -1485,6 +1496,19 @@ export default function ViewSchedules() {
             </Tooltip>
           )}
 
+          {skippedPins.length > 0 && (
+            <Tooltip title="Standing pins the solver couldn't apply (carer left, wrong gender, 7th day in a row...)">
+              <Chip
+                icon={<WarningAmberIcon />}
+                label={`${skippedPins.length} pin${skippedPins.length === 1 ? '' : 's'} not applied`}
+                color="warning"
+                clickable
+                onClick={() => setSkippedPinsOpen(true)}
+                sx={{ mr: 2 }}
+              />
+            </Tooltip>
+          )}
+
           {slotFilterInfo && (() => {
             let dateLabel = slotFilterInfo.date;
             try {
@@ -1767,6 +1791,8 @@ export default function ViewSchedules() {
         data={violationsData}
       />
       {/* ✅ Add Conflict Dialog */}
+      <SkippedPinsDialog open={skippedPinsOpen} onClose={() => setSkippedPinsOpen(false)} pins={skippedPins} />
+
       <ConflictDialog
         open={conflictDialogOpen}
         onClose={() => {

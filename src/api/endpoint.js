@@ -87,6 +87,8 @@ export const API_ENDPOINTS = {
   // Authoritative same-day conflicts (same rule the save-time block uses) — source of
   // truth for the Conflicts drawer so the UI can't diverge from the backend.
   rotaConflicts: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/conflicts`,
+  // Standing pins the solver didn't apply for this rota, and why (left, wrong gender, 6:1, clash)
+  rotaSkippedPins: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/skipped-pins`,
   // Side-by-side stats for two rotas (e.g. the same period solved Spread vs Continuity)
   rotaCompare: (a, b) => `${API_BASE_URL}/api/rota/compare?a=${a}&b=${b}`,
   // Find the solved rota id for a region + exact date range (custom-period View)

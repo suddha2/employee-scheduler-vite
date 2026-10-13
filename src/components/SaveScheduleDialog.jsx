@@ -68,6 +68,14 @@ export default function SaveScheduleDialog({
     }));
   };
 
+  // "Carer - date - reason" lines for the dialog, so the planner sees why a save is blocked.
+  const describeConflicts = (conflicts) => {
+    const lines = (conflicts || []).slice(0, 8).map((c) =>
+      `${c.employeeName || 'Carer'} – ${c.date || ''} – ${c.reason || 'conflict'}`);
+    const more = (conflicts || []).length > 8 ? ` … and ${conflicts.length - 8} more` : '';
+    return lines.join('; ') + more;
+  };
+
   const handleSave = async () => {
     if (!versionLabel.trim()) {
       setError('Version label is required');
@@ -89,18 +97,31 @@ export default function SaveScheduleDialog({
         changes: formattedChanges,
       });
 
-      const response = await axiosInstance.post(
-        `${API_ENDPOINTS.scheduleVersions}/${scheduleId}/versions`,
-        {
-          versionLabel: versionLabel.trim(),
-          comment: comment.trim() || null,
-          changes: formattedChanges,
-          pinAllChanges: pinAllChanges,  // ✅ SEND TO BACKEND
-        },
-        {
-          headers: { Authorization: `Bearer ${safeStorage.get('token')}` }
+      const body = {
+        versionLabel: versionLabel.trim(),
+        comment: comment.trim() || null,
+        changes: formattedChanges,
+        pinAllChanges: pinAllChanges,  // ✅ SEND TO BACKEND
+      };
+      const headers = { Authorization: `Bearer ${safeStorage.get('token')}` };
+
+      // Pin-all turns the whole rota into standing pins: check it first (dry run, nothing
+      // saved) - overlaps, wrong gender / missing skill, and 6:1 for permanent carers.
+      if (pinAllChanges) {
+        const check = await axiosInstance.post(
+          `${API_ENDPOINTS.scheduleVersions}/${scheduleId}/versions/validate`, body, { headers });
+        const conflicts = check.data?.conflicts || [];
+        if (!check.data?.ok) {
+          if (onSaveConflict) onSaveConflict({ conflicts, message: 'Fix these before pinning' });
+          setError(
+            `Not saved - ${conflicts.length} conflict${conflicts.length === 1 ? '' : 's'} to fix before pinning: ` +
+            describeConflicts(conflicts));
+          return;
         }
-      );
+      }
+
+      const response = await axiosInstance.post(
+        `${API_ENDPOINTS.scheduleVersions}/${scheduleId}/versions`, body, { headers });
 
       console.log('Save response:', response.data);
 
@@ -128,7 +149,7 @@ export default function SaveScheduleDialog({
         }
         setError(
           `${message}: ${conflicts.length} conflict${conflicts.length === 1 ? '' : 's'} detected. ` +
-          `Conflicting cells are highlighted on the schedule.`
+          `Conflicting cells are highlighted on the schedule. ` + describeConflicts(conflicts)
         );
       } else {
         const errorMsg = err.response?.data?.message || 'Failed to save version';
