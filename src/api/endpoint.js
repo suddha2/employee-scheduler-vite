@@ -29,6 +29,8 @@ export const API_ENDPOINTS = {
 
   // Data-driven shift types (dropdown source + admin CRUD; new types = DB rows, no deploy)
   shiftTypes: `${API_BASE_URL}/api/shift-types`,
+  // Skills in use (employees, templates, shift types) - same spellings the solver matches on
+  skills: `${API_BASE_URL}/api/skills`,
   shiftTypeByCode: (code) => `${API_BASE_URL}/api/shift-types/${encodeURIComponent(code)}`,
 
   // Solver levers + tuning (constraint weights/severity/enable + numeric thresholds)

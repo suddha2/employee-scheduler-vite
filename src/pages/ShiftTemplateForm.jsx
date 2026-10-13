@@ -72,7 +72,8 @@ const ShiftTemplateForm = () => {
     const [shiftTypes, setShiftTypes] = useState([]);
     const daysOfWeek = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
     const genders = ['ANY', 'MALE', 'FEMALE'];
-    const skillOptions = ['BUCCAL', 'DRIVING'];
+    // Skills in use (employees, templates, shift types) - the spellings the solver matches on.
+    const [skillOptions, setSkillOptions] = useState([]);
 
     // UI state
     const [loading, setLoading] = useState(false);
@@ -85,7 +86,10 @@ const ShiftTemplateForm = () => {
     // (all shift types for the whole service at once). Available on create + edit.
     // Grid is the default (and only) editor for templates now — the single-template
     // form path is kept in code but no longer surfaced.
-    const [gridMode] = useState(true);
+    // Create uses the bulk grid (gender + skills per shift-type row); Edit opens the full form
+    // for the one template (gender, skills, staffing...). Was hard-wired to the grid for both,
+    // so a template's gender/skills could not be set anywhere.
+    const gridMode = !isEditMode;
 
     // ✅ NEW: Bulk edit state
     const [bulkEditMode, setBulkEditMode] = useState(false);
@@ -98,6 +102,7 @@ const ShiftTemplateForm = () => {
     useEffect(() => {
         fetchRegions();
         fetchShiftTypes();
+        axiosInstance.get(API_ENDPOINTS.skills).then((r) => setSkillOptions(r.data || [])).catch(() => {});
         if (isEditMode) {
             fetchShiftTemplate();
         }

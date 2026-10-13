@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Box, Typography, Grid, FormControl, InputLabel, Select, MenuItem,
   Table, TableHead, TableBody, TableRow, TableCell, TableContainer,
-  TextField, Button, Checkbox, Alert, CircularProgress, Divider, Tooltip,
+  TextField, Button, Checkbox, Alert, CircularProgress, Divider, Tooltip, Autocomplete,
 } from '@mui/material';
 import { Save as SaveIcon } from '@mui/icons-material';
 import axiosInstance from './axiosInstance';
@@ -34,7 +34,8 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
   const [region, setRegion] = useState(initialRegion || '');
   const [location, setLocation] = useState('');
 
-  // grid: { [code]: { days:Set<string>, startTime, endTime, empCount } }
+  const [skillOptions, setSkillOptions] = useState([]);
+  // grid: { [code]: { days:Set<string>, startTime, endTime, empCount, requiredGender, requiredSkills } }
   const [grid, setGrid] = useState({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -47,6 +48,7 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
   useEffect(() => {
     axiosInstance.get(`${API_ENDPOINTS.shiftTemplates}/regions`).then((r) => setRegions(r.data || [])).catch(() => {});
     axiosInstance.get(API_ENDPOINTS.shiftTypes, { params: { active: true } }).then((r) => setShiftTypes(r.data || [])).catch(() => {});
+    axiosInstance.get(API_ENDPOINTS.skills).then((r) => setSkillOptions(r.data || [])).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -70,7 +72,7 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
   useEffect(() => {
     setResult(null);
     const empty = {};
-    shiftTypes.forEach((t) => { empty[t.code] = { days: new Set(), startTime: '', endTime: '', empCount: 1 }; });
+    shiftTypes.forEach((t) => { empty[t.code] = { days: new Set(), startTime: '', endTime: '', empCount: 1, requiredGender: 'ANY', requiredSkills: [] }; });
     if (!location) { setGrid(empty); return; }
     setLoading(true);
     axiosInstance.get(API_ENDPOINTS.shiftTemplatesByLocation(location), { params: { active: true } })
@@ -78,7 +80,13 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
         const g = empty;
         (r.data || []).forEach((tpl) => {
           const code = tpl.shiftType; // JSON key is the code
-          if (!g[code]) g[code] = { days: new Set(), startTime: '', endTime: '', empCount: 1 };
+          if (!g[code]) g[code] = { days: new Set(), startTime: '', endTime: '', empCount: 1, requiredGender: 'ANY', requiredSkills: [] };
+          // Gender/skills: shown from the type's first existing template; saving applies them to every ticked day.
+          if (!g[code].loadedReqs) {
+            g[code].requiredGender = tpl.requiredGender || 'ANY';
+            g[code].requiredSkills = tpl.requiredSkills || [];
+            g[code].loadedReqs = true;
+          }
           if (tpl.dayOfWeek) g[code].days.add(tpl.dayOfWeek);
           if (!g[code].startTime && tpl.startTime) g[code].startTime = hhmm(tpl.startTime);
           if (!g[code].endTime && tpl.endTime) g[code].endTime = hhmm(tpl.endTime);
@@ -96,7 +104,15 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
     if (row.days.has(day)) row.days.delete(day); else row.days.add(day);
     return { ...g, [code]: row };
   });
-  const setWeekdays = (code) => setGrid((g) => ({ ...g, [code]: { ...g[code], days: new Set(WEEKDAYS) } }));
+  // M–F toggles the weekdays: ticks all five, or unticks them if all five are already ticked.
+  // Saturday/Sunday are left as they are (it used to replace the row, wiping weekend ticks).
+  const allWeekdays = (r) => WEEKDAYS.every((d) => r?.days?.has(d));
+  const toggleWeekdays = (code) => setGrid((g) => {
+    const days = new Set(g[code]?.days || []);
+    if (allWeekdays(g[code])) WEEKDAYS.forEach((d) => days.delete(d));
+    else WEEKDAYS.forEach((d) => days.add(d));
+    return { ...g, [code]: { ...g[code], days } };
+  });
   const setField = (code, field, val) => setGrid((g) => ({ ...g, [code]: { ...g[code], [field]: val } }));
 
   const invalidRow = (code) => {
@@ -117,6 +133,8 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
           startTime: r.startTime || null,
           endTime: r.endTime || null,
           empCount: Number(r.empCount) || 1,
+          requiredGender: r.requiredGender || 'ANY',
+          requiredSkills: r.requiredSkills || [],
           // Follower staffing: own carer, or (default) its leader shift's carer stays on.
           pairingMode: t.defaultIsFollower ? (r.ownCarer ? 'STANDALONE' : null) : null,
         };
@@ -174,11 +192,13 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
                 <TableCell>Start</TableCell>
                 <TableCell>End</TableCell>
                 <TableCell sx={{ width: 80 }}>Count</TableCell>
+                <TableCell sx={{ minWidth: 110 }}>Gender</TableCell>
+                <TableCell sx={{ minWidth: 220 }}>Skills required</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {shiftTypes.map((t) => {
-                const r = grid[t.code] || { days: new Set(), startTime: '', endTime: '', empCount: 1 };
+                const r = grid[t.code] || { days: new Set(), startTime: '', endTime: '', empCount: 1, requiredGender: 'ANY', requiredSkills: [] };
                 const active = r.days.size > 0;
                 return (
                   <TableRow key={t.code} hover>
@@ -202,13 +222,31 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
                         <Checkbox size="small" checked={r.days.has(d)} onChange={() => toggleDay(t.code, d)} />
                       </TableCell>
                     ))}
-                    <TableCell><Tooltip title="Mon–Fri"><Button size="small" onClick={() => setWeekdays(t.code)}>M–F</Button></Tooltip></TableCell>
+                    <TableCell>
+                      <Tooltip title={allWeekdays(r) ? 'Untick Mon–Fri' : 'Tick Mon–Fri'}>
+                        <Button size="small" variant={allWeekdays(r) ? 'contained' : 'text'}
+                          onClick={() => toggleWeekdays(t.code)}>M–F</Button>
+                      </Tooltip>
+                    </TableCell>
                     <TableCell><TextField type="time" size="small" value={r.startTime} disabled={!active}
                       error={active && !r.startTime} onChange={(e) => setField(t.code, 'startTime', e.target.value)} /></TableCell>
                     <TableCell><TextField type="time" size="small" value={r.endTime} disabled={!active}
                       error={active && !r.endTime} onChange={(e) => setField(t.code, 'endTime', e.target.value)} /></TableCell>
                     <TableCell><TextField type="number" size="small" value={r.empCount} disabled={!active}
                       inputProps={{ min: 1, style: { width: 56 } }} onChange={(e) => setField(t.code, 'empCount', e.target.value)} /></TableCell>
+                    <TableCell>
+                      <Select size="small" value={r.requiredGender || 'ANY'} disabled={!active} sx={{ minWidth: 100 }}
+                        onChange={(e) => setField(t.code, 'requiredGender', e.target.value)}>
+                        <MenuItem value="ANY">Any</MenuItem>
+                        <MenuItem value="FEMALE">Female</MenuItem>
+                        <MenuItem value="MALE">Male</MenuItem>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Autocomplete multiple size="small" options={skillOptions} value={r.requiredSkills || []} disabled={!active}
+                        onChange={(e, value) => setField(t.code, 'requiredSkills', value)}
+                        renderInput={(params) => <TextField {...params} placeholder={(r.requiredSkills || []).length ? '' : 'None'} />} />
+                    </TableCell>
                   </TableRow>
                 );
               })}

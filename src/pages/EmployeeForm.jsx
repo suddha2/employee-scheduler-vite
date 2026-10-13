@@ -85,7 +85,12 @@ export default function EmployeeForm() {
     const shiftTypes = ['LONG_DAY', 'DAY', 'SLEEP_IN', 'WAKING_NIGHT', 'FLOATING', 'CARE_CALL'];
     // Offered skills (field is still freeSolo, so others can be typed). SHIFT_LEAD gates
     // lead-shift eligibility; the rest are the care skills used on templates' required_skills.
-    const skillsList = ['SHIFT_LEAD', 'BUCCAL', 'MOVING AND HANDLING', 'DRIVING', 'DRIVER', 'PRADER-WILLI'];
+    // Skills in use across employees, templates and shift types (same spellings the solver
+    // matches on); the field is still free text for a genuinely new skill.
+    const [skillsList, setSkillsList] = useState(['SHIFT_LEAD', 'Carer', 'BUCCAL']);
+    useEffect(() => {
+        axiosInstance.get(API_ENDPOINTS.skills).then((r) => { if ((r.data || []).length) setSkillsList(r.data); }).catch(() => {});
+    }, []);
 
     // Fetch regions and locations on mount
     useEffect(() => {
