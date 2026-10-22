@@ -623,7 +623,7 @@ export default function PayCycleSchedule() {
                                         )}
                                         {/* Use currentPeriod instead of period below */}
                                         <Typography variant="h6">
-                                            {location.label} | Period {index + 1}
+                                            {location.label} | {currentPeriod.name || `Period ${index + 1}`}
                                         </Typography>
 
                                         <Typography variant="body2" color="text.secondary">

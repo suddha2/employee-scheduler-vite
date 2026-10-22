@@ -269,7 +269,7 @@ export default function ArchivedPayCycleView() {
                             <Card variant="outlined">
                                 <CardContent sx={{ position: 'relative' }}>
                                     <Typography variant="h6">
-                                        {location?.label} | Period {index + 1}
+                                        {location?.label} | {period.name || `Period ${index + 1}`}
                                     </Typography>
                                     <Typography variant="body2" color="text.secondary">
                                         {period.startDate} → {period.endDate}
