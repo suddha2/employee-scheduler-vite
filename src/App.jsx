@@ -12,7 +12,6 @@ import MicrosoftCallback from './pages/MicrosoftCallback';
 import Dashboard from './pages/Dashboard';
 import EmployeeList from './pages/EmployeeList';
 import EmployeeForm from './pages/EmployeeForm';
-import SubmitSchedule from './pages/SubmitSchedule';
 import ViewSchedules from './pages/ViewSchedules';
 import PayCycleSchedule from './pages/PayCycleScheduleView';
 import ArchivedPayCycleView from './pages/ArchivedPayCycleView';
@@ -21,7 +20,6 @@ import EmpStatsView from './pages/EmpStatsView';
 import ShiftRequestsPage from './pages/ShiftRequestsPage';
 import ShiftTemplatesList from './pages/ShiftTemplatesList';
 import ShiftTemplateForm from './pages/ShiftTemplateForm';
-import ShiftTemplateBuilder from './pages/ShiftTemplateBuilder';
 import ManageShiftTypes from './pages/ManageShiftTypes';
 import ManageServices from './pages/ManageServices';
 import StandingPins from './pages/StandingPins';
@@ -99,9 +97,6 @@ export default function App() {
               <Route path="/shift-templates/new" element={<ProtectedRoute>
                     <Layout><ShiftTemplateForm /></Layout>
                   </ProtectedRoute>} />
-              <Route path="/shift-templates/builder" element={<ProtectedRoute>
-                    <Layout><ShiftTemplateBuilder /></Layout>
-                  </ProtectedRoute>} />
               <Route path="/shift-types" element={<ProtectedRoute>
                     <Layout><ManageShiftTypes /></Layout>
                   </ProtectedRoute>} />
@@ -137,16 +132,6 @@ export default function App() {
                   <ProtectedRoute>
                     <Layout>
                       <ArchivedPayCycleView />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/submit"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <SubmitSchedule />
                     </Layout>
                   </ProtectedRoute>
                 }

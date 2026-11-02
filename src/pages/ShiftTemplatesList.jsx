@@ -239,13 +239,6 @@ const ShiftTemplatesList = () => {
                     {canManagePeople && (
                     <Box sx={{ display: 'inline-flex', gap: 1 }}>
                     <Button
-                        variant="outlined"
-                        startIcon={<AddIcon />}
-                        onClick={() => navigate('/shift-templates/builder')}
-                    >
-                        Bulk Create
-                    </Button>
-                    <Button
                         variant="contained"
                         startIcon={<AddIcon />}
                         onClick={() => navigate('/shift-templates/new')}

@@ -14,8 +14,7 @@ export default function Breadcrumbs({ onMenuClick, sidebarOpen }) {
         '/paycycleSchedule': { label: 'Pay Cycle Schedule', parent: '/dashboard' },
         '/schedules': { label: 'View Schedules', parent: '/dashboard' },
         '/servicestats': { label: 'Service Statistics', parent: '/dashboard' },
-        '/empstats': { label: 'Employee Statistics', parent: '/dashboard' },
-        '/submit': { label: 'Submit Schedule', parent: '/dashboard' }
+        '/empstats': { label: 'Employee Statistics', parent: '/dashboard' }
     };
 
     // Build breadcrumb trail

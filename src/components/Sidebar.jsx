@@ -12,7 +12,6 @@ import {
     IconButton,
     useTheme,
     useMediaQuery,
-    Collapse,
     Badge,
     Chip,
     Stack
@@ -23,10 +22,6 @@ import {
     PushPin as PushPinIcon,
     People as PeopleIcon,
     CalendarMonth as CalendarIcon,
-    Schedule as ScheduleIcon,
-    Assessment as AssessmentIcon,
-    ExpandLess,
-    ExpandMore,
     ChevronLeft as ChevronLeftIcon,
     Menu as MenuIcon,
     Archive as ArchiveIcon,
@@ -47,7 +42,6 @@ export default function Sidebar({ open, onClose, onToggle }) {
     const location = useLocation();
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-    const [statsOpen, setStatsOpen] = useState(false);
     const { newCount: newShiftRequestCount } = useShiftRequestsNotifications();
     const { canManageUsers, canManagePeople, roles, username } = useAuth();
 
@@ -66,10 +60,6 @@ export default function Sidebar({ open, onClose, onToggle }) {
         READ_ONLY: 'default',
     };
     const primaryRole = ROLE_RANK.find((r) => roles?.includes(r)) || roles?.[0];
-
-    const handleStatsClick = () => {
-        setStatsOpen(!statsOpen);
-    };
 
     const menuItems = [
         {
@@ -151,27 +141,6 @@ export default function Sidebar({ open, onClose, onToggle }) {
                 path: '/admin/users',
             }]
             : []),
-        // {
-        //     title: 'View Schedules',
-        //     icon: <ScheduleIcon />,
-        //     path: '/schedules',
-        //     divider: true
-        // },
-        // {
-        //     title: 'Statistics',
-        //     icon: <AssessmentIcon />,
-        //     isExpandable: true,
-        //     children: [
-        //         {
-        //             title: 'Service Stats',
-        //             path: '/servicestats'
-        //         },
-        //         {
-        //             title: 'Employee Stats',
-        //             path: '/empstats'
-        //         }
-        //     ]
-        // }
     ];
 
     const handleNavigate = (path) => {
@@ -234,43 +203,6 @@ export default function Sidebar({ open, onClose, onToggle }) {
                                         primaryTypographyProps={{ variant: 'body2', color: isActive(item.path) ? 'primary' : 'text.secondary' }}
                                     />
                                 </ListItemButton>
-                        ) : item.isExpandable ? (
-                                <>
-                                    <ListItemButton onClick={handleStatsClick}>
-                                        <ListItemIcon
-                                            sx={{
-                                                color: statsOpen ? 'primary.main' : 'inherit'
-                                            }}
-                                        >
-                                            {item.icon}
-                                        </ListItemIcon>
-                                        <ListItemText primary={item.title} />
-                                        {statsOpen ? <ExpandLess /> : <ExpandMore />}
-                                    </ListItemButton>
-                                    <Collapse in={statsOpen} timeout="auto" unmountOnExit>
-                                        <List component="div" disablePadding>
-                                            {item.children.map((child) => (
-                                                <ListItemButton
-                                                    key={child.path}
-                                                    sx={{
-                                                        pl: 4,
-                                                        bgcolor: isActive(child.path)
-                                                            ? 'action.selected'
-                                                            : 'transparent',
-                                                        '&:hover': {
-                                                            bgcolor: isActive(child.path)
-                                                                ? 'action.selected'
-                                                                : 'action.hover'
-                                                        }
-                                                    }}
-                                                    onClick={() => handleNavigate(child.path)}
-                                                >
-                                                    <ListItemText primary={child.title} />
-                                                </ListItemButton>
-                                            ))}
-                                        </List>
-                                    </Collapse>
-                                </>
                             ) : (
                                 <ListItemButton
                                     onClick={() => handleNavigate(item.path)}

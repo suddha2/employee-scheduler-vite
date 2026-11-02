@@ -3,6 +3,9 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export const API_ENDPOINTS = {
+  // Home screen
+  dashboard: `${API_BASE_URL}/api/dashboard`,
+
   // Authentication
   login: `${API_BASE_URL}/api/auth/login`,
   microsoftLogin: `${API_BASE_URL}/api/auth/microsoft`,
@@ -33,11 +36,9 @@ export const API_ENDPOINTS = {
   
   // Employee Management
   employees: `${API_BASE_URL}/api/employees`,
-  employeeById: (id) => `${API_BASE_URL}/api/employees/${id}`,
 
   // Shift Templates Management
   shiftTemplates: `${API_BASE_URL}/api/shift-templates`,
-  shiftTemplateById: (id) => `${API_BASE_URL}/api/shift-templates/${id}`,
 
   // Data-driven shift types (dropdown source + admin CRUD; new types = DB rows, no deploy)
   shiftTypes: `${API_BASE_URL}/api/shift-types`,
@@ -59,9 +60,7 @@ export const API_ENDPOINTS = {
   
   // Scheduling
   enqueueRequest: `${API_BASE_URL}/api/enqueueRequest`,
-  enqueueList: `${API_BASE_URL}/api/enqueue/latest`,
   solvedSchedule: `${API_BASE_URL}/api/solved`,
-  updateSolvedSol: `${API_BASE_URL}/api/save`,
   payCycleSchedule: `${API_BASE_URL}/api/payCycle`,
   payCycleArchived: `${API_BASE_URL}/api/periods/archived`,
   payCycleArchiveDetail: `${API_BASE_URL}/api/periods/archived/details`,
@@ -99,9 +98,6 @@ export const API_ENDPOINTS = {
   liveEmployeeRemove: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/live/employee/remove`,
   // Score / constraint explanation for a persisted rota (which slots break which rule)
   rotaViolations: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/violations`,
-  // Authoritative same-day conflicts (same rule the save-time block uses) — source of
-  // truth for the Conflicts drawer so the UI can't diverge from the backend.
-  rotaConflicts: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/conflicts`,
   // Standing pins the solver didn't apply for this rota, and why (left, wrong gender, 6:1, clash)
   rotaSkippedPins: (rotaId) => `${API_BASE_URL}/api/rota/${rotaId}/skipped-pins`,
   // Side-by-side stats for two rotas (e.g. the same period solved Spread vs Continuity)
