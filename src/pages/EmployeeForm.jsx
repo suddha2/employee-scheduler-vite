@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     Box,
     Paper,
@@ -31,6 +31,7 @@ import { API_ENDPOINTS } from '../api/endpoint';
 import { useServiceWeights } from '../hooks/useServiceWeights';
 import { validateEmployee } from '../utils/employeeValidation';
 import { parseServiceWeights, serializeServiceWeights } from '../utils/serviceWeights';
+import { locationHelpers } from '../utils/locationOptions';
 import ServiceWeightPicker from '../components/ServiceWeightPicker';
 
 export default function EmployeeForm() {
@@ -77,7 +78,9 @@ export default function EmployeeForm() {
     // Dropdown options
     const [regions, setRegions] = useState([]);
     const [locations, setLocations] = useState([]);
-    const [availableServices, setAvailableServices] = useState([]);  // Services for selected region
+    const [serviceOptions, setServiceOptions] = useState([]);  // Services for selected region, flats grouped
+    const serviceHelp = useMemo(() => locationHelpers(serviceOptions), [serviceOptions]);
+    const availableServices = serviceHelp.locations;
     const genders = ['MALE', 'FEMALE'];
     const contractTypes = ['PERMANENT', 'ZERO_HOURS'];
     const rateCodes = ['L1', 'L2', 'L3', 'ZERO_HOURS'];
@@ -113,7 +116,7 @@ export default function EmployeeForm() {
         if (formData.preferredRegion) {
             fetchServicesForRegion(formData.preferredRegion);
         } else {
-            setAvailableServices([]);
+            setServiceOptions([]);
             // Clear service selections if region is cleared
             setFormData(prev => ({
                 ...prev,
@@ -126,14 +129,12 @@ export default function EmployeeForm() {
     const fetchServicesForRegion = async (region) => {
         setLoadingServices(true);
         try {
-            // Update this endpoint to match your backend
-            const response = await axiosInstance.get(`${API_ENDPOINTS.services}/${region}`);
-            // Assuming response.data is array of service names: ["Service A", "Service B", ...]
-            setAvailableServices(response.data);
+            const response = await axiosInstance.get(API_ENDPOINTS.locationOptions(region));
+            setServiceOptions(response.data);
         } catch (err) {
             console.error('Failed to fetch services:', err);
             setError('Failed to load services for selected region');
-            setAvailableServices([]);
+            setServiceOptions([]);
         } finally {
             setLoadingServices(false);
         }
@@ -657,11 +658,12 @@ export default function EmployeeForm() {
                                         value={formData.preferredService}
                                         onChange={(e, value) => setFormData({ ...formData, preferredService: value })}
                                         disabled={!formData.preferredRegion || loadingServices}
+                                        groupBy={serviceHelp.groupOf}
                                         getOptionLabel={(option) => {
                                             // Strip weight if present (safety measure)
-                                            return typeof option === 'string' && option.includes(':')
+                                            return serviceHelp.labelOf(typeof option === 'string' && option.includes(':')
                                                 ? option.split(':')[0].trim()
-                                                : option;
+                                                : option);
                                         }}
                                         renderInput={(params) => (
                                             <TextField
@@ -689,6 +691,8 @@ export default function EmployeeForm() {
                                         value={formData.restrictedService}
                                         onChange={(e, value) => setFormData({ ...formData, restrictedService: value })}
                                         disabled={!formData.preferredRegion || loadingServices}
+                                        groupBy={serviceHelp.groupOf}
+                                        getOptionLabel={serviceHelp.labelOf}
                                         renderInput={(params) => (
                                             <TextField
                                                 {...params}

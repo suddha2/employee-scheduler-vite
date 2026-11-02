@@ -18,6 +18,8 @@ export const API_ENDPOINTS = {
 
   // Service Location
   services: `${API_BASE_URL}/api/service-locations`,
+  manageServices: `${API_BASE_URL}/api/services`,
+  manageServiceById: (id) => `${API_BASE_URL}/api/services/${id}`,
   
   // Employee Management
   employees: `${API_BASE_URL}/api/employees`,
@@ -40,6 +42,7 @@ export const API_ENDPOINTS = {
   solverTuningByKey: (key) => `${API_BASE_URL}/api/solver-settings/tuning/${encodeURIComponent(key)}`,
   shiftTemplatesByLocation: (loc) => `${API_BASE_URL}/api/shift-templates/by-location/${encodeURIComponent(loc)}`,
   shiftTemplatesBulk: `${API_BASE_URL}/api/shift-templates/bulk`,
+  locationOptions: (region) => `${API_BASE_URL}/api/shift-templates/regions/${encodeURIComponent(region)}/location-options`,
 
   // ✅ FIXED: Add base URL to scheduleVersions
   scheduleVersions: `${API_BASE_URL}/api/schedules`,

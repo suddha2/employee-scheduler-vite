@@ -26,6 +26,7 @@ export default function ServiceWeightPicker({
       <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
         <Typography variant="subtitle2" gutterBottom color="text.secondary">
           Services selected in "Preferred Services" above will appear here automatically. Set weight for each service (0-100, where 100 = dedicated).
+          Listing a whole service covers only its whole-service shifts, so list each flat the carer works too.
         </Typography>
 
         {serviceWeights.length === 0 ? (

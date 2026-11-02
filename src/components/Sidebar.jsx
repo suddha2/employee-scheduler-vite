@@ -19,6 +19,7 @@ import {
 } from '@mui/material';
 import {
     Home as HomeIcon,
+    HomeWork as HomeWorkIcon,
     People as PeopleIcon,
     CalendarMonth as CalendarIcon,
     Schedule as ScheduleIcon,
@@ -92,6 +93,11 @@ export default function Sidebar({ open, onClose, onToggle }) {
                 title: 'Shift Types',
                 icon: <CategoryIcon />,
                 path: '/shift-types',
+                subItem: true,
+            }, {
+                title: 'Services',
+                icon: <HomeWorkIcon />,
+                path: '/services',
                 subItem: true,
             }, {
                 title: 'Solver Settings',

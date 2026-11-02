@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  Box, Typography, Grid, FormControl, InputLabel, Select, MenuItem,
+  Box, Typography, Grid, FormControl, FormHelperText, InputLabel, ListSubheader, Select, MenuItem,
   Table, TableHead, TableBody, TableRow, TableCell, TableContainer,
   TextField, Button, Checkbox, Alert, CircularProgress, Divider, Tooltip, Autocomplete,
 } from '@mui/material';
 import { Save as SaveIcon } from '@mui/icons-material';
 import axiosInstance from './axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
+import { locationHelpers, WHOLE_SERVICE_HINT } from '../utils/locationOptions';
 
 const DAYS = [
   ['MONDAY', 'Mon'], ['TUESDAY', 'Tue'], ['WEDNESDAY', 'Wed'], ['THURSDAY', 'Thu'],
@@ -29,7 +30,9 @@ const hhmm = (t) => (t ? String(t).slice(0, 5) : '');
  */
 export default function ShiftTemplateGrid({ initialRegion = '', initialLocation = '', onSaved }) {
   const [regions, setRegions] = useState([]);
-  const [locations, setLocations] = useState([]);
+  const [locationOptions, setLocationOptions] = useState([]);
+  const locationHelp = useMemo(() => locationHelpers(locationOptions), [locationOptions]);
+  const { locations } = locationHelp;
   const [shiftTypes, setShiftTypes] = useState([]);
   const [region, setRegion] = useState(initialRegion || '');
   const [location, setLocation] = useState('');
@@ -55,9 +58,9 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
     setLocation('');
     setGrid({});
     setResult(null);
-    if (!region) { setLocations([]); return; }
-    axiosInstance.get(`${API_ENDPOINTS.shiftTemplates}/regions/${region}/locations`)
-      .then((r) => setLocations(r.data || [])).catch(() => setLocations([]));
+    if (!region) { setLocationOptions([]); return; }
+    axiosInstance.get(API_ENDPOINTS.locationOptions(region))
+      .then((r) => setLocationOptions(r.data || [])).catch(() => setLocationOptions([]));
   }, [region]);
 
   // Prefill the location once the region's list is in (edit screen deep-link).
@@ -171,8 +174,13 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
           <FormControl fullWidth size="small" disabled={!region}>
             <InputLabel>Service (location)</InputLabel>
             <Select value={location} label="Service (location)" onChange={(e) => setLocation(e.target.value)}>
-              {locations.map((l) => <MenuItem key={l} value={l}>{l}</MenuItem>)}
+              {locations.flatMap((l, i) => [
+                ...(locationHelp.groupOf(l) !== locationHelp.groupOf(locations[i - 1])
+                  ? [<ListSubheader key={`group-${l}`}>{locationHelp.groupOf(l)}</ListSubheader>] : []),
+                <MenuItem key={l} value={l}>{locationHelp.labelOf(l)}</MenuItem>,
+              ])}
             </Select>
+            {locationHelp.isWholeService(location) && <FormHelperText>{WHOLE_SERVICE_HINT}</FormHelperText>}
           </FormControl>
         </Grid>
       </Grid>

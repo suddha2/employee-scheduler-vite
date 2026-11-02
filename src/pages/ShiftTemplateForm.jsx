@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
     Box,
@@ -35,6 +35,7 @@ import ShiftTemplateGrid from '../components/ShiftTemplateGrid';
 import { API_ENDPOINTS } from '../api/endpoint';
 import { getChangedFields } from '../utils/shiftTemplateDiff';
 import { validateShiftTemplate } from '../utils/shiftTemplateValidation';
+import { locationHelpers, WHOLE_SERVICE_HINT } from '../utils/locationOptions';
 
 const ShiftTemplateForm = () => {
     const { id } = useParams();
@@ -65,7 +66,9 @@ const ShiftTemplateForm = () => {
 
     // Dropdown options
     const [regions, setRegions] = useState([]);
-    const [locations, setLocations] = useState([]);
+    const [locationOptions, setLocationOptions] = useState([]);
+    const locationHelp = useMemo(() => locationHelpers(locationOptions), [locationOptions]);
+    const { locations } = locationHelp;
 
     // Data-driven: loaded from GET /api/shift-types so new types (shift-lead, complex…)
     // appear without a code change. Each item: { code, displayName }.
@@ -150,10 +153,8 @@ const ShiftTemplateForm = () => {
 
     const fetchLocations = async (region) => {
         try {
-            const response = await axiosInstance.get(
-                `${API_ENDPOINTS.shiftTemplates}/regions/${region}/locations`
-            );
-            setLocations(response.data);
+            const response = await axiosInstance.get(API_ENDPOINTS.locationOptions(region));
+            setLocationOptions(response.data);
         } catch (err) {
             console.error('Failed to fetch locations:', err);
         }
@@ -486,6 +487,8 @@ const ShiftTemplateForm = () => {
                                         ? [formData.location, ...locations]
                                         : locations
                                 }
+                                groupBy={locationHelp.groupOf}
+                                getOptionLabel={locationHelp.labelOf}
                                 value={formData.location || null}
                                 onChange={(e, newValue) => {
                                     setFormData({ ...formData, location: newValue || '' });
@@ -502,7 +505,8 @@ const ShiftTemplateForm = () => {
                                         helperText={
                                             bulkEditMode
                                                 ? 'Read-only in bulk edit mode'
-                                                : errors.location || 'Select a service location'
+                                                : errors.location
+                                                    || (locationHelp.isWholeService(formData.location) ? WHOLE_SERVICE_HINT : 'Select a service location')
                                         }
                                     />
                                 )}
