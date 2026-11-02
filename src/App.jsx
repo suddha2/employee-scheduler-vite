@@ -24,6 +24,7 @@ import ShiftTemplateForm from './pages/ShiftTemplateForm';
 import ShiftTemplateBuilder from './pages/ShiftTemplateBuilder';
 import ManageShiftTypes from './pages/ManageShiftTypes';
 import ManageServices from './pages/ManageServices';
+import StandingPins from './pages/StandingPins';
 import SolverSettings from './pages/SolverSettings';
 import CompareRotas from './pages/CompareRotas';
 import UsersAdminPage from './pages/UsersAdminPage';
@@ -106,6 +107,9 @@ export default function App() {
                   </ProtectedRoute>} />
               <Route path="/services" element={<ProtectedRoute>
                     <Layout><ManageServices /></Layout>
+                  </ProtectedRoute>} />
+              <Route path="/standing-pins" element={<ProtectedRoute>
+                    <Layout><StandingPins /></Layout>
                   </ProtectedRoute>} />
               <Route path="/solver-settings" element={<ProtectedRoute>
                     <Layout><SolverSettings /></Layout>

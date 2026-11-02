@@ -20,6 +20,7 @@ import {
 import {
     Home as HomeIcon,
     HomeWork as HomeWorkIcon,
+    PushPin as PushPinIcon,
     People as PeopleIcon,
     CalendarMonth as CalendarIcon,
     Schedule as ScheduleIcon,
@@ -98,6 +99,11 @@ export default function Sidebar({ open, onClose, onToggle }) {
                 title: 'Services',
                 icon: <HomeWorkIcon />,
                 path: '/services',
+                subItem: true,
+            }, {
+                title: 'Standing Pins',
+                icon: <PushPinIcon />,
+                path: '/standing-pins',
                 subItem: true,
             }, {
                 title: 'Solver Settings',

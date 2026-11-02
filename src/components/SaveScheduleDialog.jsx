@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -40,6 +40,8 @@ export default function SaveScheduleDialog({
   const [versionLabel, setVersionLabel] = useState('');
   const [comment, setComment] = useState('');
   const [pinAllChanges, setPinAllChanges] = useState(false);  // ✅ NEW STATE
+  const [pinImpact, setPinImpact] = useState(null); // what Pin all would do to this region
+  const [pinAllConfirmed, setPinAllConfirmed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -48,10 +50,20 @@ export default function SaveScheduleDialog({
       setVersionLabel('');
       setComment('');
       setPinAllChanges(false);  // ✅ RESET
+      setPinAllConfirmed(false);
       setError(null);
       onClose();
     }
   };
+
+  useEffect(() => {
+    setPinAllConfirmed(false);
+    if (!pinAllChanges || !scheduleId) { setPinImpact(null); return; }
+    axiosInstance.get(API_ENDPOINTS.pinAllImpact(scheduleId)).then((r) => setPinImpact(r.data)).catch(() => setPinImpact(null));
+  }, [pinAllChanges, scheduleId]);
+
+  // Pin all can undo a clean-up: a region with few pins would get them all back from this rota.
+  const pinAllBringsPinsBack = !!pinImpact && pinImpact.currentPins < pinImpact.wouldPin / 2;
 
   const formatChangesForBackend = (changes) => {
     return changes.map(change => ({
@@ -290,6 +302,19 @@ export default function SaveScheduleDialog({
               </Typography>
             </Alert>
           )}
+
+          {pinAllChanges && pinAllBringsPinsBack && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              <Typography variant="body2" gutterBottom>
+                {pinImpact.region} has {pinImpact.currentPins} standing pin{pinImpact.currentPins === 1 ? '' : 's'} now.
+                This will create {pinImpact.wouldPin}, one for every assigned shift in this rota.
+              </Typography>
+              <FormControlLabel
+                control={<Checkbox size="small" checked={pinAllConfirmed} onChange={(e) => setPinAllConfirmed(e.target.checked)} disabled={saving} />}
+                label={`Yes, create ${pinImpact.wouldPin} pins`}
+              />
+            </Alert>
+          )}
         </Paper>
 
         <Divider sx={{ my: 2 }} />
@@ -386,7 +411,7 @@ export default function SaveScheduleDialog({
         <Button
           onClick={handleSave}
           variant="contained"
-          disabled={saving || pendingChanges.length === 0 || !versionLabel.trim()}
+          disabled={saving || pendingChanges.length === 0 || !versionLabel.trim() || (pinAllChanges && pinAllBringsPinsBack && !pinAllConfirmed)}
           startIcon={saving ? <CircularProgress size={16} /> : <SaveIcon />}
         >
           {saving ? 'Saving...' : 'Save Version'}

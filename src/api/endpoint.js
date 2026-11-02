@@ -24,6 +24,12 @@ export const API_ENDPOINTS = {
   serviceBulk: `${API_BASE_URL}/api/services/bulk`,
   serviceBulkPreview: `${API_BASE_URL}/api/services/bulk/preview`,
   serviceBulkUndo: (id) => `${API_BASE_URL}/api/services/bulk/${id}/undo`,
+  standingPins: `${API_BASE_URL}/api/standing-pins`,
+  standingPinRemove: `${API_BASE_URL}/api/standing-pins/remove`,
+  standingPinRemoveSkipped: (id) => `${API_BASE_URL}/api/standing-pins/remove-skipped/${id}`,
+  standingPinRemovals: `${API_BASE_URL}/api/standing-pins/removals`,
+  standingPinUndo: (id) => `${API_BASE_URL}/api/standing-pins/removals/${id}/undo`,
+  pinAllImpact: (rotaId) => `${API_BASE_URL}/api/standing-pins/pin-all-impact/${rotaId}`,
   
   // Employee Management
   employees: `${API_BASE_URL}/api/employees`,
