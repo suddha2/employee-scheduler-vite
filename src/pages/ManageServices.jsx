@@ -3,12 +3,17 @@ import {
   Box, Paper, Typography, Button, IconButton, Table, TableHead, TableBody, TableRow,
   TableCell, TableContainer, Chip, Tooltip, CircularProgress, Alert, Snackbar, Dialog,
   DialogTitle, DialogContent, DialogActions, TextField, FormControl, InputLabel, Select,
-  MenuItem, Switch, FormControlLabel, Grid,
+  MenuItem, Switch, FormControlLabel, Grid, Tabs, Tab,
 } from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, HomeWork as HomeWorkIcon } from '@mui/icons-material';
+import {
+  Add as AddIcon, Edit as EditIcon, HomeWork as HomeWorkIcon, DriveFileRenameOutline as RenameIcon,
+} from '@mui/icons-material';
 import axiosInstance from '../components/axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
 import { useAuth } from '../contexts/AuthContext';
+import ServiceBulkDialog from '../components/ServiceBulkDialog';
+import ServiceNamesToFix from '../components/ServiceNamesToFix';
+import ServiceBulkHistory from '../components/ServiceBulkHistory';
 
 const blankService = () => ({ id: null, name: '', location: '', parentId: '', mobizioId: '', active: true });
 
@@ -28,6 +33,10 @@ export default function ManageServices() {
   const [form, setForm] = useState(blankService());
   const [rotaNameLocked, setRotaNameLocked] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const [tab, setTab] = useState('services');
+  const [bulk, setBulk] = useState(null); // { name, initial } while the bulk dialog is open
+  const [bulkRun, setBulkRun] = useState(0); // bumps to reload the tabs after an update
 
   const showToast = (message, severity = 'success') => setToast({ message, severity });
 
@@ -50,7 +59,7 @@ export default function ManageServices() {
 
   useEffect(() => {
     if (region) load(); else setServices([]);
-  }, [region]);
+  }, [region, bulkRun]);
 
   // Each service followed by its flats, so the table reads like the dropdowns.
   const rows = useMemo(() => {
@@ -69,6 +78,17 @@ export default function ManageServices() {
     .sort((a, b) => rotaName(a).localeCompare(rotaName(b)));
 
   const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const bulkDone = () => {
+    showToast(`Updated ${bulk.name}`);
+    setBulk(null);
+    setBulkRun((n) => n + 1);
+  };
+
+  const undone = (name) => {
+    showToast(`Undid the update to ${name}`);
+    setBulkRun((n) => n + 1);
+  };
 
   const openCreate = () => {
     setForm(blankService());
@@ -133,7 +153,8 @@ export default function ManageServices() {
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           To put a flat under its building, edit the flat and choose the building in "Part of". The link only
           groups them in dropdowns: it does not change any rota. After adding a flat, set up its shift templates
-          and add it to carers' services.
+          and add it to carers' services. To change a name everywhere, use the rename button on its row, or fix
+          it from the Names to fix tab.
         </Typography>
 
         <FormControl size="small" sx={{ minWidth: 240, mb: 2 }}>
@@ -143,9 +164,23 @@ export default function ManageServices() {
           </Select>
         </FormControl>
 
+        <Tabs value={tab} onChange={(e, v) => setTab(v)} sx={{ mb: 2 }}>
+          <Tab value="services" label="Services" />
+          <Tab value="names" label="Names to fix" />
+          <Tab value="history" label="Update history" />
+        </Tabs>
+
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-        {loading ? (
+        {tab === 'names' && (
+          <ServiceNamesToFix region={region} refreshKey={bulkRun} canEdit={canManagePeople}
+            onFix={(name, initial) => setBulk({ name, initial })} />
+        )}
+        {tab === 'history' && (
+          <ServiceBulkHistory region={region} refreshKey={bulkRun} canEdit={canManagePeople}
+            onUndone={undone} onError={(m) => showToast(m, 'error')} />
+        )}
+        {tab === 'services' && (loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>
         ) : (
           <TableContainer>
@@ -182,8 +217,16 @@ export default function ManageServices() {
                     </TableCell>
                     <TableCell align="right">
                       {canManagePeople ? (
-                        <Tooltip title="Edit"><IconButton size="small" onClick={() => openEdit(s)}>
-                          <EditIcon fontSize="small" /></IconButton></Tooltip>
+                        <>
+                          <Tooltip title="Edit"><IconButton size="small" onClick={() => openEdit(s)}>
+                            <EditIcon fontSize="small" /></IconButton></Tooltip>
+                          {s.staffrotaLocation && (
+                            <Tooltip title="Rename, merge or remove">
+                              <IconButton size="small" onClick={() => setBulk({ name: s.staffrotaLocation, initial: null })}>
+                                <RenameIcon fontSize="small" /></IconButton>
+                            </Tooltip>
+                          )}
+                        </>
                       ) : <Typography variant="caption" color="text.secondary">—</Typography>}
                     </TableCell>
                   </TableRow>
@@ -191,7 +234,7 @@ export default function ManageServices() {
               </TableBody>
             </Table>
           </TableContainer>
-        )}
+        ))}
       </Paper>
 
       <Dialog open={formOpen} onClose={() => setFormOpen(false)} maxWidth="sm" fullWidth>
@@ -245,6 +288,10 @@ export default function ManageServices() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ServiceBulkDialog open={!!bulk} region={region} name={bulk?.name} initial={bulk?.initial}
+        locations={services.filter((s) => s.active).map(rotaName)}
+        onClose={() => setBulk(null)} onDone={bulkDone} />
 
       <Snackbar open={!!toast} autoHideDuration={4500} onClose={() => setToast(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>

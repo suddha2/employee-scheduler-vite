@@ -20,6 +20,10 @@ export const API_ENDPOINTS = {
   services: `${API_BASE_URL}/api/service-locations`,
   manageServices: `${API_BASE_URL}/api/services`,
   manageServiceById: (id) => `${API_BASE_URL}/api/services/${id}`,
+  serviceNamesToFix: `${API_BASE_URL}/api/services/names-to-fix`,
+  serviceBulk: `${API_BASE_URL}/api/services/bulk`,
+  serviceBulkPreview: `${API_BASE_URL}/api/services/bulk/preview`,
+  serviceBulkUndo: (id) => `${API_BASE_URL}/api/services/bulk/${id}/undo`,
   
   // Employee Management
   employees: `${API_BASE_URL}/api/employees`,
