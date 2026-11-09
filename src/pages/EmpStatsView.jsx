@@ -15,6 +15,7 @@ import {
 import { API_ENDPOINTS } from "../api/endpoint";
 import axiosInstance from "../components/axiosInstance";
 import { shiftTypes } from "../components/shiftTypeGrading";
+import { usePersistedState } from "../hooks/usePersistedState";
 
 const stickyHeaderStyle = {
   position: "sticky",
@@ -64,7 +65,9 @@ export default function EmpStatsTable() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [nameFilter, setNameFilter] = useState('');
+  // Name filter is remembered per rota for this browser tab.
+  const statsRotaId = new URLSearchParams(window.location.search).get("id");
+  const [nameFilter, setNameFilter] = usePersistedState(`ui:empStats:name:${statsRotaId}`, '');
 
 
   useEffect(() => {

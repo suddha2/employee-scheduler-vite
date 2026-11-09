@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     Box,
     Autocomplete,
@@ -14,14 +14,19 @@ import {
 } from '@mui/material';
 import { Home, People, FileDownload } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { usePersistedState } from '../hooks/usePersistedState';
+import { usePersistedState, useSharedRegion } from '../hooks/usePersistedState';
 import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
 import { safeStorage } from '../utils/safeStorage';
 
 export default function ArchivedPayCycleView() {
-    const [location, setLocation, clearLocation] = usePersistedState('archived_paycycle_location', null);
+    // Region is shared with the other screens; year range is remembered for this tab.
+    const [region, setRegion] = useSharedRegion();
     const [locations, setLocations] = useState([]);
+    const location = useMemo(
+        () => (region ? locations.find((l) => l.label === region) || { value: null, label: region } : null),
+        [region, locations]
+    );
     const [loadingLocations, setLoadingLocations] = useState(true);
     const [loadingPeriods, setLoadingPeriods] = useState(false);
     const [error, setError] = useState(null);
@@ -29,7 +34,7 @@ export default function ArchivedPayCycleView() {
 
     const [allArchivedGroups, setAllArchivedGroups] = useState([]);
     const [loadingYearRanges, setLoadingYearRanges] = useState(true);
-    const [selectedYearRange, setSelectedYearRange] = useState(null);
+    const [selectedYearRange, setSelectedYearRange] = usePersistedState('ui:archived:yearRange', null);
     const [filteredPeriods, setFilteredPeriods] = useState([]);
 
     const navigate = useNavigate();
@@ -66,8 +71,10 @@ export default function ArchivedPayCycleView() {
             .then((res) => {
                 const groups = res.data.archivedGroups || [];
                 setAllArchivedGroups(groups);
+                // Keep the remembered year range if it still exists, else the newest.
                 if (groups.length > 0) {
-                    setSelectedYearRange(groups[0].yearRange);
+                    setSelectedYearRange((cur) =>
+                        groups.some((g) => g.yearRange === cur) ? cur : groups[0].yearRange);
                 }
             })
             .catch((err) => {
@@ -116,7 +123,12 @@ export default function ArchivedPayCycleView() {
         }
 
         return () => abortController.abort();
-    }, [location, selectedYearRange]);
+    }, [location?.label, selectedYearRange]);
+
+    // A remembered region that no longer exists is dropped.
+    useEffect(() => {
+        if (locations.length && region && !locations.some((l) => l.label === region)) setRegion('');
+    }, [locations]);
 
     const handleYearRangeChange = (yearRange) => {
         setSelectedYearRange(yearRange);
@@ -225,10 +237,10 @@ export default function ArchivedPayCycleView() {
                         <Autocomplete
                             options={locations}
                             getOptionLabel={(opt) => opt.label || ''}
-                            value={location}
+                            value={locations.find((l) => l.label === region) || null}
                             onChange={(e, val) => {
                                 const matched = locations.find(loc => loc.value === val?.value);
-                                setLocation(matched || null);
+                                setRegion(matched?.label || '');
                             }}
                             isOptionEqualToValue={(opt, val) => opt.value === val?.value}
                             renderInput={(params) => (

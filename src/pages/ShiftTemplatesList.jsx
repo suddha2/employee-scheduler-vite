@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { usePersistedState, getSharedRegion, setSharedRegion } from '../hooks/usePersistedState';
+
+const BLANK_FILTERS = { region: '', location: '', shiftType: '', dayOfWeek: '', showInactive: false };
 import {
     Box,
     Paper,
@@ -51,13 +54,13 @@ const ShiftTemplatesList = () => {
     const [templateToDelete, setTemplateToDelete] = useState(null);
 
     // Filter state
-    const [filters, setFilters] = useState({
-        region: '',
-        location: '',
-        shiftType: '',
-        dayOfWeek: '',
-        showInactive: false
-    });
+    // Remembered for this browser tab, so editing a template and coming back
+    // keeps the filters. First visit starts on the region last used elsewhere.
+    const [filters, setFilters] = usePersistedState('ui:templates:filters', () => ({
+        ...BLANK_FILTERS,
+        region: getSharedRegion(),
+    }));
+    const hasFilters = !!(filters.region || filters.location || filters.shiftType || filters.dayOfWeek || filters.showInactive);
 
     const [regions, setRegions] = useState([]);
     // Data-driven: loaded from GET /api/shift-types (all, incl. inactive — old
@@ -109,6 +112,13 @@ const ShiftTemplatesList = () => {
     useEffect(() => {
         applyFilters();
     }, [templates, filters]);
+
+    // A remembered region that no longer exists falls back to All.
+    useEffect(() => {
+        if (regions.length && filters.region && !regions.includes(filters.region)) {
+            setFilters((f) => ({ ...f, region: '' }));
+        }
+    }, [regions]);
 
     const fetchRegions = async () => {
         try {
@@ -257,7 +267,7 @@ const ShiftTemplatesList = () => {
                         <InputLabel>Region</InputLabel>
                         <Select
                             value={filters.region}
-                            onChange={(e) => setFilters({ ...filters, region: e.target.value })}
+                            onChange={(e) => { setFilters({ ...filters, region: e.target.value }); setSharedRegion(e.target.value); }}
                             label="Region"
                         >
                             <MenuItem value="">All</MenuItem>
@@ -311,6 +321,12 @@ const ShiftTemplatesList = () => {
                     >
                         {filters.showInactive ? 'Showing All' : 'Active Only'}
                     </Button>
+
+                    {hasFilters && (
+                        <Button color="error" onClick={() => setFilters(BLANK_FILTERS)}>
+                            Clear filters
+                        </Button>
+                    )}
                 </Box>
 
                 {/* Table */}

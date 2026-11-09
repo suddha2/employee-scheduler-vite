@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { usePersistedState, useSharedRegion } from '../hooks/usePersistedState';
 import {
   Box, Paper, Typography, Button, IconButton, Table, TableHead, TableBody, TableRow,
   TableCell, TableContainer, Chip, Tooltip, CircularProgress, Alert, Snackbar, Dialog,
@@ -23,7 +24,7 @@ export default function ManageServices() {
   const { canManagePeople } = useAuth();
 
   const [regions, setRegions] = useState([]);
-  const [region, setRegion] = useState('');
+  const [region, setRegion] = useSharedRegion();
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -34,7 +35,7 @@ export default function ManageServices() {
   const [rotaNameLocked, setRotaNameLocked] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [tab, setTab] = useState('services');
+  const [tab, setTab] = usePersistedState('ui:services:tab', 'services');
   const [bulk, setBulk] = useState(null); // { name, initial } while the bulk dialog is open
   const [bulkRun, setBulkRun] = useState(0); // bumps to reload the tabs after an update
 
@@ -43,6 +44,11 @@ export default function ManageServices() {
   useEffect(() => {
     axiosInstance.get(`${API_ENDPOINTS.shiftTemplates}/regions`).then((r) => setRegions(r.data || [])).catch(() => {});
   }, []);
+
+  // A remembered region that no longer exists is dropped.
+  useEffect(() => {
+    if (regions.length && region && !regions.includes(region)) setRegion('');
+  }, [regions]);
 
   const load = async () => {
     setLoading(true);

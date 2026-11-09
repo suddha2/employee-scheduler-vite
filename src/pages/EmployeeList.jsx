@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { usePersistedState, useRegionFilter, getSharedRegion } from '../hooks/usePersistedState';
 import {
     Box,
     Paper,
@@ -47,20 +48,26 @@ export default function EmployeeList() {
 
     // State management
     const [allEmployees, setAllEmployees] = useState([]); // ✅ Store all employees
-    const [filteredEmployees, setFilteredEmployees] = useState([]); // ✅ Filtered results
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Pagination state
-    const [page, setPage] = useState(0);
-    const [rowsPerPage, setRowsPerPage] = useState(10);
+    // Pagination and filters are remembered for this browser tab, so going to
+    // edit an employee and coming back lands on the same page and filters.
+    const [page, setPage] = usePersistedState('ui:employees:page', 0);
+    const [rowsPerPage, setRowsPerPage] = usePersistedState('ui:employees:rowsPerPage', 10);
 
-    // Filter state
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filterRegion, setFilterRegion] = useState('');
-    const [filterContractType, setFilterContractType] = useState('');
-    const [filterGender, setFilterGender] = useState('');
-    const [showFilters, setShowFilters] = useState(false);
+    const [searchTerm, setSearchTermRaw] = usePersistedState('ui:employees:search', '');
+    const [filterRegion, setFilterRegionRaw] = useRegionFilter('employees');
+    const [filterContractType, setFilterContractTypeRaw] = usePersistedState('ui:employees:contractType', '');
+    const [filterGender, setFilterGenderRaw] = usePersistedState('ui:employees:gender', '');
+    const [showFilters, setShowFilters] = usePersistedState('ui:employees:showFilters', () => !!getSharedRegion());
+
+    // A filter change goes back to the first page. (Done here, not in an
+    // effect, so restoring the saved filters on return keeps the saved page.)
+    const setSearchTerm = (v) => { setSearchTermRaw(v); setPage(0); };
+    const setFilterRegion = (v) => { setFilterRegionRaw(v); setPage(0); };
+    const setFilterContractType = (v) => { setFilterContractTypeRaw(v); setPage(0); };
+    const setFilterGender = (v) => { setFilterGenderRaw(v); setPage(0); };
 
     // Available filter options
     const [regions, setRegions] = useState([]);
@@ -79,7 +86,6 @@ export default function EmployeeList() {
             const data = response.data.content || response.data;
 
             setAllEmployees(data);
-            setFilteredEmployees(data); // Initially show all
 
         } catch (err) {
             console.error('Failed to fetch employees:', err);
@@ -89,8 +95,9 @@ export default function EmployeeList() {
         }
     };
 
-    // ✅ Apply filters to employees
-    const applyFilters = () => {
+    // Filtered list, recomputed from the loaded employees and the filters
+    // (also after a reload, e.g. toggling active, so filters stay applied).
+    const filteredEmployees = useMemo(() => {
         let filtered = [...allEmployees];
 
         // Search filter (firstName or lastName)
@@ -117,9 +124,8 @@ export default function EmployeeList() {
             filtered = filtered.filter(emp => emp.gender === filterGender);
         }
 
-        setFilteredEmployees(filtered);
-        setPage(0); // Reset to first page when filters change
-    };
+        return filtered;
+    }, [allEmployees, searchTerm, filterRegion, filterContractType, filterGender]);
 
     // Fetch regions for filter dropdown
     const fetchRegions = async () => {
@@ -137,12 +143,10 @@ export default function EmployeeList() {
         fetchEmployees();
     }, []);
 
-    // ✅ Apply filters when filter values change
+    // A remembered region that no longer exists falls back to All.
     useEffect(() => {
-        if (allEmployees.length > 0) {
-            applyFilters();
-        }
-    }, [searchTerm, filterRegion, filterContractType, filterGender]);
+        if (regions.length && filterRegion && !regions.includes(filterRegion)) setFilterRegionRaw('');
+    }, [regions]);
 
     // Event handlers
     const handleChangePage = (event, newPage) => {
@@ -210,10 +214,12 @@ export default function EmployeeList() {
         return colors[contractType] || 'default';
     };
 
-    // ✅ Get paginated employees from filtered results
+    // A saved page can be past the end if the list shrank since; show the last page.
+    const lastPage = Math.max(0, Math.ceil(filteredEmployees.length / rowsPerPage) - 1);
+    const safePage = loading ? page : Math.min(page, lastPage);
     const displayedEmployees = filteredEmployees.slice(
-        page * rowsPerPage,
-        page * rowsPerPage + rowsPerPage
+        safePage * rowsPerPage,
+        safePage * rowsPerPage + rowsPerPage
     );
 
     return (
@@ -273,7 +279,7 @@ export default function EmployeeList() {
                             >
                                 {showFilters ? 'Hide Filters' : 'Show Filters'}
                             </Button>
-                            {(filterRegion || filterContractType || filterGender) && (
+                            {(searchTerm || filterRegion || filterContractType || filterGender) && (
                                 <Button
                                     variant="outlined"
                                     color="error"
@@ -463,7 +469,7 @@ export default function EmployeeList() {
                         <TablePagination
                             component="div"
                             count={filteredEmployees.length}
-                            page={page}
+                            page={safePage}
                             onPageChange={handleChangePage}
                             rowsPerPage={rowsPerPage}
                             onRowsPerPageChange={handleChangeRowsPerPage}

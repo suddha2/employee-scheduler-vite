@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import { usePersistedState, useSharedRegion } from '../hooks/usePersistedState';
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress, Collapse, Dialog, DialogActions, DialogContent, DialogTitle,
   FormControl, FormControlLabel, IconButton, InputLabel, MenuItem, Paper, Select, Snackbar, Tab, Table, TableBody,
@@ -36,18 +37,29 @@ export default function StandingPins() {
   const { canManagePeople } = useAuth();
 
   const [regions, setRegions] = useState([]);
-  const [region, setRegion] = useState('');
+  const [region, setRegionRaw] = useSharedRegion();
   const [pins, setPins] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
-  const [tab, setTab] = useState('pins');
+  // Remembered for this browser tab. Ticked pins are deliberately NOT kept:
+  // coming back to old ticks and pressing Remove would remove the wrong pins.
+  const [tab, setTab] = usePersistedState('ui:pins:tab', 'pins');
 
-  const [house, setHouse] = useState('');
-  const [carer, setCarer] = useState('');
+  const [house, setHouse] = usePersistedState('ui:pins:house', '');
+  const [carer, setCarer] = usePersistedState('ui:pins:carer', '');
   const [selected, setSelected] = useState(new Set());
-  const [open, setOpen] = useState(new Set());
+  const [open, setOpen] = usePersistedState('ui:pins:open', () => new Set());
+
+  // House and carer belong to a region, so a new region starts them afresh.
+  const setRegion = (r) => {
+    if (r === region) return;
+    setHouse('');
+    setCarer('');
+    setOpen(new Set());
+    setRegionRaw(r);
+  };
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -65,9 +77,13 @@ export default function StandingPins() {
         axiosInstance.get(API_ENDPOINTS.standingPins, { params: { region } }),
         axiosInstance.get(API_ENDPOINTS.standingPinRemovals, { params: { region } }),
       ]);
-      setPins(p.data || []);
+      const list = p.data || [];
+      setPins(list);
       setHistory(h.data || []);
       setSelected(new Set());
+      // Drop a remembered house/carer that has no pins any more.
+      setHouse((v) => (v && !list.some((x) => x.location === v) ? '' : v));
+      setCarer((v) => (v && !list.some((x) => x.carer === v) ? '' : v));
     } catch (e) {
       setError(e.response?.data?.error || 'Failed to load pins');
     } finally {
@@ -76,10 +92,13 @@ export default function StandingPins() {
   };
 
   useEffect(() => {
-    setHouse('');
-    setCarer('');
     if (region) load(); else { setPins([]); setHistory([]); }
   }, [region]);
+
+  // A remembered region that no longer exists is dropped.
+  useEffect(() => {
+    if (regions.length && region && !regions.includes(region)) setRegion('');
+  }, [regions]);
 
   const houses = useMemo(() => [...new Set(pins.map((p) => p.location))].sort(), [pins]);
   const carers = useMemo(() => [...new Set(pins.map((p) => p.carer))].sort(), [pins]);

@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Routes, Route, Navigate } from 'react-router-dom';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { AuthProvider } from './contexts/AuthContext';
@@ -28,11 +28,26 @@ import CompareRotas from './pages/CompareRotas';
 import UsersAdminPage from './pages/UsersAdminPage';
 import { AxiosInterceptorSetup } from './components/AxiosInterceptorSetup';
 
+// The app runs inside a data router (createBrowserRouter) rather than
+// <BrowserRouter> so screens can use useBlocker — the rota screen uses it to
+// warn before leaving with unsaved changes. All routes still live in the
+// <Routes> below, under one catch-all route.
+const router = createBrowserRouter([
+  { path: '*', element: <ErrorBoundary><AppRoutes /></ErrorBoundary> },
+]);
+
 export default function App() {
   return (
     <ErrorBoundary>
       <LocalizationProvider dateAdapter={AdapterDateFns}>
-        <Router>
+        <RouterProvider router={router} />
+      </LocalizationProvider>
+    </ErrorBoundary>
+  );
+}
+
+function AppRoutes() {
+  return (
           <AuthProvider>
             <AxiosInterceptorSetup />
             <ShiftRequestsProvider>
@@ -195,9 +210,6 @@ export default function App() {
               </Routes>
             </ShiftRequestsProvider>
           </AuthProvider>
-        </Router>
-      </LocalizationProvider>
-    </ErrorBoundary>
   );
 }
 

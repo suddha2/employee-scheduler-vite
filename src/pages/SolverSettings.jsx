@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { usePersistedState } from '../hooks/usePersistedState';
 import {
   Box, Paper, Typography, Tabs, Tab, Table, TableHead, TableBody, TableRow, TableCell,
   TableContainer, TextField, Select, MenuItem, Switch, IconButton, Tooltip, Chip, Alert,
@@ -17,7 +18,7 @@ export default function SolverSettings() {
   const { canManagePeople } = useAuth();
   const readOnly = !canManagePeople;
 
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = usePersistedState('ui:solverSettings:tab', 0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);

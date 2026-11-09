@@ -24,8 +24,14 @@ import {
 export default function DiscardChangesDialog({ 
   open, 
   onClose, 
-  onConfirm, 
-  pendingChanges = [] 
+  onConfirm,
+  pendingChanges = [],
+  // Optional wording, used by the "leave this rota?" prompt. When a
+  // cancelLabel is given, Cancel (the safe choice) gets the focus.
+  title = 'Discard Changes?',
+  message = 'Are you sure you want to discard them?',
+  cancelLabel,
+  confirmLabel = 'Discard Changes',
 }) {
   const assignedCount = pendingChanges.filter(c => c.changeType === 'ASSIGNED').length;
   const unassignedCount = pendingChanges.filter(c => c.changeType === 'UNASSIGNED').length;
@@ -40,13 +46,13 @@ export default function DiscardChangesDialog({
     >
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <WarningIcon color="warning" />
-        Discard Changes?
+        {title}
       </DialogTitle>
-      
+
       <DialogContent>
         <DialogContentText sx={{ mb: 2 }}>
-          You have <strong>{pendingChanges.length} unsaved changes</strong>. 
-          Are you sure you want to discard them?
+          You have <strong>{pendingChanges.length} unsaved changes</strong>.
+          {message}
         </DialogContentText>
 
         <Alert severity="warning" sx={{ mb: 2 }}>
@@ -94,19 +100,20 @@ export default function DiscardChangesDialog({
         <Button 
           onClick={onClose}
           variant="outlined"
+          autoFocus={!!cancelLabel}
         >
-          Cancel
+          {cancelLabel || 'Cancel'}
         </Button>
-        <Button 
+        <Button
           onClick={() => {
             onConfirm();
             onClose();
           }}
           variant="contained"
           color="error"
-          autoFocus
+          autoFocus={!cancelLabel}
         >
-          Discard Changes
+          {confirmLabel}
         </Button>
       </DialogActions>
     </Dialog>

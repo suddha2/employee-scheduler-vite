@@ -21,6 +21,7 @@ import {
 import { format } from "date-fns";
 import { parseLocalDate } from "../utils/dates";
 import { useDraggable, DragOverlay } from "@dnd-kit/core";
+import { usePersistedState } from "../hooks/usePersistedState";
 import { shiftColors, shiftTypes, getPriorityColor, shiftTypeShortText } from "../components/shiftTypeGrading";
 
 const SHIFT_COLUMN_WIDTH = 24;
@@ -238,27 +239,35 @@ export default function FloatingEmployeeList({
   slotFilterInfo = null,
   onClearSlotFilter,
 }) {
-  const [open, setOpen] = useState(true);
+  // Panel state is remembered for this browser tab, so going to the stats
+  // screens and back keeps the panel as it was. The search is per rota.
+  const rotaKey = new URLSearchParams(window.location.search).get("id") || "fresh";
+  const [open, setOpen] = usePersistedState("ui:rota:panelOpen", true);
   const [activeId, setActiveId] = useState(null);
   const columnWidths = [200, 150, 150, 150, 150, 150, 150, 150];
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = usePersistedState(`ui:rota:search:${rotaKey}`, "");
   // 'inRegion' = current rota's employees (existing), 'outOfRegion' = staff
   // from other regions in the same paycycle period. Tab state lives here so
   // the parent doesn't need to track it — parent just provides the data and
   // a lazy-load callback fired on first switch.
-  const [activeTab, setActiveTab] = useState("inRegion");
+  const [activeTab, setActiveTab] = usePersistedState("ui:rota:panelTab", "inRegion");
   const dragging = useRef(false);
   const offset = useRef({ x: 0, y: 0 });
   const NAVBAR_HEIGHT = 64;
   const BOTTOM_BAR_HEIGHT = 56;
   const LIST_HEIGHT = 400; // or measure dynamically if needed
   const LIST_WIDTH = 260;
-  const [position, setPosition] = useState({
+  // Kept inside the window even if it was saved on a bigger screen.
+  const [savedPosition, setPosition] = usePersistedState("ui:rota:panelPosition", () => ({
     top: 250,
     left: window.innerWidth - LIST_WIDTH - 30, // 30px margin from right edge
-  });
+  }));
+  const position = {
+    top: Math.max(NAVBAR_HEIGHT, Math.min(savedPosition.top, window.innerHeight - BOTTOM_BAR_HEIGHT - LIST_HEIGHT)),
+    left: Math.max(0, Math.min(savedPosition.left, window.innerWidth - LIST_WIDTH)),
+  };
 
-  const [contractFilter, setContractFilter] = useState("All");
+  const [contractFilter, setContractFilter] = usePersistedState("ui:rota:contractFilter", "All");
 
   // Other-Regions-only: optional region filter, plus whether its expandable
   // section is open. Filter persists when toggling tabs (so the user can
@@ -279,6 +288,15 @@ export default function FloatingEmployeeList({
 
   const isOutTab = activeTab === "outOfRegion";
   const sourceList = isOutTab ? (outOfRegionEmployees || []) : employees;
+
+  // Opened on the remembered "Other Regions" tab: load that list now, as the
+  // tab switch that normally triggers it won't happen. (Not after an error,
+  // so a failed load doesn't retry in a loop.)
+  useEffect(() => {
+    if (isOutTab && outOfRegionEmployees == null && !outOfRegionLoading && !outOfRegionError) {
+      onRequestOutOfRegion?.();
+    }
+  }, [isOutTab, outOfRegionEmployees, outOfRegionLoading, outOfRegionError]);
 
   // Reset the region filter when the underlying out-of-region list reloads
   // (parent sets it to null when navigating to a different schedule).

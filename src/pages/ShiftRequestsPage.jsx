@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { usePersistedState } from '../hooks/usePersistedState';
 import {
   Box,
   Typography,
@@ -75,7 +76,7 @@ export default function ShiftRequestsPage() {
   // without the action buttons.
   const { canResolveRequests } = useAuth();
 
-  const [statusFilter, setStatusFilter] = useState('PENDING');
+  const [statusFilter, setStatusFilter] = usePersistedState('ui:shiftRequests:status', 'PENDING');
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

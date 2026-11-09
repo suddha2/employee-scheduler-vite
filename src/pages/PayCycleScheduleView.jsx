@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     Box,
     Select,
@@ -22,7 +22,7 @@ import { DatePicker } from '@mui/x-date-pickers';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { useRequestUpdates } from '../components/useRequestUpdates';
-import { usePersistedState } from '../hooks/usePersistedState';
+import { useSharedRegion, readPersisted, writePersisted } from '../hooks/usePersistedState';
 
 import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
@@ -30,8 +30,14 @@ import { safeStorage } from '../utils/safeStorage';
 
 
 export default function PayCycleSchedule() {
-    const [location, setLocation, clearLocation] = usePersistedState('paycycle_location', null);
+    // The region is shared with the other screens (Services, Standing Pins,
+    // Archived...), so picking it once carries across.
+    const [region, setRegion] = useSharedRegion();
     const [locations, setLocations] = useState([]);
+    const location = useMemo(
+        () => (region ? locations.find((l) => l.label === region) || { value: null, label: region } : null),
+        [region, locations]
+    );
     const [periods, setPeriods] = useState([]);
     const [loadingLocations, setLoadingLocations] = useState(true);
     const [loadingPeriods, setLoadingPeriods] = useState(false);
@@ -61,8 +67,18 @@ export default function PayCycleSchedule() {
     // Custom (ad-hoc) date range — VIEW: open the schedule for this region+period.
     // If it's already solved, the view shows it (edit/save as usual); if it's a fresh
     // period, the view opens in an unsolved state where the user runs auto mode.
-    const [customStart, setCustomStart] = useState(null);
-    const [customEnd, setCustomEnd] = useState(null);
+    // Remembered for this browser tab (only complete, valid dates are saved).
+    const restoreDate = (key) => {
+        const s = readPersisted(key, null);
+        return s ? dayjs(s).toDate() : null;
+    };
+    const [customStart, setCustomStart] = useState(() => restoreDate('ui:paycycle:customStart'));
+    const [customEnd, setCustomEnd] = useState(() => restoreDate('ui:paycycle:customEnd'));
+    useEffect(() => {
+        const save = (key, d) => writePersisted(key, d && dayjs(d).isValid() ? dayjs(d).format('YYYY-MM-DD') : null);
+        save('ui:paycycle:customStart', customStart);
+        save('ui:paycycle:customEnd', customEnd);
+    }, [customStart, customEnd]);
 
     const handleCustomView = async () => {
         if (!location) { setError('Pick a location first'); return; }
@@ -201,7 +217,12 @@ export default function PayCycleSchedule() {
         return () => {
             abortController.abort(); // Cancel pending request when location changes
         };
-    }, [location]);
+    }, [location?.label]);
+
+    // A remembered region that no longer exists is dropped.
+    useEffect(() => {
+        if (locations.length && region && !locations.some((l) => l.label === region)) setRegion('');
+    }, [locations]);
     // const handleViewClick = (id) => {
     //     console.log("handleViewClick = ", id);
     //     //navigate(`/schedules?id=${id}`);
@@ -517,12 +538,11 @@ export default function PayCycleSchedule() {
                     <Autocomplete
                         options={locations}
                         getOptionLabel={(opt) => opt.label || ''}
-                        value={location}
+                        value={locations.find((l) => l.label === region) || null}
                         onChange={(e, val) => {
                             const matched = locations.find(loc => loc.value === val?.value);
-                            console.log("Selected location: ", matched);
-                            setLocation(matched || null);
-                            if (matched) loadCardData(matched);
+                            // The effect on location reloads the periods.
+                            setRegion(matched?.label || '');
                         }}
                         isOptionEqualToValue={(opt, val) => opt.value === val?.value}
                         renderInput={(params) => (

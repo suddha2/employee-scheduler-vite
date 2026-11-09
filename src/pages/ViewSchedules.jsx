@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   Table, TableHead, TableBody, TableRow, TableCell,
   TableContainer, Paper, Typography, Box, Tooltip, Button, CircularProgress,
@@ -24,7 +24,7 @@ import { format } from "date-fns";
 import { DndContext, DragOverlay, pointerWithin } from "@dnd-kit/core";
 import { useVirtualizer } from '@tanstack/react-virtual';
 import FloatingEmployeeList from "./FloatingEmployeeList";
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useBlocker } from 'react-router-dom';
 import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
 import LiveSolvePanel from '../components/LiveSolvePanel';
@@ -251,6 +251,24 @@ export default function ViewSchedules() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
+
+  // Unsaved edits: ask before leaving this rota by any in-app route (sidebar,
+  // breadcrumbs, back button, browser back). Going to /login is let through:
+  // that's a sign-out or an expired session, where staying can't save anyway.
+  const hasUnsavedChanges = pendingChanges.length > 0;
+  const leaveBlocker = useBlocker(useCallback(({ currentLocation, nextLocation }) =>
+    hasUnsavedChanges
+      && nextLocation.pathname !== '/login'
+      && (currentLocation.pathname !== nextLocation.pathname || currentLocation.search !== nextLocation.search),
+  [hasUnsavedChanges]));
+
+  // Closing or reloading the browser tab: the browser shows its own prompt.
+  useEffect(() => {
+    if (!hasUnsavedChanges) return undefined;
+    const warn = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [hasUnsavedChanges]);
 
   useEffect(() => {
     if (!id) { setSkippedPins([]); return; }
@@ -1821,6 +1839,16 @@ export default function ViewSchedules() {
         onClose={() => setDiscardDialogOpen(false)}
         onConfirm={handleConfirmDiscard}
         pendingChanges={pendingChanges}
+      />
+      <DiscardChangesDialog
+        open={leaveBlocker.state === 'blocked'}
+        onClose={() => { if (leaveBlocker.state === 'blocked') leaveBlocker.reset(); }}
+        onConfirm={() => leaveBlocker.proceed()}
+        pendingChanges={pendingChanges}
+        title="Leave without saving?"
+        message="This rota has unsaved changes. If you leave now they will be lost."
+        cancelLabel="Stay on this rota"
+        confirmLabel="Leave without saving"
       />
 
       <Dialog

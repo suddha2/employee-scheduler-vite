@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { usePersistedState } from '../hooks/usePersistedState';
 import {
   Box, Paper, Typography, Button, IconButton, Table, TableHead, TableBody, TableRow,
   TableCell, TableContainer, Chip, Tooltip, CircularProgress, Alert, Snackbar, Dialog,
@@ -56,7 +57,7 @@ export default function ManageShiftTypes() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
-  const [showInactive, setShowInactive] = useState(true);
+  const [showInactive, setShowInactive] = usePersistedState('ui:shiftTypes:showInactive', true);
 
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState('create'); // 'create' | 'edit'
