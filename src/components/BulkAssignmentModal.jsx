@@ -267,7 +267,7 @@ export default function BulkAssignmentModal({
             };
         }
 
-        const dateLabel = format(parseLocalDate(cell.date), 'MMM d');
+        const dateLabel = format(parseLocalDate(cell.date), 'dd/MM');
         const slotLabel = cell.empCount > 1
             ? ` · ${cell.assignedCount}/${cell.empCount} slots filled`
             : '';
@@ -397,7 +397,7 @@ export default function BulkAssignmentModal({
                             <Box>
                                 <Typography variant="body1">Single Assignment</Typography>
                                 <Typography variant="caption" color="text.secondary">
-                                    Assign only to {format(parseLocalDate(targetCellKey.split('|')[2]), 'MMM d')}
+                                    Assign only to {format(parseLocalDate(targetCellKey.split('|')[2]), 'dd/MM')}
                                 </Typography>
                             </Box>
                         }
@@ -524,7 +524,7 @@ export default function BulkAssignmentModal({
                                                             display: 'inline-block',
                                                         }}
                                                     >
-                                                        {format(cellDate, 'MMM d')}
+                                                        {format(cellDate, 'dd/MM')}
                                                     </Typography>
                                                 ) : null;
 

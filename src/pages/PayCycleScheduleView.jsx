@@ -27,6 +27,7 @@ import { useSharedRegion, readPersisted, writePersisted } from '../hooks/usePers
 import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
 import { safeStorage } from '../utils/safeStorage';
+import { fmtDate } from '../utils/dates';
 
 
 export default function PayCycleSchedule() {
@@ -647,7 +648,7 @@ export default function PayCycleSchedule() {
                                         </Typography>
 
                                         <Typography variant="body2" color="text.secondary">
-                                            {currentPeriod.startDate} → {currentPeriod.endDate}
+                                            {fmtDate(currentPeriod.startDate)} → {fmtDate(currentPeriod.endDate)}
                                         </Typography>
 
                                         <Box sx={{ mt: 1 }}>
@@ -864,7 +865,7 @@ export default function PayCycleSchedule() {
                 <DialogContent>
                     {modeDialog.action === 'custom' && modeDialog.period && (
                         <Typography variant="body2" sx={{ mb: 1 }}>
-                            {modeDialog.period.startDate} → {modeDialog.period.endDate}
+                            {fmtDate(modeDialog.period.startDate)} → {fmtDate(modeDialog.period.endDate)}
                         </Typography>
                     )}
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>

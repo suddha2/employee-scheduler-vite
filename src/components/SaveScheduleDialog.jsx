@@ -27,6 +27,7 @@ import {
 import axiosInstance from './axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
 import { safeStorage } from '../utils/safeStorage';
+import { fmtDate } from '../utils/dates';
 
 export default function SaveScheduleDialog({
   open,
@@ -182,7 +183,7 @@ export default function SaveScheduleDialog({
 
   // Generate default label if empty
   const suggestedLabel = versionLabel ||
-    `Manual Edit - ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+    `Manual Edit - ${fmtDate(new Date())}`;
 
   return (
     <Dialog

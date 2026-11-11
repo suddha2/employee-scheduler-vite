@@ -18,6 +18,7 @@ import { usePersistedState, useSharedRegion } from '../hooks/usePersistedState';
 import { API_ENDPOINTS } from '../api/endpoint';
 import axiosInstance from '../components/axiosInstance';
 import { safeStorage } from '../utils/safeStorage';
+import { fmtDate } from '../utils/dates';
 
 export default function ArchivedPayCycleView() {
     // Region is shared with the other screens; year range is remembered for this tab.
@@ -284,7 +285,7 @@ export default function ArchivedPayCycleView() {
                                         {location?.label} | {period.name || `Period ${index + 1}`}
                                     </Typography>
                                     <Typography variant="body2" color="text.secondary">
-                                        {period.startDate} → {period.endDate}
+                                        {fmtDate(period.startDate)} → {fmtDate(period.endDate)}
                                     </Typography>
 
                                     <Box sx={{ mt: 1 }}>

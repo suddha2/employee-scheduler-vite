@@ -4,6 +4,7 @@ import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Table, Table
 import axiosInstance from './axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
 import { useAuth } from '../contexts/AuthContext';
+import { fmtDate } from '../utils/dates';
 
 /**
  * Standing pins the solver did not apply when this rota was generated, and why (carer has
@@ -53,7 +54,7 @@ export default function SkippedPinsDialog({ open, onClose, pins }) {
           <TableBody>
             {(pins || []).map((p) => (
               <TableRow key={p.id}>
-                <TableCell sx={{ whiteSpace: 'nowrap' }}>{p.shiftDate}</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>{fmtDate(p.shiftDate)}</TableCell>
                 <TableCell>{p.employeeName || `#${p.employeeId}`}</TableCell>
                 <TableCell>{p.location} · {(p.shiftType || '').replaceAll('_', ' ')}</TableCell>
                 <TableCell>{p.reason}</TableCell>

@@ -67,7 +67,7 @@ export default function ConflictDialog({
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
             <CalendarIcon fontSize="small" color="action" />
             <Typography variant="body2">
-              {format(new Date(targetShift.date), 'EEEE, MMMM d, yyyy')}
+              {format(new Date(targetShift.date), 'EEEE dd/MM/yyyy')}
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>

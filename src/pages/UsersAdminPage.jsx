@@ -48,6 +48,7 @@ import {
     ROLE_LABELS,
 } from '../api/users';
 import { useAuth } from '../contexts/AuthContext';
+import { fmtDate } from '../utils/dates';
 
 const ROLE_CHIP_COLOR = {
     ADMIN:       'error',
@@ -266,7 +267,7 @@ export default function UsersAdminPage() {
                                             </TableCell>
                                             <TableCell>
                                                 <Typography variant="caption" color="text.secondary">
-                                                    {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}
+                                                    {fmtDate(u.createdAt)}
                                                 </Typography>
                                             </TableCell>
                                             <TableCell align="right">

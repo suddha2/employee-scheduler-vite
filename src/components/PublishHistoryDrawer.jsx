@@ -11,12 +11,13 @@ import CloseIcon from '@mui/icons-material/Close';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import { fetchServicePublishLog } from '../api/stats';
+import { fmtDateTime } from '../utils/dates';
 
 // One audit-trail entry: when it was published, by whom, the shift count, the
 // broadcast outcome and (if any) the notification text.
 function PublishLogRow({ entry }) {
   const when = entry.publishedAt
-    ? new Date(entry.publishedAt).toLocaleString()
+    ? fmtDateTime(entry.publishedAt)
     : '—';
   const sent = entry.broadcastSent;
   const count = entry.unallocatedCount ?? 0;

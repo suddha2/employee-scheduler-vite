@@ -7,6 +7,7 @@ import { Compare as CompareIcon } from '@mui/icons-material';
 import { useSearchParams } from 'react-router-dom';
 import axiosInstance from '../components/axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
+import { fmtDate } from '../utils/dates';
 
 // Metric rows: key, label, tooltip, and `better` = which direction is "good"
 // ('high' | 'low' | null). Used to highlight the stronger column.
@@ -83,7 +84,7 @@ export default function CompareRotas() {
           <Chip size="small" label={s.profile} color={PROFILE_COLOR[s.profile] || 'default'} sx={{ alignSelf: 'flex-start' }} />
         )}
         {s.found && s.startDate && (
-          <Typography variant="caption" color="text.secondary">{s.startDate} → {s.endDate}</Typography>
+          <Typography variant="caption" color="text.secondary">{fmtDate(s.startDate)} → {fmtDate(s.endDate)}</Typography>
         )}
         {s.found && s.region && <Typography variant="caption" color="text.secondary">{s.region}</Typography>}
       </Box>

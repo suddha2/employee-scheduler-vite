@@ -373,7 +373,7 @@ export default function FloatingEmployeeList({
   if (slotFilterInfo) {
     let dateLabel = slotFilterInfo.date;
     try {
-      dateLabel = format(parseLocalDate(slotFilterInfo.date), 'EEE d MMM');
+      dateLabel = format(parseLocalDate(slotFilterInfo.date), 'EEE dd/MM/yyyy');
     } catch { /* fallback to raw date string */ }
     slotFilterLabel = `Free on ${dateLabel}`;
   }

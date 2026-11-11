@@ -115,7 +115,7 @@ export default function VersionHistorySidebar({
   const formatDate = (dateString) => {
     if (!dateString) return 'Unknown';
     try {
-      return format(new Date(dateString), 'MMM dd, yyyy HH:mm');
+      return format(new Date(dateString), 'dd/MM/yyyy HH:mm');
     } catch (e) {
       return dateString;
     }

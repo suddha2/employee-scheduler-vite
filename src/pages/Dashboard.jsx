@@ -7,10 +7,11 @@ import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../components/axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
 import { useAuth } from '../contexts/AuthContext';
+import { fmtWeekdayDate } from '../utils/dates';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const parseDate = (d) => new Date(`${d}T00:00:00`);
-const longDate = (d) => parseDate(d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+const longDate = (d) => fmtWeekdayDate(parseDate(d));
 const daysBetween = (from, to) => Math.round((parseDate(to) - parseDate(from)) / DAY_MS);
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const sum = (rows, pick) => rows.reduce((total, r) => total + pick(r), 0);

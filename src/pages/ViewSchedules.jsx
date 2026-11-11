@@ -1531,7 +1531,7 @@ export default function ViewSchedules() {
             let dateLabel = slotFilterInfo.date;
             try {
               const d = new Date(`${slotFilterInfo.date}T00:00:00`);
-              dateLabel = format(d, 'EEE d MMM');
+              dateLabel = format(d, 'EEE dd/MM/yyyy');
             } catch { /* keep raw */ }
             const label = `Free on ${dateLabel} · ${slotFilterInfo.location} · ${slotFilterInfo.startTime}`;
             return (

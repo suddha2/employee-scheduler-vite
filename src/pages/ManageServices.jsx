@@ -227,7 +227,7 @@ export default function ManageServices() {
                           <Tooltip title="Edit"><IconButton size="small" onClick={() => openEdit(s)}>
                             <EditIcon fontSize="small" /></IconButton></Tooltip>
                           {s.staffrotaLocation && (
-                            <Tooltip title="Rename, merge or remove">
+                            <Tooltip title="Rename, merge, remove or close">
                               <IconButton size="small" onClick={() => setBulk({ name: s.staffrotaLocation, initial: null })}>
                                 <RenameIcon fontSize="small" /></IconButton>
                             </Tooltip>

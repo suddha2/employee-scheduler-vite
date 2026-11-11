@@ -33,7 +33,7 @@ function parseScore(score) {
 const fmtDate = (d) => {
   if (!d) return '';
   try {
-    return format(parseLocalDate(d), 'EEE d MMM');
+    return format(parseLocalDate(d), 'EEE dd/MM/yyyy');
   } catch {
     return d;
   }

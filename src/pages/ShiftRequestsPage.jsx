@@ -39,7 +39,7 @@ const SUMMARY_RANK = { STRONG: 0, OK: 1, WEAK: 2 };
 
 function formatShiftLine(shift) {
   if (!shift) return '';
-  const dateLabel = format(new Date(`${shift.shiftStart}T00:00:00`), 'EEE d MMM');
+  const dateLabel = format(new Date(`${shift.shiftStart}T00:00:00`), 'EEE dd/MM/yyyy');
   const start = (shift.startTime || '').slice(0, 5);
   const end = (shift.endTime || '').slice(0, 5);
   const type = (shift.shiftType || '').replaceAll('_', ' ');

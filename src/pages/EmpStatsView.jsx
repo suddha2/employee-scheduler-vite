@@ -89,7 +89,7 @@ export default function EmpStatsTable() {
   const formatDate = (dateString) => {
     if (!dateString) return "";
     const [year, month, day] = dateString.split('-');
-    return `${day}-${month}-${year}`;
+    return `${day}/${month}/${year}`;
   };
 
   if (loading) {

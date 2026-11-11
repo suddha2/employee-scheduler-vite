@@ -10,9 +10,10 @@ const ACTIONS = [
   ['RENAME', 'Rename', 'Change this name everywhere it is used.'],
   ['MERGE', 'Merge into another location', 'Move everything onto an existing location. A carer listing both keeps the higher weight.'],
   ['REMOVE', 'Remove from carers', 'Take this name off carers’ services and restricted lists. Shift templates are not touched.'],
+  ['CLOSE', 'Close the house', 'For a house that has moved or shut: take it off carers’ lists and switch off its shift templates, so new rotas have no shifts there. Past rotas are kept. Undo brings everything back.'],
 ];
 
-const needsNewName = (action) => action !== 'REMOVE';
+const needsNewName = (action) => action !== 'REMOVE' && action !== 'CLOSE';
 
 // Rename, merge or remove one service name. Nothing is saved until the user has seen the preview.
 export default function ServiceBulkDialog({ open, region, name, initial, locations, onClose, onDone }) {
@@ -62,7 +63,9 @@ export default function ServiceBulkDialog({ open, region, name, initial, locatio
   };
 
   const summary = preview ? [
-    [preview.templates, 'shift template'],
+    action === 'CLOSE'
+      ? [preview.templates, 'shift template switched off', 'shift templates switched off']
+      : [preview.templates, 'shift template'],
     [preview.carerServices.length, 'carer service list'],
     [preview.carerRestrictions.length, 'carer restricted list'],
     [preview.services, 'service record'],
@@ -100,7 +103,7 @@ export default function ServiceBulkDialog({ open, region, name, initial, locatio
         {preview && (
           <Box sx={{ mt: 2 }}>
             <Alert severity="info">
-              This will change: {summary.map(([n, label]) => `${n} ${label}${n === 1 ? '' : 's'}`).join(', ')}.
+              This will change: {summary.map(([n, label, plural]) => `${n} ${n === 1 ? label : (plural || `${label}s`)}`).join(', ')}.
             </Alert>
             {preview.warnings.map((w) => <Alert key={w} severity="warning" sx={{ mt: 1 }}>{w}</Alert>)}
             {preview.carerServices.length > 0 && (

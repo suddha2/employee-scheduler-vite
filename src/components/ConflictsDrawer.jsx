@@ -81,7 +81,7 @@ export default function ConflictsDrawer({
             {items.map((item) => {
               let dateLabel = item.date;
               try {
-                dateLabel = format(parseLocalDate(item.date), 'EEE d MMM');
+                dateLabel = format(parseLocalDate(item.date), 'EEE dd/MM/yyyy');
               } catch {
                 // fall back to raw string
               }

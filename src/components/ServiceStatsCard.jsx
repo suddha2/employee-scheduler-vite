@@ -29,6 +29,7 @@ import HistoryIcon from '@mui/icons-material/History';
 import { formatDistanceToNow } from 'date-fns';
 import { publishUnallocatedShiftsForService } from '../api/stats';
 import PublishHistoryDrawer from './PublishHistoryDrawer';
+import { fmtDateTime, fmtDate } from '../utils/dates';
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const ONE_DAY_MS = 24 * ONE_HOUR_MS;
@@ -60,6 +61,8 @@ function recencyLabel(lastPublishedAt) {
     return 'Published recently';
   }
 }
+
+const fmtPeriod = (p) => (p ? p.split(':').map((d) => fmtDate(d)).join(' → ') : '');
 
 function aggregateByShiftType(allStats) {
   const map = new Map();
@@ -226,7 +229,7 @@ export default function ServiceStatsCard({
             />
           </Box>
           <Typography variant="body2" color="text.secondary">
-            Region: {region.region} | Period: {region.period}
+            Region: {region.region} | Period: {fmtPeriod(region.period)}
           </Typography>
         </Box>
 
@@ -269,7 +272,7 @@ export default function ServiceStatsCard({
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Typography variant="subtitle2">
-                    Week {week.weekNumber} ({week.start} → {week.end})
+                    Week {week.weekNumber} ({fmtDate(week.start)} → {fmtDate(week.end)})
                   </Typography>
                   {hasIncompleteCoverage && (
                     <Tooltip title="Incomplete coverage">
@@ -331,7 +334,7 @@ export default function ServiceStatsCard({
           >
             <Tooltip
               title={publishHistory?.lastPublishedAt
-                ? `Last broadcast: ${new Date(publishHistory.lastPublishedAt).toLocaleString()}`
+                ? `Last broadcast: ${fmtDateTime(publishHistory.lastPublishedAt)}`
                 : 'No previous broadcast for this service.'}
             >
               <Badge

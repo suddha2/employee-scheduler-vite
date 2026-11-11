@@ -5,7 +5,7 @@ import {
 import axiosInstance from './axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
 
-const LABEL = { RENAME: 'Rename', MERGE: 'Merge', REMOVE: 'Remove' };
+const LABEL = { RENAME: 'Rename', MERGE: 'Merge', REMOVE: 'Remove', CLOSE: 'Close house' };
 
 const when = (v) => (v ? new Date(v).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' }) : '—');
 

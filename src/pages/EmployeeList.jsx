@@ -54,7 +54,7 @@ export default function EmployeeList() {
     // Pagination and filters are remembered for this browser tab, so going to
     // edit an employee and coming back lands on the same page and filters.
     const [page, setPage] = usePersistedState('ui:employees:page', 0);
-    const [rowsPerPage, setRowsPerPage] = usePersistedState('ui:employees:rowsPerPage', 10);
+    const [rowsPerPage, setRowsPerPage] = usePersistedState('ui:employees:rowsPerPage', 25);
 
     const [searchTerm, setSearchTermRaw] = usePersistedState('ui:employees:search', '');
     const [filterRegion, setFilterRegionRaw] = useRegionFilter('employees');
@@ -214,12 +214,16 @@ export default function EmployeeList() {
         return colors[contractType] || 'default';
     };
 
+    // With a region chosen the whole region is shown in one scrolling list (a region is
+    // under a hundred people); otherwise pages, where -1 means "All".
+    const showAll = !!filterRegion || rowsPerPage === -1;
+    const pageSize = showAll ? Math.max(1, filteredEmployees.length) : rowsPerPage;
     // A saved page can be past the end if the list shrank since; show the last page.
-    const lastPage = Math.max(0, Math.ceil(filteredEmployees.length / rowsPerPage) - 1);
-    const safePage = loading ? page : Math.min(page, lastPage);
-    const displayedEmployees = filteredEmployees.slice(
-        safePage * rowsPerPage,
-        safePage * rowsPerPage + rowsPerPage
+    const lastPage = Math.max(0, Math.ceil(filteredEmployees.length / pageSize) - 1);
+    const safePage = showAll ? 0 : (loading ? page : Math.min(page, lastPage));
+    const displayedEmployees = showAll ? filteredEmployees : filteredEmployees.slice(
+        safePage * pageSize,
+        safePage * pageSize + pageSize
     );
 
     return (
@@ -372,8 +376,8 @@ export default function EmployeeList() {
                 ) : (
                     <>
                         {/* Table */}
-                        <TableContainer>
-                            <Table>
+                        <TableContainer sx={showAll ? { maxHeight: 'calc(100vh - 320px)' } : undefined}>
+                            <Table stickyHeader={showAll}>
                                 <TableHead>
                                     <TableRow>
                                         <TableCell><strong>ID</strong></TableCell>
@@ -445,13 +449,16 @@ export default function EmployeeList() {
                                                                 <EditIcon />
                                                             </IconButton>
 
+                                                            {/* The icon shows the carer's status (open eye = active);
+                                                                clicking switches it. */}
                                                             <IconButton
-                                                                color={employee.active ? 'warning' : 'success'}
+                                                                color={employee.active ? 'success' : 'default'}
                                                                 onClick={() => handleToggleActive(employee.id)}
                                                                 size="small"
-                                                                title={employee.active ? 'Deactivate' : 'Activate'}
+                                                                title={employee.active ? 'Active: click to deactivate' : 'Inactive: click to activate'}
+                                                                aria-label={employee.active ? 'Active: click to deactivate' : 'Inactive: click to activate'}
                                                             >
-                                                                {employee.active ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                                                {employee.active ? <VisibilityIcon /> : <VisibilityOffIcon />}
                                                             </IconButton>
                                                         </>
                                                     ) : (
@@ -465,16 +472,22 @@ export default function EmployeeList() {
                             </Table>
                         </TableContainer>
 
-                        {/* Pagination */}
-                        <TablePagination
-                            component="div"
-                            count={filteredEmployees.length}
-                            page={safePage}
-                            onPageChange={handleChangePage}
-                            rowsPerPage={rowsPerPage}
-                            onRowsPerPageChange={handleChangeRowsPerPage}
-                            rowsPerPageOptions={[5, 10, 25, 50]}
-                        />
+                        {/* Pagination (not needed when a region's whole list is shown) */}
+                        {filterRegion ? (
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5, textAlign: 'right' }}>
+                                {filteredEmployees.length} {filteredEmployees.length === 1 ? 'person' : 'people'} in {filterRegion}
+                            </Typography>
+                        ) : (
+                            <TablePagination
+                                component="div"
+                                count={filteredEmployees.length}
+                                page={safePage}
+                                onPageChange={handleChangePage}
+                                rowsPerPage={rowsPerPage}
+                                onRowsPerPageChange={handleChangeRowsPerPage}
+                                rowsPerPageOptions={[10, 25, 50, 100, { label: 'All', value: -1 }]}
+                            />
+                        )}
                     </>
                 )}
             </Paper>

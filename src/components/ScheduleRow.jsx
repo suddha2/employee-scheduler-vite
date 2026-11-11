@@ -100,7 +100,7 @@ const ScheduleRow = memo(({
                   }}
                 >
                   <Typography variant="caption" fontWeight="bold" display="block">
-                    {format(parseLocalDate(assignment.shift.shiftStart), "MMM d")}
+                    {format(parseLocalDate(assignment.shift.shiftStart), "dd/MM")}
                   </Typography>
                   <Typography variant="caption" display="block" color="text.secondary">
                     {assignment.shift.shiftTemplate.startTime.slice(0, 5)}-
