@@ -8,6 +8,7 @@ import { Save as SaveIcon } from '@mui/icons-material';
 import axiosInstance from './axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
 import { locationHelpers, WHOLE_SERVICE_HINT } from '../utils/locationOptions';
+import { breakProblems, refusalText } from '../utils/breakRules';
 
 const DAYS = [
   ['MONDAY', 'Mon'], ['TUESDAY', 'Tue'], ['WEDNESDAY', 'Wed'], ['THURSDAY', 'Thu'],
@@ -38,7 +39,7 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
   const [location, setLocation] = useState('');
 
   const [skillOptions, setSkillOptions] = useState([]);
-  // grid: { [code]: { days:Set<string>, startTime, endTime, empCount, requiredGender, requiredSkills } }
+  // grid: { [code]: { days:Set<string>, startTime, endTime, breakMinutes, empCount, requiredGender, requiredSkills } }
   const [grid, setGrid] = useState({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -75,7 +76,7 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
   useEffect(() => {
     setResult(null);
     const empty = {};
-    shiftTypes.forEach((t) => { empty[t.code] = { days: new Set(), startTime: '', endTime: '', empCount: 1, requiredGender: 'ANY', requiredSkills: [] }; });
+    shiftTypes.forEach((t) => { empty[t.code] = { days: new Set(), startTime: '', endTime: '', breakMinutes: 0, empCount: 1, requiredGender: 'ANY', requiredSkills: [] }; });
     if (!location) { setGrid(empty); return; }
     setLoading(true);
     axiosInstance.get(API_ENDPOINTS.shiftTemplatesByLocation(location), { params: { active: true } })
@@ -83,7 +84,7 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
         const g = empty;
         (r.data || []).forEach((tpl) => {
           const code = tpl.shiftType; // JSON key is the code
-          if (!g[code]) g[code] = { days: new Set(), startTime: '', endTime: '', empCount: 1, requiredGender: 'ANY', requiredSkills: [] };
+          if (!g[code]) g[code] = { days: new Set(), startTime: '', endTime: '', breakMinutes: 0, empCount: 1, requiredGender: 'ANY', requiredSkills: [] };
           // Gender/skills: shown from the type's first existing template; saving applies them to every ticked day.
           if (!g[code].loadedReqs) {
             g[code].requiredGender = tpl.requiredGender || 'ANY';
@@ -93,6 +94,7 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
           if (tpl.dayOfWeek) g[code].days.add(tpl.dayOfWeek);
           if (!g[code].startTime && tpl.startTime) g[code].startTime = hhmm(tpl.startTime);
           if (!g[code].endTime && tpl.endTime) g[code].endTime = hhmm(tpl.endTime);
+          if (!g[code].loadedBreak) { g[code].breakMinutes = tpl.breakMinutes ?? 0; g[code].loadedBreak = true; }
           if (tpl.empCount) g[code].empCount = tpl.empCount;
           if (tpl.pairingMode === 'STANDALONE') g[code].ownCarer = true;
         });
@@ -122,7 +124,13 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
     const r = grid[code]; if (!r) return false;
     return r.days.size > 0 && (!r.startTime || !r.endTime || Number(r.empCount) < 1);
   };
-  const anyInvalid = shiftTypes.some((t) => invalidRow(t.code));
+  // Statutory break and daily-limit checks for a ticked row (the server refuses the save otherwise).
+  const rowIssues = (t) => {
+    const r = grid[t.code];
+    if (!r || r.days.size === 0) return [];
+    return breakProblems({ startTime: r.startTime, endTime: r.endTime, breakMinutes: r.breakMinutes, shiftType: t.code }, t);
+  };
+  const anyInvalid = shiftTypes.some((t) => invalidRow(t.code) || rowIssues(t).length > 0);
   const canSave = region && location && !anyInvalid && !saving && !loading;
 
   const save = async () => {
@@ -135,6 +143,7 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
           days: [...r.days],
           startTime: r.startTime || null,
           endTime: r.endTime || null,
+          breakMinutes: Number(r.breakMinutes) || 0,
           empCount: Number(r.empCount) || 1,
           requiredGender: r.requiredGender || 'ANY',
           requiredSkills: r.requiredSkills || [],
@@ -146,7 +155,7 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
       setResult(res.data);
       if (onSaved) onSaved(res.data);
     } catch (e) {
-      setError(e.response?.data?.error || e.message || 'Save failed');
+      setError(refusalText(e, e.message || 'Save failed'));
     } finally {
       setSaving(false);
     }
@@ -155,7 +164,7 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
   return (
     <Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Pick a service, then tick the days each shift type runs and set its times/headcount. Ticks reflect what
+        Pick a service, then tick the days each shift type runs and set its times, unpaid break (minutes) and headcount. Ticks reflect what
         already exists; saving creates ticked cells, updates changed ones and removes unticked ones. Rate comes from
         the shift type. A follower shift (e.g. a sleep-in) takes its leader shift's carer when both are ticked on the
         same day — tick "Own carer" on the follower row if the package needs a different person.
@@ -199,6 +208,7 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
                 <TableCell />
                 <TableCell>Start</TableCell>
                 <TableCell>End</TableCell>
+                <TableCell sx={{ width: 90 }}>Break (min)</TableCell>
                 <TableCell sx={{ width: 80 }}>Count</TableCell>
                 <TableCell sx={{ minWidth: 110 }}>Gender</TableCell>
                 <TableCell sx={{ minWidth: 220 }}>Skills required</TableCell>
@@ -206,8 +216,9 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
             </TableHead>
             <TableBody>
               {shiftTypes.map((t) => {
-                const r = grid[t.code] || { days: new Set(), startTime: '', endTime: '', empCount: 1, requiredGender: 'ANY', requiredSkills: [] };
+                const r = grid[t.code] || { days: new Set(), startTime: '', endTime: '', breakMinutes: 0, empCount: 1, requiredGender: 'ANY', requiredSkills: [] };
                 const active = r.days.size > 0;
+                const issues = rowIssues(t);
                 return (
                   <TableRow key={t.code} hover>
                     <TableCell>
@@ -224,6 +235,9 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
                           </Typography>
                         </Tooltip>
                       )}
+                      {issues.map((p) => (
+                        <Typography key={p} variant="caption" color="error" display="block" sx={{ maxWidth: 260 }}>{p}</Typography>
+                      ))}
                     </TableCell>
                     {DAYS.map(([d]) => (
                       <TableCell key={d} align="center" sx={{ px: 0.5 }}>
@@ -240,6 +254,9 @@ export default function ShiftTemplateGrid({ initialRegion = '', initialLocation 
                       error={active && !r.startTime} onChange={(e) => setField(t.code, 'startTime', e.target.value)} /></TableCell>
                     <TableCell><TextField type="time" size="small" value={r.endTime} disabled={!active}
                       error={active && !r.endTime} onChange={(e) => setField(t.code, 'endTime', e.target.value)} /></TableCell>
+                    <TableCell><TextField type="number" size="small" value={r.breakMinutes} disabled={!active}
+                      error={issues.length > 0} inputProps={{ min: 0, step: 5, style: { width: 64 } }}
+                      onChange={(e) => setField(t.code, 'breakMinutes', e.target.value)} /></TableCell>
                     <TableCell><TextField type="number" size="small" value={r.empCount} disabled={!active}
                       inputProps={{ min: 1, style: { width: 56 } }} onChange={(e) => setField(t.code, 'empCount', e.target.value)} /></TableCell>
                     <TableCell>

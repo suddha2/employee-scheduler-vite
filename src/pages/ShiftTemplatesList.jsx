@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePersistedState, getSharedRegion, setSharedRegion } from '../hooks/usePersistedState';
 
-const BLANK_FILTERS = { region: '', location: '', shiftType: '', dayOfWeek: '', showInactive: false };
+const BLANK_FILTERS = { region: '', location: '', shiftType: '', dayOfWeek: '', showInactive: false, needsFix: false };
 import {
     Box,
     Paper,
@@ -26,18 +26,21 @@ import {
     InputLabel,
     Select,
     MenuItem,
-    TextField
+    TextField,
+    Tooltip
 } from '@mui/material';
 import {
     Edit as EditIcon,
     Delete as DeleteIcon,
     Add as AddIcon,
     Visibility as VisibilityIcon,
-    VisibilityOff as VisibilityOffIcon
+    VisibilityOff as VisibilityOffIcon,
+    ErrorOutline as ErrorOutlineIcon
 } from '@mui/icons-material';
 import axiosInstance from '../components/axiosInstance';
 import { API_ENDPOINTS } from '../api/endpoint';
 import { useAuth } from '../contexts/AuthContext';
+import { breakProblems, refusalText } from '../utils/breakRules';
 
 const ShiftTemplatesList = () => {
     const navigate = useNavigate();
@@ -60,7 +63,7 @@ const ShiftTemplatesList = () => {
         ...BLANK_FILTERS,
         region: getSharedRegion(),
     }));
-    const hasFilters = !!(filters.region || filters.location || filters.shiftType || filters.dayOfWeek || filters.showInactive);
+    const hasFilters = !!(filters.region || filters.location || filters.shiftType || filters.dayOfWeek || filters.showInactive || filters.needsFix);
 
     const [regions, setRegions] = useState([]);
     // Data-driven: loaded from GET /api/shift-types (all, incl. inactive — old
@@ -111,7 +114,7 @@ const ShiftTemplatesList = () => {
 
     useEffect(() => {
         applyFilters();
-    }, [templates, filters]);
+    }, [templates, filters, typeByCode]);
 
     // A remembered region that no longer exists falls back to All.
     useEffect(() => {
@@ -152,8 +155,17 @@ const ShiftTemplatesList = () => {
         }
     };
 
+    // Active templates that fail the save checks (statutory break, daily limit). They keep
+    // working until edited, but can't be saved again until fixed.
+    const typeByCode = useMemo(() => Object.fromEntries(shiftTypes.map((t) => [t.code, t])), [shiftTypes]);
+    const issuesOf = (t) => breakProblems(t, typeByCode[t.shiftType]);
+
     const applyFilters = () => {
         let filtered = [...templates];
+
+        if (filters.needsFix) {
+            filtered = filtered.filter((t) => issuesOf(t).length > 0);
+        }
 
         // Filter by active status
         if (!filters.showInactive) {
@@ -207,7 +219,7 @@ const ShiftTemplatesList = () => {
             fetchTemplates();
         } catch (err) {
             console.error('Failed to toggle active status:', err);
-            setError('Failed to update template. Please try again.');
+            setError(refusalText(err, 'Failed to update template. Please try again.'));
         }
     };
 
@@ -322,12 +334,32 @@ const ShiftTemplatesList = () => {
                         {filters.showInactive ? 'Showing All' : 'Active Only'}
                     </Button>
 
+                    <Button
+                        variant={filters.needsFix ? 'contained' : 'outlined'}
+                        color="error"
+                        onClick={() => setFilters({ ...filters, needsFix: !filters.needsFix })}
+                        startIcon={<ErrorOutlineIcon />}
+                    >
+                        Needs fixing
+                    </Button>
+
                     {hasFilters && (
                         <Button color="error" onClick={() => setFilters(BLANK_FILTERS)}>
                             Clear filters
                         </Button>
                     )}
                 </Box>
+
+                {(() => {
+                    const n = filteredTemplates.filter((t) => issuesOf(t).length > 0).length;
+                    return n > 0 && !filters.needsFix ? (
+                        <Alert severity="warning" sx={{ mb: 2 }}>
+                            {n} active template{n === 1 ? '' : 's'} here can't be saved until fixed: no statutory break,
+                            or more hours than the shift type allows in a day. They keep working until edited.
+                            Use "Needs fixing" to list them.
+                        </Alert>
+                    ) : null;
+                })()}
 
                 {/* Table */}
                 <TableContainer>
@@ -391,8 +423,18 @@ const ShiftTemplatesList = () => {
                                                 </TableCell>
                                                 <TableCell>
                                                     {formatTime(template.startTime)} - {formatTime(template.endTime)}
+                                                    <Typography variant="caption" color="text.secondary" display="block">
+                                                        {template.breakMinutes ? `${template.breakMinutes} min break` : 'No break'}
+                                                    </Typography>
                                                 </TableCell>
-                                                <TableCell>{template.totalHours || '-'}</TableCell>
+                                                <TableCell>
+                                                    {template.totalHours || '-'}
+                                                    {issuesOf(template).length > 0 && (
+                                                        <Tooltip title={issuesOf(template).join(' ')}>
+                                                            <ErrorOutlineIcon color="error" fontSize="small" sx={{ ml: 0.5, verticalAlign: 'middle' }} />
+                                                        </Tooltip>
+                                                    )}
+                                                </TableCell>
                                                 <TableCell>{template.empCount}</TableCell>
                                                 <TableCell>{template.priority}</TableCell>
                                                 <TableCell>

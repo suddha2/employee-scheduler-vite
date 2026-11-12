@@ -34,6 +34,7 @@ import axiosInstance from '../components/axiosInstance';
 import ShiftTemplateGrid from '../components/ShiftTemplateGrid';
 import { API_ENDPOINTS } from '../api/endpoint';
 import { getChangedFields } from '../utils/shiftTemplateDiff';
+import { breakProblems, fmtHM, workedMinutes, refusalText } from '../utils/breakRules';
 import { validateShiftTemplate } from '../utils/shiftTemplateValidation';
 import { locationHelpers, WHOLE_SERVICE_HINT } from '../utils/locationOptions';
 
@@ -50,9 +51,8 @@ const ShiftTemplateForm = () => {
         daysOfWeek: [],
         startTime: '',
         endTime: '',
-        breakStart: '',
-        breakEnd: '',
-        totalHours: '',
+        // Unpaid break in minutes; worked hours = (end - start) - break.
+        breakMinutes: 0,
         // 'ANY' = no preference. Never blank: a blank gender used to make the solver
         // treat every carer as a mismatch and leave the slot empty.
         requiredGender: 'ANY',
@@ -173,9 +173,7 @@ const ShiftTemplateForm = () => {
                 daysOfWeek: template.dayOfWeek ? [template.dayOfWeek] : [],
                 startTime: template.startTime || '',
                 endTime: template.endTime || '',
-                breakStart: template.breakStart || '',
-                breakEnd: template.breakEnd || '',
-                totalHours: template.totalHours || '',
+                breakMinutes: template.breakMinutes ?? 0,
                 requiredGender: template.requiredGender || 'ANY',
                 pairingMode: template.pairingMode || '',
                 requiredSkills: template.requiredSkills || [],
@@ -248,6 +246,10 @@ const ShiftTemplateForm = () => {
     const leaderType = shiftTypes.find((t) => t.code === selectedType?.defaultPairsWith);
     const leaderName = leaderType?.displayName || selectedType?.defaultPairsWith || 'its leader shift';
 
+    // Statutory break and daily-limit checks, previewed as you type; saving is blocked until they pass.
+    const breakIssues = breakProblems(formData, selectedType);
+    const worked = workedMinutes(formData.startTime, formData.endTime, formData.breakMinutes);
+
     const handleChange = (field) => (event) => {
         setFormData({
             ...formData,
@@ -263,6 +265,10 @@ const ShiftTemplateForm = () => {
 
         if (!validate()) {
             setError('Please fix the validation errors before submitting.');
+            return;
+        }
+        if (breakIssues.length > 0) {
+            setError("This shift can't be saved until the break and hours are fixed.");
             return;
         }
 
@@ -290,7 +296,7 @@ const ShiftTemplateForm = () => {
                 pairingMode: isFollowerType ? (formData.pairingMode || null) : null,
                 empCount: parseInt(formData.empCount),
                 priority: parseInt(formData.priority),
-                totalHours: formData.totalHours ? parseFloat(formData.totalHours) : null
+                breakMinutes: parseInt(formData.breakMinutes, 10) || 0
             };
 
             if (isEditMode && bulkEditMode && affectedTemplates.length > 1) {
@@ -307,9 +313,7 @@ const ShiftTemplateForm = () => {
                         updates: {
                             startTime: formData.startTime,
                             endTime: formData.endTime,
-                            breakStart: formData.breakStart || null,
-                            breakEnd: formData.breakEnd || null,
-                            totalHours: payload.totalHours,
+                            breakMinutes: payload.breakMinutes,
                             requiredGender: formData.requiredGender || null,
                             requiredSkills: formData.requiredSkills,
                             empCount: payload.empCount,
@@ -336,7 +340,7 @@ const ShiftTemplateForm = () => {
             }
         } catch (err) {
             console.error('Failed to save shift template:', err);
-            setError(err.response?.data?.message || 'Failed to save shift template. Please try again.');
+            setError(refusalText(err, 'Failed to save shift template. Please try again.'));
         } finally {
             setSaving(false);
             setConfirmDialogOpen(false);
@@ -625,35 +629,32 @@ const ShiftTemplateForm = () => {
                         <Grid item xs={12} md={3}>
                             <TextField
                                 fullWidth
-                                label="Break Start"
-                                type="time"
-                                value={formData.breakStart}
-                                onChange={handleChange('breakStart')}
-                                InputLabelProps={{ shrink: true }}
+                                label="Break (minutes)"
+                                type="number"
+                                value={formData.breakMinutes}
+                                onChange={handleChange('breakMinutes')}
+                                inputProps={{ step: 5, min: 0 }}
+                                helperText="Unpaid break, taken off worked hours"
                             />
                         </Grid>
 
                         <Grid item xs={12} md={3}>
                             <TextField
                                 fullWidth
-                                label="Break End"
-                                type="time"
-                                value={formData.breakEnd}
-                                onChange={handleChange('breakEnd')}
-                                InputLabelProps={{ shrink: true }}
+                                label="Worked hours"
+                                value={formData.startTime && formData.endTime ? fmtHM(worked) : ''}
+                                InputProps={{ readOnly: true }}
+                                helperText="End − start − break"
                             />
                         </Grid>
 
-                        <Grid item xs={12} md={4}>
-                            <TextField
-                                fullWidth
-                                label="Total Hours"
-                                type="number"
-                                value={formData.totalHours}
-                                onChange={handleChange('totalHours')}
-                                inputProps={{ step: '0.25', min: '0' }}
-                            />
-                        </Grid>
+                        {breakIssues.length > 0 && (
+                            <Grid item xs={12}>
+                                <Alert severity="error">
+                                    {breakIssues.map((p) => <div key={p}>{p}</div>)}
+                                </Alert>
+                            </Grid>
+                        )}
                     </Grid>
 
                     {/* Requirements */}
@@ -737,7 +738,7 @@ const ShiftTemplateForm = () => {
                             type="submit"
                             variant="contained"
                             color={bulkEditMode ? "warning" : "primary"}
-                            disabled={saving}
+                            disabled={saving || (formData.active && breakIssues.length > 0)}
                             startIcon={saving && <CircularProgress size={20} />}
                         >
                             {saving 

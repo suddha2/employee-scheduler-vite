@@ -20,25 +20,11 @@ export function getChangedFields(formData, originalFormData) {
       to: formData.endTime,
     });
   }
-  if (formData.breakStart !== originalFormData.breakStart) {
+  if (String(formData.breakMinutes ?? 0) !== String(originalFormData.breakMinutes ?? 0)) {
     changes.push({
-      field: 'Break Start',
-      from: originalFormData.breakStart || 'None',
-      to: formData.breakStart || 'None',
-    });
-  }
-  if (formData.breakEnd !== originalFormData.breakEnd) {
-    changes.push({
-      field: 'Break End',
-      from: originalFormData.breakEnd || 'None',
-      to: formData.breakEnd || 'None',
-    });
-  }
-  if (formData.totalHours !== originalFormData.totalHours) {
-    changes.push({
-      field: 'Total Hours',
-      from: originalFormData.totalHours || 'Auto',
-      to: formData.totalHours || 'Auto',
+      field: 'Break (minutes)',
+      from: originalFormData.breakMinutes || 'None',
+      to: formData.breakMinutes || 'None',
     });
   }
   if (formData.empCount !== originalFormData.empCount) {
