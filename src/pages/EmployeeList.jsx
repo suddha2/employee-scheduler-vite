@@ -124,6 +124,14 @@ export default function EmployeeList() {
             filtered = filtered.filter(emp => emp.gender === filterGender);
         }
 
+        // The server's order shifts whenever an employee is saved, so rows jumped around.
+        // First name, then last name, then id so equal names keep a stable order.
+        const byName = (a, b) => (a || '').localeCompare(b || '', 'en', { sensitivity: 'base' });
+        filtered.sort((a, b) =>
+            byName(a.firstName?.trim(), b.firstName?.trim())
+            || byName(a.lastName?.trim(), b.lastName?.trim())
+            || (a.id ?? 0) - (b.id ?? 0));
+
         return filtered;
     }, [allEmployees, searchTerm, filterRegion, filterContractType, filterGender]);
 
