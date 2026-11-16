@@ -74,6 +74,11 @@ const ShiftTemplatesList = () => {
         shiftTypes.forEach((t) => { m[t.code] = t.displayName || t.code; });
         return (code) => m[code] || (code || '').replace(/_/g, ' ');
     }, [shiftTypes]);
+    // Active templates that fail the save checks (statutory break, daily limit). They keep
+    // working until edited, but can't be saved again until fixed. Declared before the
+    // filter effect below, which lists typeByCode as a dependency.
+    const typeByCode = useMemo(() => Object.fromEntries(shiftTypes.map((t) => [t.code, t])), [shiftTypes]);
+    const issuesOf = (t) => breakProblems(t, typeByCode[t.shiftType]);
     const daysOfWeek = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
     // Rank lookup so we can sort rows by day-of-week in calendar order
     // rather than the alphabetical default a string sort would give.
@@ -154,11 +159,6 @@ const ShiftTemplatesList = () => {
             setLoading(false);
         }
     };
-
-    // Active templates that fail the save checks (statutory break, daily limit). They keep
-    // working until edited, but can't be saved again until fixed.
-    const typeByCode = useMemo(() => Object.fromEntries(shiftTypes.map((t) => [t.code, t])), [shiftTypes]);
-    const issuesOf = (t) => breakProblems(t, typeByCode[t.shiftType]);
 
     const applyFilters = () => {
         let filtered = [...templates];
